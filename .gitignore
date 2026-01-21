@@ -6,6 +6,8 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+.vscode
+__pycache__
 
 # Fichier de config personnel
 config.ini
