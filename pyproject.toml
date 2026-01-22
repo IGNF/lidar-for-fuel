@@ -1,0 +1,26 @@
+[project]lidarforfuel_industrialisation"
+dynamic = ["version"]
+description = "Industrialization code R LidarForFuel"
+readme = "README.md"
+authors = [{ name = "Malvina Dupays", email = "malvina.dupays@ign.fr" }]
+
+[tool.setuptools.dynamic]
+version = { attr = "lidarforfuel._version.__version__" }
+[tool.setuptools]
+packages = ["lidarforfuel"]
+
+[tool.black]
+line-length = 119
+include = '\.pyi?$'
+exclude = '''
+/(
+  \.toml
+  |\.sh
+  |\.git
+  |\.ini
+  |\.bat
+  | data
+)/
+
+[tool.isort]
+profile = "black"
