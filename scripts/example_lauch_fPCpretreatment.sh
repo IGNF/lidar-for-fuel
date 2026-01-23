@@ -1,0 +1,5 @@
+# For lauching fPCpretrreatment
+python -m lidarforfuel.main_fPCpretreatment \
+  io.input_dir=./tests/pointcloud/ \
+  io.input_filename=test_data_0000_0000_LA93_IGN69.laz  \
+  io.output_dir=./tmp/
