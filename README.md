@@ -30,11 +30,41 @@ This library can be used in different ways:
 * `tests/`: scripts and instructions for running tests;
 * `README.md`: this file
 
-## Contacts 
+
+# Dev / Build
+
+## Contribute
+
+Every time the code is changed, think of updating the version file: [lidarforfuel/_version.py](lidarforfuel/_version.py`)
+
+Please log your changes in [CHANGELOG.md](CHANGELOG.md)
+
+Before committing your changes, run the precommit hooks. They can be installed to run automatically with `make install-precommit`
+
+## Tests
+
+Create the conda environment: `make install`
+
+Run unit tests: `make testing`
+
+## Pip package
+
+To generate a pip package and deploy it on pypi, use the [Makefile](Makefile) at the root of the repo:
+
+* `make build`: build the library
+* `make install`: install the library in an editable way (`pip -e`)
+* `make deploy` : deploy it on pypi
+
+## Docker image
+
+To build a docker image with the library installed: `make docker-build`
+
+To test the docker image: `make docker-test`
+
+
+# Contacts 
 
 
 |Nom|Prénom|mail|fonction|
 |---|---|---|---|
-|   |   |   |   |
-|   |   |   |   |
-|   |   |   |   |
+|DUPAYS|Malvina|malvina.dupays@ign.fr|DSI IGN|

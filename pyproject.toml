@@ -1,4 +1,5 @@
-[project]lidarforfuel_industrialisation"
+[project]
+name= "lidarforfuel_industrialisation"
 dynamic = ["version"]
 description = "Industrialization code R LidarForFuel"
 readme = "README.md"
@@ -21,6 +22,4 @@ exclude = '''
   |\.bat
   | data
 )/
-
-[tool.isort]
-profile = "black"
+'''

@@ -11,8 +11,11 @@ venv.bak/
 .vscode
 __pycache__
 
-# Fichier de config personnel
+# Personal configuration file
 config.ini
 config_*.ini
 config-*.ini
 test.ini
+
+# Folders
+tmp/
