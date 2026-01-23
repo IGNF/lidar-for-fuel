@@ -15,6 +15,9 @@ dependencies:
   - lastools # for check that lasinfo warnings desapear when standardizing 
   - geopandas
   - matplotlib>=3.3.0 # Optional: for plotting histograms
+# --------- hydra configs --------- #
+  - hydra-core
+  - hydra-colorlog
 # --------- dev dep --------- #
   - pre-commit # hooks for applying linters on commit
   - black # code formatting
