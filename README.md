@@ -1,45 +1,36 @@
-# Modèle de ReadMe
+# LidarForFuel industrialiazation
 
-Ci-dessous une proposition de readme pour tout projet
-
-
-## Description/Résumé du projet
-
-Dans cette section, on décrit la vision générale du projet ainsi que ses objectifs à destination des futurs utilisateurs et des développeurs.
-
-Pour ce dépôt : 
-
-Ce dépôt permet de répertorier les différents éléments essentiels dans un dépôt SIDC :
-* ce ReadMe
-* des modèles de tickets type pour des ajouts de fonctionnalité, réparation de bug, ajout de documentation, maintenance/montée de version...
-* des milestones témoins (ex: backlog, sprint1...)
-* des exemples de github Actions CI/CD (lancement de test, build d'images...)
-* des exemples de label pour les futurs tickets
+This repo contains the code [lidarForFuel](https://github.com/oliviermartin7/LidarForFuel) written with R and developped by Olivier Martin : that code be re-written to accommodate specified changes to industralization.
 
 
-## Installation
+## Content
 
-La procédure d'installation du projet doit être décrite dans cette section ou dans un fichier complémentaire dont le lien est présent ici.
+lidarforfuel aims to compute fuel metrics from airborne LiDAR data and map them at a large scale. Currently, two R functions have been developed: 1) fPCpretreatment: pretreatment of a point cloud and 2) fCBDprofile_fuelmetrics: computing fuel metrics. These functions can be used either at the plot scale for specific analyses on small areas or at a large scale using a catalog of LiDAR tiles from the lidR package.
+
+![Illustration summarising the global approach!](img/readme_1_general.png)
+
+It is important to note that the function fCBDprofile_fuelmetrics for computing fuel metrics/profile needs as entry a pretreated point cloud obtained with the fPCpretreatment.
 
 
-## Documentation développeurs
 
-Lien vers la documentation pour les développeurs, à la fois pour maintenir le projet, le déployer et ajouter de nouvelles fonctionnalités. Schémas UML...
+# Installation / Usage
+
+This library can be used in different ways:
+* directly from sources: `make install` creates a mamba environment with the required dependencies
+* installed with `pip` from pypi: ` pip install lidarforfuel`
+* used in a docker container: see documentation [Dockerfile](Dockerfile)
+
+## Project tree
 
 
-## L'arborescence du projet
+* `.github/`: folder containing issue templates and GitHub Actions;
+* `.vscode/`: folder containing a VS Code configuration for the project;
+* `doc/`: folder containing documentation .md files (e.g., install.md);
+* `img/`: folder containing images;
+* `tests/`: scripts and instructions for running tests;
+* `README.md`: this file
 
-Exemple d'arborescence de projet :
-
-* `.github/` : dossier contenant les modèles d'issues et github actions ;
-* `.vscode/` : dossier contenant une configuration vscode pour le projet;
-* `doc/` : dossier contenant des fichiers .md de documentation (ex: install.md) ;
-* `tests/`: scripts et explications pour lancer les tests ;
-* `README.md` : ce fichier
-
-## Contacts du projets
-
-Ici on met la liste des personnes qui travaillent sur ce projet et le maintiennent à jour.
+## Contacts 
 
 
 |Nom|Prénom|mail|fonction|
