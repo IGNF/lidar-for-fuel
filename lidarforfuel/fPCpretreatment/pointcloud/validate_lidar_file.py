@@ -4,7 +4,6 @@ LiDAR file validation utility.
 
 import os
 import logging
-from typing import Union
 
 try:
     import laspy
@@ -27,7 +26,12 @@ def check_lidar_file(input_file: str) -> "laspy.LasData":
         laspy.LasData: Loaded and validated LAS data.
 
     Raises:
-        ValueError, FileNotFoundError, ImportError, IOError.
+        ImportError: If the `laspy` library is not installed, or if a LAZ backend
+        (such as `lazrs`) is required but missing to decompress LAZ files.
+        ValueError : If the input path is not a non-empty string, or if the file
+        extension is not `.las` or `.laz`.
+        FileNotFoundError: If the input file does not exist at the given path.
+        IOError: If `laspy` fails to read the file due to I/O or data corruption issues.
     """
     if laspy is None:
         raise ImportError("Install laspy: pip install laspy")
