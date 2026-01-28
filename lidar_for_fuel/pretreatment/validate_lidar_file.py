@@ -1,9 +1,8 @@
 """
 LiDAR file validation utility.
 """
-
-import os
 import logging
+import os
 
 try:
     import laspy
@@ -39,7 +38,7 @@ def check_lidar_file(input_file: str) -> "laspy.LasData":
     # Path validation
     if not isinstance(input_file, str) or not input_file.strip():
         raise ValueError("Path must be a non-empty string")
-    
+
     if not os.path.exists(input_file):
         raise FileNotFoundError(f"File not found: {input_file}")
 
@@ -53,9 +52,7 @@ def check_lidar_file(input_file: str) -> "laspy.LasData":
     except LaspyException as e:
         error_msg = str(e)
         if any(kw in error_msg for kw in ["No LazBackend", "cannot decompress", "LazBackend"]):
-            raise ImportError(
-                f"LAZ error: {error_msg}\nInstall: pip install 'laspy[lazrs]' or 'lazrs'"
-            ) from e
+            raise ImportError(f"LAZ error: {error_msg}\nInstall: pip install 'laspy[lazrs]' or 'lazrs'") from e
         raise IOError(f"laspy read error: {error_msg}") from e
 
     # Conformity check
@@ -63,7 +60,7 @@ def check_lidar_file(input_file: str) -> "laspy.LasData":
     header_count = getattr(las.header, "point_count", None)
     if header_count and header_count != num_points:
         logger.warning("Header points mismatch: %s vs %s", header_count, num_points)
-    
+
     if num_points == 0:
         logger.warning("Empty file: %s", input_file)
 
