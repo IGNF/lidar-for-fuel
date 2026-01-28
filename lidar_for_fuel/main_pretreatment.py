@@ -3,19 +3,19 @@
 Main script for LiDAR file validation in fPC pretreatment pipeline.
 Validates single file or all files in directory.
 """
-import os
-import sys
+
 import logging
+import os
 
 import hydra
 from omegaconf import DictConfig
 
+from lidar_for_fuel.pretreatment.validate_lidar_file import check_lidar_file
+
 logger = logging.getLogger(__name__)
 
 
-from lidarforfuel.fPCpretreatment.pointcloud.validate_lidar_file import check_lidar_file
-
-@hydra.main(config_path="../configs/", config_name="configs_lidarforfuel.yaml", version_base="1.2")
+@hydra.main(config_path="../configs/", config_name="config.yaml", version_base="1.2")
 def main(config: DictConfig):
     """Normalize and add various attributes of the input LAS/LAZ file and save it as LAS file.
 
@@ -43,7 +43,6 @@ def main(config: DictConfig):
 
     # If input filename is not provided, lidro runs on the whole input_dir directory
     initial_las_filename = config.io.input_filename
-    
 
     def main_on_one_tile(filename):
         """Lauch main.py on one tile
@@ -58,14 +57,14 @@ def main(config: DictConfig):
         return las
 
     if initial_las_filename:
-        # Lauch creating mask by one tile:
+        # Launch pretreatment by one tile:
         las = main_on_one_tile(initial_las_filename)
         print(f"✅ SUCCESS: {len(las.points)} points loaded")
         print(f"   Version: {las.header.version}")
         print(f"   Point format: {las.header.point_format}")
 
     else:
-        # Lauch creating Mask Hydro tile by tile
+        # Lauch pretreatment tile by tile
         for file in os.listdir(input_dir):
             las = main_on_one_tile(file)
             print(f"✅ SUCCESS: {len(las.points)} points loaded")
@@ -75,4 +74,3 @@ def main(config: DictConfig):
 
 if __name__ == "__main__":
     main()
-
