@@ -19,9 +19,6 @@ install:
 ##############################
 
 testing:
-	python -m pytest ./test -s --log-cli-level DEBUG -m "not geopf"
-
-testing_full:
 	python -m pytest ./test -s --log-cli-level DEBUG
 
 install-precommit:

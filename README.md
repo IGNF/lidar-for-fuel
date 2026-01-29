@@ -17,7 +17,7 @@ It is important to note that the function fCBDprofile_fuelmetrics for computing 
 
 This library can be used in different ways:
 * directly from sources: `make install` creates a mamba environment with the required dependencies
-* installed with `pip` from pypi: ` pip install lidarforfuel`
+* installed with `pip` from pypi: ` pip install lidar_for_fuel`
 * used in a docker container: see documentation [Dockerfile](Dockerfile)
 
 ## Project tree
@@ -30,11 +30,41 @@ This library can be used in different ways:
 * `tests/`: scripts and instructions for running tests;
 * `README.md`: this file
 
-## Contacts 
+
+# Dev / Build
+
+## Contribute
+
+Every time the code is changed, think of updating the version file: [lidar_for_fuel/_version.py](lidar_for_fuel/_version.py`)
+
+Please log your changes in [CHANGELOG.md](CHANGELOG.md)
+
+To lint the code automatically on commit, install the precommit hooks with ```make install-precommit```
+
+## Tests
+
+Create the conda environment: `make install`
+
+Run unit tests: `make testing`
+
+## Pip package
+
+To generate a pip package and deploy it on pypi, use the [Makefile](Makefile) at the root of the repo:
+
+* `make build`: build the library
+* `make install`: update environment with mamba
+* `make deploy` : deploy it on pypi
+
+## Docker image
+
+To build a docker image with the library installed: `make docker-build`
+
+To test the docker image: `make docker-test`
+
+
+# Contacts 
 
 
 |Nom|Prénom|mail|fonction|
 |---|---|---|---|
-|   |   |   |   |
-|   |   |   |   |
-|   |   |   |   |
+|DUPAYS|Malvina|malvina.dupays@ign.fr|DSI IGN|
