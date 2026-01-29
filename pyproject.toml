@@ -1,14 +1,14 @@
 [project]
-name= "lidarforfuel_industrialisation"
+name= "lidar_for_fuel"
 dynamic = ["version"]
 description = "Industrialization code R LidarForFuel"
 readme = "README.md"
 authors = [{ name = "Malvina Dupays", email = "malvina.dupays@ign.fr" }]
 
 [tool.setuptools.dynamic]
-version = { attr = "lidarforfuel._version.__version__" }
+version = { attr = "lidar_forfuel._version.__version__" }
 [tool.setuptools]
-packages = ["lidarforfuel"]
+packages = ["lidar_for_fuel"]
 
 [tool.black]
 line-length = 119
