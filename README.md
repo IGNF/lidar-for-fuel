@@ -39,7 +39,7 @@ Every time the code is changed, think of updating the version file: [lidarforfue
 
 Please log your changes in [CHANGELOG.md](CHANGELOG.md)
 
-Before committing your changes, run the precommit hooks. They can be installed to run automatically with `make install-precommit`
+To lint the code automatically on commit, install the precommit hooks with ```make install-precommit```
 
 ## Tests
 
@@ -52,7 +52,7 @@ Run unit tests: `make testing`
 To generate a pip package and deploy it on pypi, use the [Makefile](Makefile) at the root of the repo:
 
 * `make build`: build the library
-* `make install`: install the library in an editable way (`pip -e`)
+* `make install`: update environment with mamba
 * `make deploy` : deploy it on pypi
 
 ## Docker image
