@@ -17,7 +17,7 @@ It is important to note that the function fCBDprofile_fuelmetrics for computing 
 
 This library can be used in different ways:
 * directly from sources: `make install` creates a mamba environment with the required dependencies
-* installed with `pip` from pypi: ` pip install lidarforfuel`
+* installed with `pip` from pypi: ` pip install lidar_for_fuel`
 * used in a docker container: see documentation [Dockerfile](Dockerfile)
 
 ## Project tree
@@ -35,7 +35,7 @@ This library can be used in different ways:
 
 ## Contribute
 
-Every time the code is changed, think of updating the version file: [lidarforfuel/_version.py](lidarforfuel/_version.py`)
+Every time the code is changed, think of updating the version file: [lidar_for_fuel/_version.py](lidar_for_fuel/_version.py`)
 
 Please log your changes in [CHANGELOG.md](CHANGELOG.md)
 
