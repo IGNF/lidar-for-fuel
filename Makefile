@@ -10,8 +10,11 @@ SHELL = /bin/bash
 ##############################
 # Install
 ##############################
+create-env:
+	mamba env create -n lidar_for_fuel -f environment.yml
+
 install:
-	mamba env update -n lidarforfuel -f environment.yml
+	mamba env update -n lidar_for_fuel -f environment.yml
 
 
 ##############################
@@ -26,36 +29,14 @@ install-precommit:
 
 
 ##############################
-# Build/deploy pip lib
-##############################
-
-deploy: check
-	twine upload dist/*
-
-check: dist/lidarforfuel*.tar.gz
-	twine check dist/*
-
-dist/lidarforfuel*.tar.gz:
-	python -m build
-
-build: clean
-	python -m build
-
-clean:
-	rm -rf tmp
-	rm -rf lidarforfuel.egg-info
-	rm -rf dist
-
-##############################
 # Build/deploy Docker image
 ##############################
-
 REGISTRY=ghcr.io
-IMAGE_NAME=lidarforfuel
+IMAGE_NAME=lidar_for_fuel
 NAMESPACE=ignf
-VERSION=`python -m lidarforfuel._version`
+VERSION=`python -m lidar_for_fuel._version`
 FULL_IMAGE_NAME=${REGISTRY}/${NAMESPACE}/${IMAGE_NAME}:${VERSION}
-DATA_DIR= `realpath ./data`
+DATA_DIR=`realpath ./data`
 
 
 docker-build:
