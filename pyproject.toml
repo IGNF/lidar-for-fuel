@@ -6,7 +6,7 @@ readme = "README.md"
 authors = [{ name = "Malvina Dupays", email = "malvina.dupays@ign.fr" }]
 
 [tool.setuptools.dynamic]
-version = { attr = "lidar_forfuel._version.__version__" }
+version = { attr = "lidar_for_fuel._version.__version__" }
 [tool.setuptools]
 packages = ["lidar_for_fuel"]
 
