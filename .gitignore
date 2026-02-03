@@ -9,6 +9,7 @@ ENV/
 env.bak/
 venv.bak/
 .vscode
+*.egg-info/
 __pycache__
 
 # Personal configuration file
