@@ -15,4 +15,5 @@ RUN mkdir tmp
 COPY lidar_for_fuel lidar_for_fuel
 COPY test test
 COPY data data
+COPY configs configs
 
