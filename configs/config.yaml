@@ -10,6 +10,13 @@ io:
   input_filename: null
   input_dir: null
   output_dir: null
+  # Spatial reference to use to override the one from input las.
+  spatial_reference: EPSG:2154
+
+pre_treatment: 
+  filter:
+    dimension: Classification
+    keep_values: [1, 2, 3, 4, 5, 9, 66]   # Classes to keep 
 
 hydra:
   output_subdir: null
