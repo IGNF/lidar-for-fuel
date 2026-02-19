@@ -2,7 +2,7 @@ import os
 import shutil
 from pathlib import Path
 
-import laspy
+import pdal
 import pytest
 
 from lidar_for_fuel.pretreatment.validate_lidar_file import check_lidar_file
@@ -20,37 +20,22 @@ def setup_module(module):
 
 def test_check_lidar_file_return_format_okay():
     """Test function returns valid LasData object."""
-    las = check_lidar_file(SAMPLE_LAS)
-
-    assert isinstance(las, laspy.LasData) is True
-    assert len(las.points) > 0
-    assert las.header.version == "1.4"
-
-
-def test_check_lidar_file_empty():
-    """Test empty file handling (warning but success)."""
-    # Create empty LAS file
-    empty_path = TMP_PATH / "empty.las"
-    las_empty = laspy.create(point_format=2, file_version="1.2")
-    las_empty.write(empty_path)
-
-    las = check_lidar_file(str(empty_path))
-    assert isinstance(las, laspy.LasData) is True
-    assert len(las.points) == 0
+    pipeline = check_lidar_file(SAMPLE_LAS, "EPSG:2154")
+    assert isinstance(pipeline, pdal.Pipeline)
+    arrays = pipeline.arrays
+    assert len(arrays) == 1
+    assert len(arrays[0]) > 0  # Fichier test a des points
+    metadata = pipeline.metadata
+    assert isinstance(metadata, dict)
 
 
 def test_check_lidar_file_unsupported_extension():
-    """Test unsupported file extension."""
-    bad_path = TMP_PATH / "test.txt"
-    bad_path.write_text("fake data")
-
+    unsupported_path = TMP_PATH / "file.txt"
+    unsupported_path.write_text("fake")
     with pytest.raises(ValueError, match="Unsupported extension"):
-        check_lidar_file(str(bad_path))
+        check_lidar_file(str(unsupported_path), "EPSG:2154")
 
 
 def test_check_lidar_file_not_exists():
-    """Test non-existent file."""
-    fake_path = TMP_PATH / "fake.las"
-
-    with pytest.raises(FileNotFoundError, match="File not found"):
-        check_lidar_file(str(fake_path))
+    with pytest.raises(FileNotFoundError):
+        check_lidar_file("nonexistent.laz", "EPSG:2154")

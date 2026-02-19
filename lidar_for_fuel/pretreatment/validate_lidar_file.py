@@ -4,36 +4,31 @@ LiDAR file validation utility.
 import logging
 import os
 
-try:
-    import laspy
-    from laspy.errors import LaspyException
-except Exception:
-    laspy = None
-    LaspyException = Exception
+import pdal
 
 logger = logging.getLogger(__name__)
 
 
-def check_lidar_file(input_file: str) -> "laspy.LasData":
+def check_lidar_file(input_file: str, spatial_ref: str) -> pdal.Pipeline:
     """
     Validate and load a LiDAR file (.las or .laz).
 
     Args:
         input_file: Path to .las or .laz file.
+        spatial_ref (str): spatial reference to use when reading las file.
 
     Returns:
-        laspy.LasData: Loaded and validated LAS data.
+        pdal.Pipeline: Loaded and validated PDAL Pipeline.
 
     Raises:
-        ImportError: If the `laspy` library is not installed, or if a LAZ backend
-        (such as `lazrs`) is required but missing to decompress LAZ files.
-        ValueError : If the input path is not a non-empty string, or if the file
-        extension is not `.las` or `.laz`.
+        ImportError: If the `pdal` library is not installed.
+        ValueError: If the input path is not a non-empty string, or if the file
+            extension is not `.las` or `.laz`.
         FileNotFoundError: If the input file does not exist at the given path.
-        IOError: If `laspy` fails to read the file due to I/O or data corruption issues.
+        IOError: If PDAL fails to read the file due to I/O or data corruption issues.
     """
-    if laspy is None:
-        raise ImportError("Install laspy: pip install laspy")
+    if pdal is None:
+        raise ImportError("Install pdal: pip install pdal")
 
     # Path validation
     if not isinstance(input_file, str) or not input_file.strip():
@@ -46,23 +41,20 @@ def check_lidar_file(input_file: str) -> "laspy.LasData":
     if ext not in (".las", ".laz"):
         raise ValueError(f"Unsupported extension: {ext}")
 
-    # Read with LAZ backend handling
+    # Read with pdal
     try:
-        las = laspy.read(input_file)
-    except LaspyException as e:
-        error_msg = str(e)
-        if any(kw in error_msg for kw in ["No LazBackend", "cannot decompress", "LazBackend"]):
-            raise ImportError(f"LAZ error: {error_msg}\nInstall: pip install 'laspy[lazrs]' or 'lazrs'") from e
-        raise IOError(f"laspy read error: {error_msg}") from e
+        pipeline = pdal.Pipeline() | pdal.Reader.las(filename=input_file, override_srs=spatial_ref, nosrs=True)
+        arrays = pipeline.arrays
+        if not arrays:
+            raise IOError("No points read from file")
+    except Exception as e:
+        raise IOError(f"PDAL read error: {str(e)}") from e
 
-    # Conformity check
-    num_points = len(las.points)
-    header_count = getattr(las.header, "point_count", None)
-    if header_count and header_count != num_points:
-        logger.warning("Header points mismatch: %s vs %s", header_count, num_points)
+    num_points = len(arrays[0])
 
     if num_points == 0:
         logger.warning("Empty file: %s", input_file)
 
     logger.info("✓ Valid LiDAR: %s (%s points)", input_file, num_points)
-    return las
+
+    return pipeline

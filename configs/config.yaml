@@ -13,10 +13,13 @@ io:
   # Spatial reference to use to override the one from input las.
   spatial_reference: EPSG:2154
 
-pre_treatment: 
+pretreatment: 
   filter:
     dimension: Classification
     keep_values: [1, 2, 3, 4, 5, 9, 66]   # Classes to keep 
+  filter_deviation:
+    gpstime_ref: "2011-09-14 01:46:40"
+    deviation_day: 14
 
 hydra:
   output_subdir: null
