@@ -5,6 +5,7 @@ from pathlib import Path
 
 import laspy
 import numpy as np
+import pdal
 
 from lidar_for_fuel.pretreatment.normalize_height_in_pointcloud import normalize_height
 
@@ -23,6 +24,7 @@ def setup_module(module):
 def test_normalize_height_in_pointcloud():
     """Test function produces valid normalized LasData object."""
     las_in = laspy.read(SAMPLE_LAS)
+    input_pipeline = pdal.Reader.las(filename=SAMPLE_LAS, override_srs="EPSG:2154", nosrs=True)
 
     gps_times = las_in.gps_time
     gps_median = np.nanmedian(gps_times)
@@ -39,9 +41,8 @@ def test_normalize_height_in_pointcloud():
     print("Classes uniques :", np.unique(classes))
 
     normalize_height(
-        SAMPLE_LAS,
+        input_pipeline,
         OUTPUT_LAS,
-        "EPSG:2154",
         "Classification",
         [1, 2, 3, 4, 5],
         height_filter=60.0,

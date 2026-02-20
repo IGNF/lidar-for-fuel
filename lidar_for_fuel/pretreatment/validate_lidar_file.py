@@ -44,6 +44,7 @@ def check_lidar_file(input_file: str, spatial_ref: str) -> pdal.Pipeline:
     # Read with pdal
     try:
         pipeline = pdal.Pipeline() | pdal.Reader.las(filename=input_file, override_srs=spatial_ref, nosrs=True)
+        pipeline.execute()
         arrays = pipeline.arrays
         if not arrays:
             raise IOError("No points read from file")
@@ -55,6 +56,6 @@ def check_lidar_file(input_file: str, spatial_ref: str) -> pdal.Pipeline:
     if num_points == 0:
         logger.warning("Empty file: %s", input_file)
 
-    logger.info("✓ Valid LiDAR: %s (%s points)", input_file, num_points)
+    logger.info("Valid LiDAR: %s (%s points)", input_file, num_points)
 
     return pipeline

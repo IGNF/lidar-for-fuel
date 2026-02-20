@@ -10,33 +10,32 @@ logger = logging.getLogger(__name__)
 
 
 def normalize_height(
-    input_file: str,
+    input_pipeline: pdal.Pipeline,
     output_file: str,
-    spatial_ref: str,
     filter_dimension: str,
     filter_values: List[int],
     height_filter: float = 60.0,
 ) -> None:
     """
-    Pre-filtering and Normalize heights using TIN on ground points.
+    Normalize heights using TIN on ground points where dtm_marker = 1,
+    but calculate HeightAboveGround for all points.
 
-    Stepas are :
+    Steps:
         1. Keep only points classified as 1-5 or 9.
-        2. Normalyze height
-        43 Remove points Z < height filter
+        2. Split pipeline: use points with dtm_marker = 1 for TIN.
+        3. Normalize height for all points using the TIN.
+        4. Remove points with HeightAboveGround < height_filter.
 
     Args:
-        input_file: Input LAS/LAZ path.
-        output_file: Output LAS/LAZ path.
-        spatial_ref (str): spatial reference to use when reading las file.
-        filter_dimension (str): Name of the dimension along which to filter input points
-        (keep empty to disable input filter).
+        input_pipeline (pdal.Pipeline): Executed PDAL Pipeline object.
+        output_file (str): Output LAS/LAZ path.
+        filter_dimension (str): Name of the dimension along which to filter input points.
         filter_values (List[int]): Values to keep for input points along filter_dimension.
-        height_filter: Value to remove points too high (60 m default)
+        height_filter (float): Value to remove points too high (60 m default)
 
     """
-    # Read with pdal
-    pipeline = pdal.Reader.las(filename=input_file, override_srs=spatial_ref, nosrs=True)
+    # Read pdal.Pipeline
+    pipeline = input_pipeline
 
     # Filter points by classification
     if filter_dimension and filter_values:

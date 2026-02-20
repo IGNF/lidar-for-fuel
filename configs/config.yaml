@@ -18,8 +18,9 @@ pretreatment:
     dimension: Classification
     keep_values: [1, 2, 3, 4, 5, 9, 66]   # Classes to keep 
   filter_deviation:
-    gpstime_ref: "2011-09-14 01:46:40"
     deviation_day: 14
+  filter_normalize:
+    height: 60
 
 hydra:
   output_subdir: null

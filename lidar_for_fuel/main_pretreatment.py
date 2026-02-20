@@ -10,7 +10,8 @@ import os
 import hydra
 from omegaconf import DictConfig
 
-from lidar_for_fuel.pretreatment.filter_deviation_day import run_filter_deviation_day
+from lidar_for_fuel.pretreatment.filter_deviation_day import filter_points_by_date
+from lidar_for_fuel.pretreatment.normalize_height_in_pointcloud import normalize_height
 from lidar_for_fuel.pretreatment.validate_lidar_file import check_lidar_file
 
 logger = logging.getLogger(__name__)
@@ -52,30 +53,34 @@ def main(config: DictConfig):
             filename (str): filename to the LAS file
         """
         tilename = os.path.splitext(filename)[0]  # filename to the LAS file
-        input_file = os.path.join(input_dir, filename)  # path to the LAS file
+        input_filename = os.path.join(input_dir, filename)  # path to the LAS file
+        srid = config.io.spatial_reference
         logging.info(f"\nCheck data of 1 for tile : {tilename}")
-        pipeline_check_lidar = check_lidar_file(input_file)
+        pipeline_check_lidar = check_lidar_file(input_filename, srid)
 
         logging.info(f"\nFilter deviation day of 1 for tile : {tilename}")
-        deviation_days = config.pretreatment.filter_deviation.deviation_day
-        gpstime_ref = config.pretreatment.filter_deviation.gpstime_ref
-        las = run_filter_deviation_day(pipeline_check_lidar, deviation_days, gpstime_ref)
+        deviation_days = config.pretreatment.filter_deviation.deviation_day  # deviation day
+        pipeline_filter_deviation_day = filter_points_by_date(pipeline_check_lidar, deviation_days)
+
+        logging.info(f"\nCalculate normalize of 1 for tile : {tilename}")
+        # Generate output filenames
+        output_dir = config.io.output_dir
+        output_path = os.path.join(output_dir, filename)
+        # Parameters
+        dimension = config.pretreatment.filter.dimension
+        classes = config.pretreatment.filter.keep_values
+        height_value = config.pretreatment.filter_normalize.height
+        las = normalize_height(pipeline_filter_deviation_day, output_path, dimension, classes, height_value)
         return las
 
     if initial_las_filename:
         # Launch pretreatment by one tile:
-        las = main_on_one_tile(initial_las_filename)
-        print(f"✅ SUCCESS: {len(las.points)} points loaded")
-        print(f"   Version: {las.header.version}")
-        print(f"   Point format: {las.header.point_format}")
+        main_on_one_tile(initial_las_filename)
 
     else:
         # Lauch pretreatment tile by tile
         for file in os.listdir(input_dir):
-            las = main_on_one_tile(file)
-            print(f"✅ SUCCESS: {len(las.points)} points loaded")
-            print(f"   Version: {las.header.version}")
-            print(f"   Point format: {las.header.point_format}")
+            main_on_one_tile(file)
 
 
 if __name__ == "__main__":

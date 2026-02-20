@@ -1,3 +1,9 @@
+# v1.0.0
+- Add function pretreatment : 
+    - check data, 
+    - filter by deviation day,
+    - calculate normalized height in pointcloud
+
 # v0.0.2
 - Add folder "configs" in Dockerfile
 
