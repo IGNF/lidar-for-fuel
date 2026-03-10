@@ -59,8 +59,9 @@ def main(config: DictConfig):
         pipeline_check_lidar = check_lidar_file(input_filename, srid)
 
         logging.info(f"\nFilter deviation day of 1 for tile : {tilename}")
-        deviation_days = config.pretreatment.filter_deviation.deviation_day  # deviation day
-        pipeline_filter_deviation_day = filter_points_by_date(pipeline_check_lidar, deviation_days)
+        deviation_days = config.pretreatment.filter_deviation.deviation_day
+        gpstime_ref_unix = config.pretreatment.filter_deviation.gpstime_ref_unix
+        pipeline_filter_deviation_day = filter_points_by_date(pipeline_check_lidar, deviation_days, gpstime_ref_unix)
 
         logging.info(f"\nCalculate normalize of 1 for tile : {tilename}")
         # Generate output filenames
