@@ -71,7 +71,11 @@ def main(config: DictConfig):
         dimension = config.pretreatment.filter.dimension
         classes = config.pretreatment.filter.keep_values
         height_value = config.pretreatment.filter_normalize.height
-        las = normalize_height(pipeline_filter_deviation_day, output_path, dimension, classes, height_value)
+        min_height = config.pretreatment.filter_normalize.min_height
+        use_dtm_marker = config.pretreatment.filter_normalize.use_dtm_marker
+        las = normalize_height(
+            pipeline_filter_deviation_day, output_path, dimension, classes, height_value, min_height, use_dtm_marker
+        )
         return las
 
     if initial_las_filename:
