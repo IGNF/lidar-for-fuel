@@ -1,10 +1,10 @@
-"""
-Keep points within a ±deviation_day window around the most densely sampled acquisition day.
-"""
+"""Keep points within a ±deviation_days window around the most densely sampled acquisition day."""
+
 import json
-import logging
-import math
-import warnings
+import logging                                         
+import math                                            
+import warnings                                        
+from datetime import datetime, timezone   
 
 import numpy as np
 import pdal
@@ -15,93 +15,36 @@ _SECONDS_PER_DAY = 86_400.0
 _EPSILON = 1e-3  # 1 ms — smaller than any realistic GpsTime resolution
 
 
-def gpstime_to_day_index(gpstime: np.ndarray, gpstime_ref_unix: float) -> np.ndarray:
-    """Convert a GpsTime array (relative seconds) to integer UTC day indices.
-
-    Each value is floored to midnight UTC, expressed as *days since the
-    UNIX epoch* (1970-01-01).
-
-    Args:
-        gpstime (np.ndarray): 1-D array of relative GPS timestamps (seconds).
-        gpstime_ref_unix (float): UNIX timestamp of the GPS reference epoch.
-
-    Returns:
-        np.ndarray: Integer array of shape ``(n,)`` with UNIX day indices.
-
-    """
-    unix_time = gpstime + gpstime_ref_unix
-    return np.floor(unix_time / _SECONDS_PER_DAY).astype(np.int64)
-
-
-def modal_day(day_index: np.ndarray) -> int:
-    """Return the UNIX day index of the most densely sampled calendar day.
-
-    Args:
-        day_index (np.ndarray): Integer array of UNIX day indices (one per point).
-
-    Returns:
-        int: UNIX day index of the mode.
-
-    """
-    unique_days, counts = np.unique(day_index, return_counts=True)
-    return int(unique_days[counts.argmax()])
-
-
-def compute_gpstime_window(
-    main_day: int,
-    deviation_day: int | float,
-    gpstime_ref_unix: float,
-) -> tuple[float, float]:
-    """Compute the GpsTime [t_min, t_max] filter window.
-
-    The window covers all calendar days in
-    ``[main_day - deviation_day, main_day + deviation_day]``.
-    ``t_max`` is nudged inward by ``_EPSILON`` so that a point landing
-    exactly on midnight of ``day_hi + 1`` is excluded.
-
-    Args:
-        main_day (int): UNIX day index of the modal acquisition day.
-        deviation_day (int | float): Half-width of the window in days.
-        gpstime_ref_unix (float): UNIX timestamp of the GPS reference epoch.
-
-    Returns:
-        tuple[float, float]: ``(t_min, t_max)`` in GpsTime space
-    """
-    day_lo = main_day - int(deviation_day)
-    day_hi = main_day + int(deviation_day)
-    t_min = max(day_lo, 0) * _SECONDS_PER_DAY - gpstime_ref_unix
-    t_max = (day_hi + 1) * _SECONDS_PER_DAY - gpstime_ref_unix - _EPSILON
-    return t_min, t_max
-
-
-def filter_points_by_date(
-    input_pipeline: pdal.Pipeline,
-    deviation_day: int | float,
-    gpstime_ref_unix: float,
+def filter_deviation_day(
+    pipeline: pdal.Pipeline,
+    deviation_days: int | float = 14,
+    gpstime_ref: str = "2011-09-14 01:46:40",
 ) -> pdal.Pipeline:
-    """
-    Filter a LiDAR point cloud, keeping only points acquired within
-    [main_day - deviation_day, main_day + deviation_day], where *main_day*
-    is the calendar day that contains the most points.
+    """Filter a LiDAR point cloud keeping only points acquired within ±deviation_days
+    around the most densely sampled calendar day.
+
+    Equivalent to the R function ``filter_date_mode()`` from lidR.
 
     Args:
-        input_pipeline (pdal.Pipeline): Executed PDAL Pipeline object.
-        deviation_day  (int | float): Number of days around the main acquisition day.
-                                    Pass ``math.inf`` to skip filtering entirely.
-        gpstime_ref_unix (float): UNIX timestamp (seconds since 1970-01-01 UTC)
+        pipeline (pdal.Pipeline): Executed PDAL Pipeline object.
+        deviation_days (int | float): Half-width of the retention window in days.
+            Pass ``math.inf`` to skip filtering entirely. Default: 14.
+        gpstime_ref (str): ISO-8601 UTC string of the GPS time reference epoch.
+            Default: "2011-09-14 01:46:40".
 
     Returns:
-        pdal.Pipeline: A new, configured-but-not-yet-executed PDAL Pipeline restricted to
-        the selected time window.
+        pdal.Pipeline: A new, configured-but-not-yet-executed PDAL Pipeline restricted
+        to the selected time window, or the original pipeline unchanged if
+        ``deviation_days`` is infinite.
 
     Raises:
-        ValueError: If the pipeline produced no arrays, if the point cloud
-            lacks a ``GpsTime`` dimension, or if ``deviation_day`` is negative.
+        ValueError: If the pipeline has no arrays, lacks a ``GpsTime`` dimension,
+            or if ``deviation_days`` is negative.
     """
-    if not math.isinf(deviation_day) and deviation_day < 0:
-        raise ValueError(f"deviation_day must be >= 0 or math.inf, got {deviation_day!r}")
+    if not math.isinf(deviation_days) and deviation_days < 0:
+        raise ValueError(f"deviation_days must be >= 0 or math.inf, got {deviation_days!r}")
 
-    arrays = input_pipeline.arrays
+    arrays = pipeline.arrays
     if not arrays:
         raise ValueError("No arrays produced by the pipeline.")
 
@@ -110,19 +53,28 @@ def filter_points_by_date(
     if "GpsTime" not in points.dtype.names:
         raise ValueError("Point cloud does not contain a 'GpsTime' dimension.")
 
-    if math.isinf(deviation_day):
-        logger.debug("deviation_day is Inf — no filtering applied.")
-        return input_pipeline
+    if math.isinf(deviation_days):
+        logger.debug("deviation_days is Inf — no filtering applied.")
+        return pipeline
 
+    gpstime_ref_unix = datetime.fromisoformat(gpstime_ref).replace(tzinfo=timezone.utc).timestamp()
     n_total = len(points)
 
-    day_index = gpstime_to_day_index(points["GpsTime"], gpstime_ref_unix)
-    main_day_idx = modal_day(day_index)
-    t_min, t_max = compute_gpstime_window(main_day_idx, deviation_day, gpstime_ref_unix)
-
+    # Convert GpsTime to absolute UNIX time and floor to calendar day
     unix_time = points["GpsTime"] + gpstime_ref_unix
-    day_lo = main_day_idx - int(deviation_day)
-    day_hi = main_day_idx + int(deviation_day)
+    day_index = np.floor(unix_time / _SECONDS_PER_DAY).astype(np.int64)
+
+    # Find the modal day (most abundantly sampled)
+    unique_days, counts = np.unique(day_index, return_counts=True)
+    modal_day = int(unique_days[counts.argmax()])
+
+    # Compute the GpsTime filter window [t_min, t_max]
+    day_lo = modal_day - int(deviation_days)
+    day_hi = modal_day + int(deviation_days)
+    t_min = max(day_lo, 0) * _SECONDS_PER_DAY - gpstime_ref_unix
+    t_max = (day_hi + 1) * _SECONDS_PER_DAY - gpstime_ref_unix - _EPSILON
+
+    # Warn about removed points
     n_retained = int(
         np.sum((unix_time >= max(day_lo, 0) * _SECONDS_PER_DAY) & (unix_time < (day_hi + 1) * _SECONDS_PER_DAY))
     )
@@ -131,21 +83,18 @@ def filter_points_by_date(
         warnings.warn(
             f"Careful {round(pct_removed)} % of the returns were removed because they had a "
             f"deviation of days around the most abundant date greater than your threshold "
-            f"({deviation_day} days).",
+            f"({deviation_days} days).",
             UserWarning,
             stacklevel=2,
         )
 
-    unique_days = np.unique(day_index)
     logger.debug(
-        "Main day index: %d | GpsTime window [%.1f, %.1f) | %d/%d days retained | %.1f %% points removed",
-        main_day_idx,
+        "Modal day: %d | GpsTime window [%.1f, %.1f] | %.1f%% points removed",
+        modal_day,
         t_min,
         t_max,
-        int(np.sum((unique_days >= day_lo) & (unique_days <= day_hi))),
-        len(unique_days),
         pct_removed,
     )
 
-    filter_pipeline_json = {"pipeline": [{"type": "filters.range", "limits": f"GpsTime[{t_min}:{t_max}]"}]}
-    return pdal.Pipeline(json.dumps(filter_pipeline_json), arrays=[points])
+    filter_json = {"pipeline": [{"type": "filters.range", "limits": f"GpsTime[{t_min}:{t_max}]"}]}
+    return pdal.Pipeline(json.dumps(filter_json), arrays=[points])

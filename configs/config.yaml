@@ -18,11 +18,11 @@ pretreatment:
     dimension: Classification
     keep_values: [1, 2, 3, 4, 5, 9, 66]   # Classes to keep 
   filter_deviation:
-    deviation_day: 14
-      # UNIX timestamp (seconds since 1970-01-01 UTC) corresponding to gpstime == 0.
-      # Default matches the R reference: as.POSIXct("2011-09-14 01:46:40") = 1315964800.0
+    deviation_days: 14
+      # ISO-8601 UTC string corresponding to gpstime == 0.
+      # Default matches the R reference: as.POSIXct("2011-09-14 01:46:40")
       # Override this value if your LiDAR data uses a different GPS time origin.
-    gpstime_ref_unix: 1315964800.0
+    gpstime_ref: "2011-09-14 01:46:40"
   filter_normalize:
     height: 60
 
