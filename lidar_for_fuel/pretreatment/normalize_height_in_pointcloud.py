@@ -20,7 +20,6 @@ def normalize_height(
     filter_values: List[int],
     height_filter: float = 60.0,
     min_height: float = -3.0,
-    use_dtm_marker: bool = False,
 ) -> None:
     """
     Normalize heights using a Delaunay TIN built from ground points, and write result.
@@ -30,35 +29,29 @@ def normalize_height(
         filter_poi((Classification <= 5 | Classification == 9) & Z < Height_filter)
 
     Steps:
-        1. Execute the input pipeline and filter points by filter_dimension/filter_values.
-        2. Build a Delaunay TIN from Class 2 ground points.
-           If use_dtm_marker=True, only Class 2 points with dtm_marker == 1 are used
-           (points used for the official IGN DTM).
+        1. Execute the input pipeline.
+        2. Build a Delaunay TIN from all points with dtm_marker == 1.
         3. Interpolate ground elevation for every point. Points outside the TIN convex
            hull are handled by nearest-neighbour extrapolation.
         4. Compute Z_ref = Z - interpolated_ground_Z.
-        5. Remove points outside [min_height, height_filter].
-        6. Write output LAS/LAZ with Z_ref as an extra dimension.
+        5. Filter points by filter_dimension/filter_values.
+        6. Remove points outside [min_height, height_filter].
+        7. Write output LAS/LAZ with Z_ref as an extra dimension.
 
     Args:
         input_pipeline (pdal.Pipeline): PDAL Pipeline object (may be unexecuted).
         output_file (str): Output LAS/LAZ path.
-        filter_dimension (str): Dimension name used to filter input points.
+        filter_dimension (str): Dimension name used to filter output points.
         filter_values (List[int]): Values to keep along filter_dimension.
         height_filter (float): Upper height threshold in metres (default: 60 m).
         min_height (float): Lower height threshold in metres (default: -3 m).
-        use_dtm_marker (bool): If True, build the TIN only from Class 2 points where
-            dtm_marker == 1 (requires dtm_marker extra dimension in the LAS file).
-            Default: False (all Class 2 points are used).
 
     Raises:
         ValueError: If the pipeline produces no arrays, or if there are fewer than
             3 ground points to build a TIN.
     """
-    # Filter points by classification and execute the pipeline
-    pipeline = input_pipeline
-    if filter_dimension and filter_values:
-        pipeline |= pdal.Filter.range(limits=",".join(f"{filter_dimension}[{v}:{v}]" for v in filter_values))
+    # Execute the pipeline on all points
+    pipeline = input_pipeline if isinstance(input_pipeline, pdal.Pipeline) else pdal.Pipeline() | input_pipeline
     pipeline.execute()
 
     arrays = pipeline.arrays
@@ -66,11 +59,9 @@ def normalize_height(
         raise ValueError("No arrays produced by the pipeline.")
     points = arrays[0]
 
-    # Select ground points for DTM computation
-    ground_mask = points["Classification"] == 2
-    if use_dtm_marker and "dtm_marker" in points.dtype.names:
-        ground_mask = ground_mask & (points["dtm_marker"] == 1)
-        logger.debug("use_dtm_marker=True: %d ground points with dtm_marker=1", int(ground_mask.sum()))
+    # Select ground points for DTM computation: all points with dtm_marker == 1
+    ground_mask = points["dtm_marker"] == 1
+    logger.debug("%d ground points with dtm_marker=1", int(ground_mask.sum()))
     ground_points = points[ground_mask]
 
     if len(ground_points) < 3:
@@ -102,6 +93,13 @@ def normalize_height(
 
     # Compute height above ground
     hag = points["Z"] - ground_z_interp
+
+    # Filter points by filter_dimension/filter_values
+    if filter_dimension and filter_values:
+        dim_mask = np.isin(points[filter_dimension], filter_values)
+        points = points[dim_mask]
+        hag = hag[dim_mask]
+        logger.debug("Dimension filter on %s %s: %d points kept", filter_dimension, filter_values, len(points))
 
     # Filter by height bounds [min_height, height_filter]
     valid = (hag >= min_height) & (hag <= height_filter)

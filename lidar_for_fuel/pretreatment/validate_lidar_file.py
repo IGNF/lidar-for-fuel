@@ -22,8 +22,9 @@ def check_lidar_file(input_file: str, spatial_ref: str) -> pdal.Pipeline:
 
     Raises:
         ImportError: If the `pdal` library is not installed.
-        ValueError: If the input path is not a non-empty string, or if the file
-            extension is not `.las` or `.laz`.
+        ValueError: If the input path is not a non-empty string, if the file
+            extension is not `.las` or `.laz`, or if the `dtm_marker` extra
+            dimension is missing.
         FileNotFoundError: If the input file does not exist at the given path.
         IOError: If PDAL fails to read the file due to I/O or data corruption issues.
     """
@@ -55,6 +56,9 @@ def check_lidar_file(input_file: str, spatial_ref: str) -> pdal.Pipeline:
 
     if num_points == 0:
         logger.warning("Empty file: %s", input_file)
+
+    if "dtm_marker" not in arrays[0].dtype.names:
+        raise ValueError(f"Missing extra dimension 'dtm_marker' in file: {input_file}")
 
     logger.info("Valid LiDAR: %s (%s points)", input_file, num_points)
 

@@ -8,7 +8,7 @@ import pytest
 from lidar_for_fuel.pretreatment.validate_lidar_file import check_lidar_file
 
 TMP_PATH = Path("./tmp/check_lidar")
-SAMPLE_LAS = "./data/pointcloud/test_data_0000_0000_LA93_IGN69.laz"
+SAMPLE_LAS = "./data/pointcloud/test_semis_2022_0897_6577_LA93_IGN69_decimation.laz"
 
 
 def setup_module(module):
@@ -39,3 +39,9 @@ def test_check_lidar_file_unsupported_extension():
 def test_check_lidar_file_not_exists():
     with pytest.raises(FileNotFoundError):
         check_lidar_file("nonexistent.laz", "EPSG:2154")
+
+
+def test_check_lidar_file_missing_dtm_marker():
+    """A LAS file without dtm_marker extra dimension must raise ValueError."""
+    with pytest.raises(ValueError, match="dtm_marker"):
+        check_lidar_file("./data/pointcloud/test_data_0000_0000_LA93_IGN69.laz", "EPSG:2154")

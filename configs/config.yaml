@@ -26,7 +26,6 @@ pretreatment:
   filter_normalize:
     height: 60
     min_height: -3
-    use_dtm_marker: false
 
 hydra:
   output_subdir: null

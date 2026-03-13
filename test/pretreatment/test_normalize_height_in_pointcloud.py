@@ -26,18 +26,20 @@ _LAS_DTYPE = np.dtype(
         ("ReturnNumber", np.uint8),
         ("NumberOfReturns", np.uint8),
         ("Classification", np.uint8),
+        ("dtm_marker", np.uint8),
     ]
 )
 
 
 def _make_synthetic_pipeline(rows: list) -> pdal.Pipeline:
-    """Build an unexecuted PDAL Pipeline from a list of (x, y, z, classification) tuples."""
+    """Build an unexecuted PDAL Pipeline from a list of (x, y, z, classification, dtm_marker) tuples."""
     pts = np.zeros(len(rows), dtype=_LAS_DTYPE)
-    for i, (x, y, z, c) in enumerate(rows):
+    for i, (x, y, z, c, dtm) in enumerate(rows):
         pts[i]["X"] = x
         pts[i]["Y"] = y
         pts[i]["Z"] = z
         pts[i]["Classification"] = c
+        pts[i]["dtm_marker"] = dtm
     return pdal.Pipeline(json.dumps({"pipeline": []}), arrays=[pts])
 
 
@@ -72,28 +74,6 @@ def test_normalize_height_in_pointcloud():
     assert np.all(las_out.Z_ref <= 60.0), "No points above height_filter threshold"
 
 
-def test_normalize_height_dtm_marker_preserves_classification():
-    """When use_dtm_marker=True, Classification must not be altered."""
-    normalize_height(
-        _make_pipeline(),
-        OUTPUT_DTM_MARKER,
-        "Classification",
-        [1, 2, 3, 4, 5],
-        height_filter=60.0,
-        min_height=-3.0,
-        use_dtm_marker=True,
-    )
-
-    las_out = laspy.read(OUTPUT_DTM_MARKER)
-    output_classes = np.array(las_out.classification)
-
-    # The test data has only classes [2, 3, 4, 5] — Class 1 must not appear
-    assert 1 not in output_classes, "Temporary reclassification leaked into output"
-    assert 2 in output_classes, "Ground points (Class 2) must be present in output"
-    assert np.all(las_out.Z_ref >= -3.0), "No points below min_height threshold"
-    assert np.all(las_out.Z_ref <= 60.0), "No points above height_filter threshold"
-
-
 def test_normalize_height_flat_ground():
     """On a flat ground at Z=100, Z_ref must equal Z - 100 for each non-ground point.
 
@@ -103,12 +83,12 @@ def test_normalize_height_flat_ground():
 
         Expected: Z_ref = Z - 100 (exactly, since the TIN reproduces a flat plane).
     """
-    ground = [(0, 0, 100, 2), (20, 0, 100, 2), (0, 20, 100, 2), (20, 20, 100, 2), (10, 10, 100, 2)]
-    # (x, y, z, class) — expected Z_ref in comment
+    ground = [(0, 0, 100, 2, 1), (20, 0, 100, 2, 1), (0, 20, 100, 2, 1), (20, 20, 100, 2, 1), (10, 10, 100, 2, 1)]
+    # (x, y, z, class, dtm_marker) — expected Z_ref in comment
     non_ground = [
-        (5, 5, 103, 3),  # Z_ref = 3.0
-        (10, 5, 105, 3),  # Z_ref = 5.0
-        (8, 8, 102, 3),  # Z_ref = 2.0
+        (5, 5, 103, 3, 0),  # Z_ref = 3.0
+        (10, 5, 105, 3, 0),  # Z_ref = 5.0
+        (8, 8, 102, 3, 0),  # Z_ref = 2.0
     ]
     expected_z_ref = np.array([3.0, 5.0, 2.0])
 
@@ -139,11 +119,11 @@ def test_normalize_height_sloped_ground():
         regardless of the (X, Y) position of the non-ground point.
     """
     known_height = 5.0
-    ground = [(0, 0, 0, 2), (20, 0, 20, 2), (0, 20, 0, 2), (20, 20, 20, 2), (10, 10, 10, 2)]
+    ground = [(0, 0, 0, 2, 1), (20, 0, 20, 2, 1), (0, 20, 0, 2, 1), (20, 20, 20, 2, 1), (10, 10, 10, 2, 1)]
     non_ground = [
-        (5, 5, 5 + known_height, 3),
-        (10, 5, 10 + known_height, 3),
-        (8, 8, 8 + known_height, 3),
+        (5, 5, 5 + known_height, 3, 0),
+        (10, 5, 10 + known_height, 3, 0),
+        (8, 8, 8 + known_height, 3, 0),
     ]
 
     normalize_height(
