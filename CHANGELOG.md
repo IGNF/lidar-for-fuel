@@ -1,4 +1,4 @@
-# v1.0.0
+# 
 - Add function pretreatment : 
     - check data, 
     - filter by deviation day,
