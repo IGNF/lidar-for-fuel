@@ -11,6 +11,9 @@ import hydra
 from omegaconf import DictConfig
 
 from lidar_for_fuel.pretreatment.filter_points_by_date import filter_by_date
+from lidar_for_fuel.pretreatment.filter_points_by_dimension_values import (
+    filter_by_dimension_values,
+)
 from lidar_for_fuel.pretreatment.validate_lidar_file import check_lidar_file
 
 logger = logging.getLogger(__name__)
@@ -60,7 +63,12 @@ def main(config: DictConfig):
         logging.info(f"\nFilter deviation day of 1 for tile : {tilename}")
         deviation_days = config.pretreatment.filter_date.deviation_days
         gpstime_ref = config.pretreatment.filter_date.gpstime_ref
-        las = filter_by_date(pipeline_check_lidar, deviation_days, gpstime_ref)
+        pipeline_filter_date = filter_by_date(pipeline_check_lidar, deviation_days, gpstime_ref)
+
+        logging.info(f"\nFilter dimension/values (classfication) of 1 for tile : {tilename}")
+        dimension = config.pretreatment.filter.dimension
+        values = config.pretreatment.filter.keep_values
+        las = filter_by_dimension_values(pipeline_filter_date, dimension, values)
 
         return las
 
