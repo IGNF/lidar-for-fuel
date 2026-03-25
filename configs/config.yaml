@@ -15,6 +15,9 @@ io:
 
 
 pretreatment: 
+  filter:
+    dimension: Classification
+    keep_values: [1, 2, 3, 4, 5, 9, 66]   # Classes to keep 
   filter_date:
     deviation_days: 14
       # ISO-8601 UTC string corresponding to gpstime == 0.
