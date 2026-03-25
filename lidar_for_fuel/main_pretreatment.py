@@ -51,25 +51,20 @@ def main(config: DictConfig):
             filename (str): filename to the LAS file
         """
         tilename = os.path.splitext(filename)[0]  # filename to the LAS file
-        input_file = os.path.join(input_dir, filename)  # path to the LAS file
-        logging.info(f"\nNormalize and add attributes  of 1 for tile : {tilename}")
-        las = check_lidar_file(input_file)
+        input_filename = os.path.join(input_dir, filename)  # path to the LAS file
+        srid = config.io.spatial_reference
+        logging.info(f"\nCheck data of 1 for tile : {tilename}")
+        las = check_lidar_file(input_filename, srid)
         return las
 
     if initial_las_filename:
         # Launch pretreatment by one tile:
-        las = main_on_one_tile(initial_las_filename)
-        print(f"✅ SUCCESS: {len(las.points)} points loaded")
-        print(f"   Version: {las.header.version}")
-        print(f"   Point format: {las.header.point_format}")
+        main_on_one_tile(initial_las_filename)
 
     else:
         # Lauch pretreatment tile by tile
         for file in os.listdir(input_dir):
-            las = main_on_one_tile(file)
-            print(f"✅ SUCCESS: {len(las.points)} points loaded")
-            print(f"   Version: {las.header.version}")
-            print(f"   Point format: {las.header.point_format}")
+            main_on_one_tile(file)
 
 
 if __name__ == "__main__":
