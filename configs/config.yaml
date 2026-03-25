@@ -10,6 +10,8 @@ io:
   input_filename: null
   input_dir: null
   output_dir: null
+  # Spatial reference to use to override the one from input las.
+  spatial_reference: EPSG:2154
 
 hydra:
   output_subdir: null
