@@ -10,6 +10,7 @@ import os
 import hydra
 from omegaconf import DictConfig
 
+from lidar_for_fuel.pretreatment.filter_points_by_date import filter_by_date
 from lidar_for_fuel.pretreatment.validate_lidar_file import check_lidar_file
 
 logger = logging.getLogger(__name__)
@@ -54,7 +55,13 @@ def main(config: DictConfig):
         input_filename = os.path.join(input_dir, filename)  # path to the LAS file
         srid = config.io.spatial_reference
         logging.info(f"\nCheck data of 1 for tile : {tilename}")
-        las = check_lidar_file(input_filename, srid)
+        pipeline_check_lidar = check_lidar_file(input_filename, srid)
+
+        logging.info(f"\nFilter deviation day of 1 for tile : {tilename}")
+        deviation_days = config.pretreatment.filter_date.deviation_days
+        gpstime_ref = config.pretreatment.filter_date.gpstime_ref
+        las = filter_by_date(pipeline_check_lidar, deviation_days, gpstime_ref)
+
         return las
 
     if initial_las_filename:
