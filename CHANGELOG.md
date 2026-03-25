@@ -1,3 +1,6 @@
+# 
+- Add function "check lidar data"
+
 # v0.0.2
 - Add folder "configs" in Dockerfile
 
