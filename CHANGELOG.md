@@ -1,12 +1,5 @@
-# v0.1.0
+# 
 - Add function "check lidar data"
-- Add function "filter by deviation day"
-- Add function "filter by dimension / values"
-- Add function "detect and remove outliers"
-- Add function "download DTM LIDAR HD from Geoplateforme"
-- Add function "normalize height"
-- ADD function "add trajectory"
-- Update version for cicc_deploy.yml
 
 # v0.0.2
 - Add folder "configs" in Dockerfile
