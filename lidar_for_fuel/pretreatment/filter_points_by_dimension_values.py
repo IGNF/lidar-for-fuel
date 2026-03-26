@@ -18,7 +18,7 @@ def filter_by_dimension_values(
     Filter points by filter_dimension/filter_values.
 
     Args:
-        input_pipeline (pdal.Pipeline): PDAL Pipeline object (may be unexecuted).
+        input_pipeline (pdal.Pipeline): Executed PDAL Pipeline object.
         filter_dimension (str): Dimension name used to filter output points.
         filter_values (List[int]): Values to keep along filter_dimension.
 
