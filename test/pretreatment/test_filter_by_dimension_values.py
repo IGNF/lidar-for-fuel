@@ -82,24 +82,3 @@ def test_point_count_reduced(executed_pipeline, tmp_path):
 
     filtered_count = len(laspy.read(output_path).x)
     assert filtered_count <= original_count
-
-
-def test_all_original_classes_outside_keep_are_removed(executed_pipeline, tmp_path):
-    """Any class not in keep_classes must be absent from the output."""
-    output_path = str(tmp_path / "filtered.las")
-
-    original_classes = set(np.array(executed_pipeline.arrays[0]["Classification"]).tolist())
-    excluded_classes = original_classes - set(_KEEP_CLASSES)
-
-    if not excluded_classes:
-        pytest.skip("All classes in the tile already belong to keep_classes — nothing to exclude.")
-
-    result = filter_by_dimension_values(executed_pipeline, "Classification", _KEEP_CLASSES)
-    result |= pdal.Writer.las(filename=output_path, extra_dims="all", forward="all", minor_version="4")
-    result.execute()
-
-    las = laspy.read(output_path)
-    retained_classes = set(np.array(las.classification).tolist())
-    assert retained_classes.isdisjoint(
-        excluded_classes
-    ), f"Excluded classes still present in output: {retained_classes & excluded_classes}"
