@@ -10,6 +10,7 @@ import os
 import hydra
 from omegaconf import DictConfig
 
+from lidar_for_fuel.pretreatment.filter_outliers import remove_outliers
 from lidar_for_fuel.pretreatment.filter_points_by_date import filter_by_date
 from lidar_for_fuel.pretreatment.filter_points_by_dimension_values import (
     filter_by_dimension_values,
@@ -68,7 +69,12 @@ def main(config: DictConfig):
         logging.info(f"\nFilter dimension/values (classfication) of 1 for tile : {tilename}")
         dimension = config.pretreatment.filter.dimension
         values = config.pretreatment.filter.keep_values
-        las = filter_by_dimension_values(pipeline_filter_date, dimension, values)
+        pipeline_filter_dimension = filter_by_dimension_values(pipeline_filter_date, dimension, values)
+
+        logging.info(f"\nFilter outliers of 1 for tile : {tilename}")
+        mean_k = config.pretreatment.filter_outlier.mean_k
+        multiplier = config.pretreatment.filter_outlier.multiplier
+        las = remove_outliers(pipeline_filter_dimension, mean_k, multiplier)
 
         return las
 
