@@ -4,7 +4,11 @@ import laspy
 import numpy as np
 import pdal
 
+<<<<<<< HEAD:test/preprocessing/test_filter_outliers.py
 from lidar_for_fuel.preprocessing.filter_outliers import remove_outliers
+=======
+from lidar_for_fuel.pretreatment.filter_outliers import remove_outliers
+>>>>>>> 447cd2a (add function : detect and remove outliers):test/pretreatment/test_filter_outliers.py
 
 _LAS_DTYPE = np.dtype(
     [
