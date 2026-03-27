@@ -3,6 +3,7 @@
 - Add function "filter by deviation day"
 - Add function "filter by dimension / values"
 - Add function "detect and remove outliers"
+- Add function "download DTM LIDAR HD from Geoplateforme"
 
 # v0.0.2
 - Add folder "configs" in Dockerfile
