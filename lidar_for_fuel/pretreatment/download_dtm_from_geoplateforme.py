@@ -1,5 +1,5 @@
 """
-Download MNT LiDAR HD from IGN Géoplateforme for a given LiDAR tile.
+Download DTM LiDAR HD from IGN Géoplateforme for a given LiDAR tile.
 
 Dataset: https://cartes.gouv.fr/rechercher-une-donnee/dataset/IGNF_MNT-LIDAR-HD
 WMS flux: https://data.geopf.fr/wms-r/wms?service=wms&version=1.3.0&request=GetCapabilities
@@ -47,7 +47,7 @@ def download_dtm(
     timeout: int = 60,
 ) -> str:
     """
-    Download the MNT LiDAR HD from IGN Géoplateforme for the given LiDAR tile.
+    Download the DTM LiDAR HD from IGN Géoplateforme for the given LiDAR tile.
 
     The bounding box (minx, maxx, miny, maxy) is read directly from the LAS
     header via pdaltools.las_info, avoiding any dependency on the filename format.
@@ -55,17 +55,17 @@ def download_dtm(
     Args:
         tile_path (str): Path to the LiDAR tile (LAS/LAZ).
         layer (str): which kind of image is downloaded (IGNF_LIDAR-HD_MNT_ELEVATION)
-        output_dir (str): Directory where the MNT GeoTIFF is saved.
+        output_dir (str): Directory where the DTM GeoTIFF is saved.
         epsg (int): EPSG code of the coordinate reference system. Default: 2154
             (Lambert 93).
         tile_width (int): Tile size in metres. Default: 1000 (LiDAR HD tiles
             are 1 km × 1 km).
         resolution (float): Pixel size in metres. Default: 0.5 m (native
-            resolution of the LiDAR HD MNT).
+            resolution of the LiDAR HD DTM).
         timeout (int): Delay after which the request is canceled (in seconds) Default: 60.
 
     Returns:
-        str: Absolute path to the downloaded MNT GeoTIFF.
+        str: Absolute path to the downloaded DTM GeoTIFF.
 
     Raises:
         requests.HTTPError: If the WMS request fails.
@@ -84,7 +84,7 @@ def download_dtm(
     url = URL_GPP + "LAYERS=" + layer + URL_FORMAT + URL_EPSG + URL_BBOX + URL_SIZE
 
     logger.info(
-        "Downloading MNT for tile '%s' — bbox=[%s, %s, %s, %s]",
+        "Downloading DTM for tile '%s' — bbox=[%s, %s, %s, %s]",
         Path(tile_path).name,
         minx,
         miny,
