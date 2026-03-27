@@ -7,6 +7,7 @@ dependencies:
   - geopandas
   - conda-forge:pdal>=2.9.*
   - conda-forge:python-pdal>=3.4
+  - rasterio
 # --------- hydra configs --------- #
   - hydra-core
   - hydra-colorlog
@@ -20,3 +21,4 @@ dependencies:
   - pip:
     # Install laspy with laszip laz compression (as laszip is an implementation of the laz 1.4 standard)
     - laspy[lazrs]  # Installed via pip because laszip is not handled by the conda package.
+    - ign-pdal-tools  # IGN tools for LiDAR HD 
