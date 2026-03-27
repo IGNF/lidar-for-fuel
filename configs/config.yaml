@@ -13,7 +13,10 @@ io:
   # Spatial reference to use to override the one from input las.
   spatial_reference: EPSG:2154
 
-
+tile_geometry:
+  tile_coord_scale: 1000  # coords in tile names are in km
+  tile_width: 1000
+ 
 pretreatment: 
   filter:
     dimension: Classification
@@ -27,6 +30,12 @@ pretreatment:
   filter_outlier:
     mean_k: 5
     multiplier: 10
+
+dtm:
+  download:
+    resolution: 0.5 # Pixel size in metres
+    dtm_layer : "IGNF_LIDAR-HD_MNT_ELEVATION.ELEVATIONGRIDCOVERAGE.LAMB93"
+  output_subfolder: "DTM"
 
 hydra:
   output_subdir: null
