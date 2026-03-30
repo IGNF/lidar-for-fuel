@@ -8,6 +8,7 @@ dependencies:
   - conda-forge:pdal>=2.9.*
   - conda-forge:python-pdal>=3.4
   - rasterio
+  - gdal
 # --------- hydra configs --------- #
   - hydra-core
   - hydra-colorlog
