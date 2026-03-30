@@ -9,9 +9,13 @@ dependencies:
   - conda-forge:python-pdal>=3.4
   - rasterio
 <<<<<<< HEAD
+<<<<<<< HEAD
   - gdal
 =======
 >>>>>>> cef44e0 (add function : download DTM from geoservice)
+=======
+  - gdal
+>>>>>>> a4aaed8 (add GDAL environment)
 # --------- hydra configs --------- #
   - hydra-core
   - hydra-colorlog
