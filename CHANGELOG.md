@@ -4,6 +4,7 @@
 - Add function "filter by dimension / values"
 - Add function "detect and remove outliers"
 - Add function "download DTM LIDAR HD from Geoplateforme"
+- Add function "Normalize height"
 
 # v0.0.2
 - Add folder "configs" in Dockerfile

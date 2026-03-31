@@ -10,11 +10,14 @@ import os
 import hydra
 from omegaconf import DictConfig
 
+from lidar_for_fuel.commons import commons
+from lidar_for_fuel.pretreatment.download_dtm_from_geoplateforme import download_dtm
 from lidar_for_fuel.pretreatment.filter_outliers import remove_outliers
 from lidar_for_fuel.pretreatment.filter_points_by_date import filter_by_date
 from lidar_for_fuel.pretreatment.filter_points_by_dimension_values import (
     filter_by_dimension_values,
 )
+from lidar_for_fuel.pretreatment.normalize_height_by_points import add_Zref
 from lidar_for_fuel.pretreatment.validate_lidar_file import check_lidar_file
 
 logger = logging.getLogger(__name__)
@@ -46,7 +49,13 @@ def main(config: DictConfig):
 
     os.makedirs(output_dir, exist_ok=True)
 
-    # If input filename is not provided, lidro runs on the whole input_dir directory
+    output_dtm_dir = os.path.join(output_dir, config.dtm.output_subfolder)
+    if output_dtm_dir is None:
+        raise ValueError("""config.io.output_dtm_dir is empty""")
+
+    os.makedirs(output_dtm_dir, exist_ok=True)
+
+    # If input filename is not provided, runs on the whole input_dir directory
     initial_las_filename = config.io.input_filename
 
     def main_on_one_tile(filename):
@@ -58,8 +67,22 @@ def main(config: DictConfig):
         tilename = os.path.splitext(filename)[0]  # filename to the LAS file
         input_filename = os.path.join(input_dir, filename)  # path to the LAS file
         srid = config.io.spatial_reference
+
+        # Generate output filenames : DTM
+        _size = commons.give_name_resolution_raster(config.dtm.download.resolution)
+        geotiff_stem = f"{tilename}{_size}"
+        geotiff_filename = f"{geotiff_stem}.tif"
+        geotiff_path = os.path.join(output_dtm_dir, geotiff_filename)
+
         logging.info(f"\nCheck data of 1 for tile : {tilename}")
         pipeline_check_lidar = check_lidar_file(input_filename, srid)
+
+        logging.info(f"\nDownload DTM of 1 for tile : {tilename}")
+        dtm_layer = config.dtm.download.dtm_layer
+        tile_width = config.tile_geometry.tile_width
+        resolution = config.dtm.download.resolution
+        timeout = config.dtm.download.timeout
+        download_dtm(input_filename, dtm_layer, geotiff_path, srid, tile_width, resolution, timeout)
 
         logging.info(f"\nFilter deviation day of 1 for tile : {tilename}")
         deviation_days = config.pretreatment.filter_date.deviation_days
@@ -70,6 +93,10 @@ def main(config: DictConfig):
         dimension = config.pretreatment.filter.dimension
         values = config.pretreatment.filter.keep_values
         pipeline_filter_dimension = filter_by_dimension_values(pipeline_filter_date, dimension, values)
+
+        logging.info(f"\nNormalize height of 1 for tile : {tilename}")
+        nodata_value = config.dtm.nodata_value
+        las = add_Zref(pipeline_filter_dimension, geotiff_path, nodata_value)
 
         logging.info(f"\nFilter outliers of 1 for tile : {tilename}")
         mean_k = config.pretreatment.filter_outlier.mean_k
