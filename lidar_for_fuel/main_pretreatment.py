@@ -92,7 +92,8 @@ def main(config: DictConfig):
 
         logging.info(f"\nNormalize height of 1 for tile : {tilename}")
         nodata_value = config.dtm.nodata_value
-        las = add_Zref(pipeline_filter_dimension, geotiff_path, nodata_value)
+        height_filter = config.pretreatment.normalize.height_filter
+        las = add_Zref(pipeline_filter_dimension, geotiff_path, nodata_value, height_filter)
 
         logging.info(f"\nFilter outliers of 1 for tile : {tilename}")
         mean_k = config.pretreatment.filter_outlier.mean_k
