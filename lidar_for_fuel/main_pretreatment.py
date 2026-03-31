@@ -10,7 +10,6 @@ import os
 import hydra
 from omegaconf import DictConfig
 
-from lidar_for_fuel.commons import commons
 from lidar_for_fuel.pretreatment.download_dtm_from_geoplateforme import download_dtm
 from lidar_for_fuel.pretreatment.filter_outliers import remove_outliers
 from lidar_for_fuel.pretreatment.filter_points_by_date import filter_by_date
@@ -68,12 +67,6 @@ def main(config: DictConfig):
         input_filename = os.path.join(input_dir, filename)  # path to the LAS file
         srid = config.io.spatial_reference
 
-        # Generate output filenames : DTM
-        _size = commons.give_name_resolution_raster(config.dtm.download.resolution)
-        geotiff_stem = f"{tilename}{_size}"
-        geotiff_filename = f"{geotiff_stem}.tif"
-        geotiff_path = os.path.join(output_dtm_dir, geotiff_filename)
-
         logging.info(f"\nCheck data of 1 for tile : {tilename}")
         pipeline_check_lidar = check_lidar_file(input_filename, srid)
 
@@ -82,7 +75,10 @@ def main(config: DictConfig):
         tile_width = config.tile_geometry.tile_width
         resolution = config.dtm.download.resolution
         timeout = config.dtm.download.timeout
-        download_dtm(input_filename, dtm_layer, geotiff_path, srid, tile_width, resolution, timeout)
+        epsg = config.dtm.download.epsg
+        geotiff_path = download_dtm(
+            filename, input_dir, dtm_layer, output_dtm_dir, epsg, tile_width, resolution, timeout
+        )
 
         logging.info(f"\nFilter deviation day of 1 for tile : {tilename}")
         deviation_days = config.pretreatment.filter_date.deviation_days
