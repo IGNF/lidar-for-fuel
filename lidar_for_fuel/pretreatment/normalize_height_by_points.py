@@ -25,6 +25,7 @@ def add_Zref(
     input_pipeline: pdal.Pipeline,
     dtm_path: str,
     nodata_value: float = -9999,
+    height_filter: float = 80,
 ) -> pdal.Pipeline:
     """
     Add Z_ref = Z - Z_sol to each LiDAR point using bilinear interpolation on a DTM.
@@ -39,6 +40,8 @@ def add_Zref(
             resolution 0.5 m, EPSG:2154).
         nodata_value (float): Value assigned to Z_ref for points on NoData DTM pixels
             or outside the DTM extent. Default: -9999 (from config dtm.nodata_value).
+        height_filter (float): Height limit (in metres) to remove noise points above
+            the canopy. Points with Z_ref > height_filter are removed. Default: 80.
 
     Returns:
         pdal.Pipeline: Unexecuted pipeline with Z_ref (float64) added as an
@@ -97,5 +100,12 @@ def add_Zref(
 
     # Append Z_ref as extra dimension
     points_with_zref = rfn.append_fields(points, "Z_ref", z_ref, dtypes=np.float64, usemask=False)
+
+    # Remove points too low (<-3) or too high (>height_filter m)
+    mask = (points_with_zref["Z_ref"] >= -3) & (points_with_zref["Z_ref"] <= height_filter)
+    n_removed = int((~mask).sum())
+    if n_removed:
+        logger.debug("%d points removed by Z_ref filter [-3, %s]", n_removed, height_filter)
+    points_with_zref = points_with_zref[mask]
 
     return pdal.Pipeline(json.dumps({"pipeline": []}), arrays=[points_with_zref])

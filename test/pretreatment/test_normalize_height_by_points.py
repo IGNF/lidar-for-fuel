@@ -3,7 +3,6 @@ from pathlib import Path
 
 import numpy as np
 import pdal
-import pytest
 import rasterio
 from rasterio.transform import from_bounds
 
@@ -99,19 +98,61 @@ def test_zref_flat_dtm(tmp_path):
 
 
 def test_zref_nodata_pixel(tmp_path):
-    """Points on NoData pixels receive Z_ref = nodata_value."""
+    """Points on NoData pixels are removed by the Z_ref filter (Z_ref=nodata_value < -3)."""
     data = np.full((_DTM_HEIGHT, _DTM_WIDTH), _GROUND_Z)
     data[5, 5] = _DTM_NODATA  # pixel (row=5, col=5) → centre at x=5.5, y=4.5
     dtm = _make_dtm(tmp_path / "dtm_nodata.tif", data)
 
     result = add_Zref(_make_pipeline([(5.5, 4.5, 110.0)]), dtm, nodata_value=_NODATA_VALUE)
     result.execute()
-    assert result.arrays[0]["Z_ref"][0] == pytest.approx(_NODATA_VALUE)
+    assert len(result.arrays[0]) == 0
 
 
 def test_zref_outside_extent(tmp_path):
-    """Points outside the DTM extent receive Z_ref = nodata_value."""
+    """Points outside the DTM extent are removed by the Z_ref filter (Z_ref=nodata_value < -3)."""
     dtm = _make_flat_dtm(tmp_path / "dtm.tif")
     result = add_Zref(_make_pipeline([(999.0, 999.0, 110.0)]), dtm, nodata_value=_NODATA_VALUE)
     result.execute()
-    assert result.arrays[0]["Z_ref"][0] == pytest.approx(_NODATA_VALUE)
+    assert len(result.arrays[0]) == 0
+
+
+def test_height_filter_removes_high_points(tmp_path):
+    """Points with Z_ref > height_filter are removed."""
+    dtm = _make_flat_dtm(tmp_path / "dtm.tif")
+    # Z_ref = 5.0 (kept), 85.0 (removed with default 80), 50.0 (kept)
+    points = [(5.5, 4.5, 105.0), (2.5, 7.5, 185.0), (8.5, 1.5, 150.0)]
+
+    result = add_Zref(_make_pipeline(points), dtm)
+    result.execute()
+    z_ref = result.arrays[0]["Z_ref"]
+
+    assert len(z_ref) == 2
+    np.testing.assert_allclose(sorted(z_ref), [5.0, 50.0], atol=1e-3)
+
+
+def test_height_filter_removes_low_points(tmp_path):
+    """Points with Z_ref < -3 are removed."""
+    dtm = _make_flat_dtm(tmp_path / "dtm.tif")
+    # Z_ref = -5.0 (removed), 5.0 (kept)
+    points = [(5.5, 4.5, 95.0), (2.5, 7.5, 105.0)]
+
+    result = add_Zref(_make_pipeline(points), dtm)
+    result.execute()
+    z_ref = result.arrays[0]["Z_ref"]
+
+    assert len(z_ref) == 1
+    np.testing.assert_allclose(z_ref[0], 5.0, atol=1e-3)
+
+
+def test_height_filter_custom(tmp_path):
+    """Custom height_filter value is respected."""
+    dtm = _make_flat_dtm(tmp_path / "dtm.tif")
+    # Z_ref = 5.0 (kept), 15.0 (removed with height_filter=10)
+    points = [(5.5, 4.5, 105.0), (2.5, 7.5, 115.0)]
+
+    result = add_Zref(_make_pipeline(points), dtm, height_filter=10)
+    result.execute()
+    z_ref = result.arrays[0]["Z_ref"]
+
+    assert len(z_ref) == 1
+    np.testing.assert_allclose(z_ref[0], 5.0, atol=1e-3)
