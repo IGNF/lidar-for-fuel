@@ -30,6 +30,8 @@ pretreatment:
   filter_outlier:
     mean_k: 5
     multiplier: 10
+  normalize:
+    height_filter: 80
 
 dtm:
   download:
