@@ -7,12 +7,15 @@ WMS flux: https://data.geopf.fr/wms-r/wms?service=wms&version=1.3.0&request=GetC
 The tile bounding box is read directly from the LAS header using ign-pdaltools
 """
 import logging
+import os
 from pathlib import Path
 
 import numpy as np
 import requests
 from pdaltools.las_info import get_bounds_from_header_info, las_info_metadata
 from rasterio.io import MemoryFile
+
+from lidar_for_fuel.commons import commons
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +41,8 @@ def is_dtm_nodata(content: bytes) -> bool:
 
 
 def download_dtm(
-    tile_path: str,
+    tilename: str,
+    input_dir: str,
     layer: str,
     output_dir: str,
     epsg: int = 2154,
@@ -53,7 +57,8 @@ def download_dtm(
     header via pdaltools.las_info, avoiding any dependency on the filename format.
 
     Args:
-        tile_path (str): Path to the LiDAR tile (LAS/LAZ).
+        tilename (str): Filename of the LiDAR tile (LAS/LAZ), without directory.
+        input_dir (str): Directory where the LiDAR tiles are stored.
         layer (str): which kind of image is downloaded (IGNF_LIDAR-HD_MNT_ELEVATION)
         output_dir (str): Directory where the DTM GeoTIFF is saved.
         epsg (int): EPSG code of the coordinate reference system. Default: 2154
@@ -70,6 +75,7 @@ def download_dtm(
     Raises:
         requests.HTTPError: If the WMS request fails.
     """
+    tile_path = os.path.join(input_dir, tilename)
     metadata = las_info_metadata(tile_path)
     minx, maxx, miny, maxy = get_bounds_from_header_info(metadata)
 
@@ -85,7 +91,7 @@ def download_dtm(
 
     logger.info(
         "Downloading DTM for tile '%s' — bbox=[%s, %s, %s, %s]",
-        Path(tile_path).name,
+        tilename,
         minx,
         miny,
         maxx,
@@ -99,7 +105,12 @@ def download_dtm(
     if is_dtm_nodata(response.content):
         raise ValueError(f"Downloaded DTM contains only uniform values (nodata): {layer}")
 
-    output_path = Path(output_dir) / f"{Path(tile_path).stem}.tif"
+    # Generate output filename : DTM
+    _size = commons.give_name_resolution_raster(resolution)
+    geotiff_stem = f"{Path(tilename).stem}{_size}"
+    geotiff_filename = f"{geotiff_stem}.tif"
+
+    output_path = Path(output_dir) / geotiff_filename
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_bytes(response.content)
 
