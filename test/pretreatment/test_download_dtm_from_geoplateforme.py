@@ -24,9 +24,7 @@ def test_download_dtm():
     # File exists and has the expected name
     assert Path(output_path).exists(), "Output DTM file was not created"
     assert Path(output_path).suffix == ".tif", "Output file should be a GeoTIFF"
-    assert Path(output_path).stem.startswith(
-        Path(SAMPLE_TILENAME).stem
-    ), "Output stem should start with input tile stem"
+    assert Path(output_path).stem == Path(SAMPLE_TILENAME).stem, "Output stem should match input tile stem"
 
     # File is a readable raster with varying elevation values
     with rasterio.open(output_path) as src:
