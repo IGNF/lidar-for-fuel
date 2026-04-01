@@ -6,6 +6,7 @@ Validates single file or all files in directory.
 
 import logging
 import os
+import tempfile
 
 import hydra
 from omegaconf import DictConfig
@@ -48,12 +49,6 @@ def main(config: DictConfig):
 
     os.makedirs(output_dir, exist_ok=True)
 
-    output_dtm_dir = os.path.join(output_dir, config.dtm.output_subfolder)
-    if output_dtm_dir is None:
-        raise ValueError("""config.io.output_dtm_dir is empty""")
-
-    os.makedirs(output_dtm_dir, exist_ok=True)
-
     # If input filename is not provided, runs on the whole input_dir directory
     initial_las_filename = config.io.input_filename
 
@@ -76,10 +71,6 @@ def main(config: DictConfig):
         resolution = config.dtm.download.resolution
         timeout = config.dtm.download.timeout
         epsg = config.dtm.download.epsg
-        geotiff_path = download_dtm(
-            filename, input_dir, dtm_layer, output_dtm_dir, epsg, tile_width, resolution, timeout
-        )
-
         logging.info(f"\nFilter deviation day of 1 for tile : {tilename}")
         deviation_days = config.pretreatment.filter_date.deviation_days
         gpstime_ref = config.pretreatment.filter_date.gpstime_ref
@@ -93,7 +84,11 @@ def main(config: DictConfig):
         logging.info(f"\nNormalize height of 1 for tile : {tilename}")
         nodata_value = config.dtm.nodata_value
         height_filter = config.pretreatment.normalize.height_filter
-        las = add_Zref(pipeline_filter_dimension, geotiff_path, nodata_value, height_filter)
+        with tempfile.TemporaryDirectory() as tmp_dtm_dir:
+            geotiff_path = download_dtm(
+                filename, input_dir, dtm_layer, tmp_dtm_dir, epsg, tile_width, resolution, timeout
+            )
+            las = add_Zref(pipeline_filter_dimension, geotiff_path, nodata_value, height_filter)
 
         logging.info(f"\nFilter outliers of 1 for tile : {tilename}")
         mean_k = config.pretreatment.filter_outlier.mean_k
