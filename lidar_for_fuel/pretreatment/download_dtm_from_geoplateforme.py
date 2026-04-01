@@ -15,8 +15,6 @@ import requests
 from pdaltools.las_info import get_bounds_from_header_info, las_info_metadata
 from rasterio.io import MemoryFile
 
-from lidar_for_fuel.commons import commons
-
 logger = logging.getLogger(__name__)
 
 
@@ -105,11 +103,7 @@ def download_dtm(
     if is_dtm_nodata(response.content):
         raise ValueError(f"Downloaded DTM contains only uniform values (nodata): {layer}")
 
-    # Generate output filename : DTM
-    _size = commons.give_name_resolution_raster(resolution)
-    geotiff_stem = f"{Path(tilename).stem}{_size}"
-    geotiff_filename = f"{geotiff_stem}.tif"
-
+    geotiff_filename = f"{Path(tilename).stem}.tif"
     output_path = Path(output_dir) / geotiff_filename
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_bytes(response.content)
