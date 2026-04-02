@@ -3,30 +3,55 @@ Compute the vertical height above ground (Z_ref = Z - Z_sol) for each LiDAR poin
 using a pre-computed DTM raster (GeoTIFF).
 
 Interpolation strategy:
-    - Bilinear interpolation (map_coordinates, order=1):
-      converts (X, Y) world coordinates to fractional pixel indices, then
-      weights the 4 surrounding DTM pixels in a single vectorised C call.
+    - Bilinear interpolation (RegularGridInterpolator, method='linear'):
+      works directly on geographic coordinates — no manual pixel-index conversion.
     - NoData fallback: points on NoData pixels or outside the DTM extent
       receive Z_ref = nodata_value (default: -9999).
 """
-import json
 import logging
 
 import numpy as np
-import pdal
 import rasterio
 from numpy.lib import recfunctions as rfn
-from scipy.ndimage import map_coordinates
+from scipy.interpolate import RegularGridInterpolator
 
 logger = logging.getLogger(__name__)
 
 
+def filter_z_by_height(
+    points: np.ndarray,
+    min_height_filter: float = -3,
+    height_filter: float = 80,
+) -> np.ndarray:
+    """
+    Remove points too low (<-3) or too high (>height_filter m).
+
+    Args:
+        points (np.ndarray): Structured array of LiDAR points with fields X, Y, Z.
+        min_height_filter (float): Minimum height (in metres) to remove noise points above
+            the canopy. Points with Z_ref > height_filter are removed. Default: 80.
+        height_filter (float): Height limit (in metres) to remove noise points above
+            the canopy. Points with Z_ref > height_filter are removed. Default: 80.
+
+    Returns:
+        np.ndarray: Filtered structured array with Z_ref (float64) and filtered added as an
+            extra field.
+    """
+    # Remove points too low (<-3) or too high (>height_filter m)
+    mask = (points["Z_ref"] >= min_height_filter) & (points["Z_ref"] <= height_filter)
+    n_removed = int((~mask).sum())
+    if n_removed:
+        logger.debug("%d points removed by Z_ref filter [%s, %s]", n_removed, min_height_filter, height_filter)
+    points = points[mask]
+
+    return points
+
+
 def add_Zref(
-    input_pipeline: pdal.Pipeline,
+    points: np.ndarray,
     dtm_path: str,
     nodata_value: float = -9999,
-    height_filter: float = 80,
-) -> pdal.Pipeline:
+) -> np.ndarray:
     """
     Add Z_ref = Z - Z_sol to each LiDAR point using bilinear interpolation on a DTM.
 
@@ -34,55 +59,42 @@ def add_Zref(
     position using bilinear interpolation (map_coordinates, order=1). Points that
     fall on NoData pixels or outside the DTM extent receive Z_ref = nodata_value.
 
+
     Args:
-        input_pipeline (pdal.Pipeline): PDAL pipeline (may be unexecuted).
+        points (np.ndarray): Structured array of LiDAR points with fields X, Y, Z.
         dtm_path (str): Path to the DTM GeoTIFF (single band, elevation in metres,
             resolution 0.5 m, EPSG:2154).
         nodata_value (float): Value assigned to Z_ref for points on NoData DTM pixels
             or outside the DTM extent. Default: -9999 (from config dtm.nodata_value).
+        min_height_filter (float): Minimum height (in metres) to remove noise points above
+            the canopy. Points with Z_ref > height_filter are removed. Default: 80.
         height_filter (float): Height limit (in metres) to remove noise points above
             the canopy. Points with Z_ref > height_filter are removed. Default: 80.
 
     Returns:
-        pdal.Pipeline: Unexecuted pipeline with Z_ref (float64) added as an
-            extra dimension.
-
-    Raises:
-        ValueError: If the pipeline produces no arrays.
+        np.ndarray: Filtered structured array with Z_ref (float64) added as an
+            extra field.
     """
-    # Execute pipeline and extract point array
-    pipeline = input_pipeline if isinstance(input_pipeline, pdal.Pipeline) else pdal.Pipeline() | input_pipeline
-    pipeline.execute()
-
-    arrays = pipeline.arrays
-    if not arrays:
-        raise ValueError("No arrays produced by the pipeline.")
-    points = arrays[0]
-
-    # Load DTM raster
+    # Load DTM raster and build coordinate arrays for pixel centres
     with rasterio.open(dtm_path) as src:
         data = src.read(1).astype(np.float64)
         nodata = src.nodata
         transform = src.transform
+        height, width = data.shape
+        xs = transform.c + (np.arange(width) + 0.5) * transform.a
+        ys = transform.f + (np.arange(height) + 0.5) * transform.e  # decreasing (e < 0)
 
     # Replace nodata with NaN
     if nodata is not None:
         data[data == nodata] = np.nan
 
-    # Convert world coordinates (X, Y) to fractional pixel indices (row, col)
-    # Pixel centre (row=i, col=j): x = c + (j+0.5)*a  ;  y = f + (i+0.5)*e  (e < 0)
-    row_idx = (points["Y"] - transform.f) / transform.e - 0.5
-    col_idx = (points["X"] - transform.c) / transform.a - 0.5
-
-    # Bilinear interpolation — cval=NaN for points outside DTM extent
-    z_ground = map_coordinates(
-        data,
-        [row_idx, col_idx],
-        order=1,
-        mode="constant",
-        cval=np.nan,
-        prefilter=False,
+    # Bilinear interpolation directly on geographic coordinates.
+    # RegularGridInterpolator requires increasing axes, so Y is flipped.
+    interp = RegularGridInterpolator(
+        (ys[::-1], xs), data[::-1],
+        method="linear", bounds_error=False, fill_value=np.nan,
     )
+    z_ground = interp(np.column_stack([points["Y"], points["X"]]))
 
     # Compute vertical height above ground
     z_ref = (points["Z"] - z_ground).astype(np.float64)
@@ -101,11 +113,4 @@ def add_Zref(
     # Append Z_ref as extra dimension
     points_with_zref = rfn.append_fields(points, "Z_ref", z_ref, dtypes=np.float64, usemask=False)
 
-    # Remove points too low (<-3) or too high (>height_filter m)
-    mask = (points_with_zref["Z_ref"] >= -3) & (points_with_zref["Z_ref"] <= height_filter)
-    n_removed = int((~mask).sum())
-    if n_removed:
-        logger.debug("%d points removed by Z_ref filter [-3, %s]", n_removed, height_filter)
-    points_with_zref = points_with_zref[mask]
-
-    return pdal.Pipeline(json.dumps({"pipeline": []}), arrays=[points_with_zref])
+    return points_with_zref
