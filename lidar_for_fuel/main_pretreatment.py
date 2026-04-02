@@ -8,6 +8,8 @@ import logging
 import os
 import tempfile
 
+import pdal
+
 import hydra
 from omegaconf import DictConfig
 
@@ -17,7 +19,10 @@ from lidar_for_fuel.pretreatment.filter_points_by_date import filter_by_date
 from lidar_for_fuel.pretreatment.filter_points_by_dimension_values import (
     filter_by_dimension_values,
 )
-from lidar_for_fuel.pretreatment.normalize_height_by_points import add_Zref
+from lidar_for_fuel.pretreatment.normalize_height_by_points import (
+    add_Zref,
+    filter_z_by_height,
+)
 from lidar_for_fuel.pretreatment.validate_lidar_file import check_lidar_file
 
 logger = logging.getLogger(__name__)
@@ -82,18 +87,23 @@ def main(config: DictConfig):
         pipeline_filter_dimension = filter_by_dimension_values(pipeline_filter_date, dimension, values)
 
         logging.info(f"\nNormalize height of 1 for tile : {tilename}")
+        pipeline_filter_dimension.execute()
+        points = pipeline_filter_dimension.arrays[0]
         nodata_value = config.dtm.nodata_value
+        min_height_filter = config.pretreatment.normalize.min_height_filter
         height_filter = config.pretreatment.normalize.height_filter
         with tempfile.TemporaryDirectory() as tmp_dtm_dir:
             geotiff_path = download_dtm(
                 filename, input_dir, dtm_layer, tmp_dtm_dir, epsg, tile_width, resolution, timeout
             )
-            las = add_Zref(pipeline_filter_dimension, geotiff_path, nodata_value, height_filter)
+            points_with_zref = add_Zref(points, geotiff_path, nodata_value)
+            points_filter_z_by_height= filter_z_by_height(points_with_zref, min_height_filter, height_filter)
 
         logging.info(f"\nFilter outliers of 1 for tile : {tilename}")
+        pipeline_with_zref = pdal.Pipeline(arrays=[points_filter_z_by_height])
         mean_k = config.pretreatment.filter_outlier.mean_k
         multiplier = config.pretreatment.filter_outlier.multiplier
-        las = remove_outliers(pipeline_filter_dimension, mean_k, multiplier)
+        las = remove_outliers(pipeline_with_zref, mean_k, multiplier)
 
         return las
 
