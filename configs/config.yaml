@@ -31,6 +31,7 @@ pretreatment:
     mean_k: 5
     multiplier: 10
   normalize:
+    min_height_filter: -3
     height_filter: 80
 
 dtm:
