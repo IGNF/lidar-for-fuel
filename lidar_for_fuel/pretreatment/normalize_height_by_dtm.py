@@ -28,8 +28,8 @@ def filter_z_by_height(
 
     Args:
         points (np.ndarray): Structured array of LiDAR points with fields X, Y, Z.
-        min_height_filter (float): Minimum height (in metres) to remove noise points above
-            the canopy. Points with Z_ref > height_filter are removed. Default: 80.
+        min_height_filter (float): Minimum height (in metres) to remove noise points below the ground. 
+                                    Points with Z_ref > height_filter are removed. Default: -3.
         height_filter (float): Height limit (in metres) to remove noise points above
             the canopy. Points with Z_ref > height_filter are removed. Default: 80.
 
@@ -66,10 +66,6 @@ def add_Zref(
             resolution 0.5 m, EPSG:2154).
         nodata_value (float): Value assigned to Z_ref for points on NoData DTM pixels
             or outside the DTM extent. Default: -9999 (from config dtm.nodata_value).
-        min_height_filter (float): Minimum height (in metres) to remove noise points above
-            the canopy. Points with Z_ref > height_filter are removed. Default: 80.
-        height_filter (float): Height limit (in metres) to remove noise points above
-            the canopy. Points with Z_ref > height_filter are removed. Default: 80.
 
     Returns:
         np.ndarray: Filtered structured array with Z_ref (float64) added as an
