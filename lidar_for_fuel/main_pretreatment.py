@@ -19,7 +19,7 @@ from lidar_for_fuel.pretreatment.filter_points_by_date import filter_by_date
 from lidar_for_fuel.pretreatment.filter_points_by_dimension_values import (
     filter_by_dimension_values,
 )
-from lidar_for_fuel.pretreatment.normalize_height_by_points import (
+from lidar_for_fuel.pretreatment.normalize_height_by_dtm import (
     add_Zref,
     filter_z_by_height,
 )
