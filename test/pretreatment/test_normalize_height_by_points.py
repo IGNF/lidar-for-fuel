@@ -4,7 +4,7 @@ import rasterio
 from pathlib import Path
 from rasterio.transform import from_bounds
 
-from lidar_for_fuel.pretreatment.normalize_height_by_points import add_Zref, filter_z_by_height
+from lidar_for_fuel.pretreatment.normalize_height_by_dtm import add_Zref, filter_z_by_height
 
 _NODATA_VALUE = -9999.0
 _GROUND_Z = 100.0
