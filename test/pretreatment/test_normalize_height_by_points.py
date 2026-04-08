@@ -115,6 +115,38 @@ def test_add_zref_non_flat_dtm(tmp_path, n_pixels, pixel_size):
     assert result["Z_ref"][2] == _NODATA_VALUE                        # outside extent
 
 
+@_RESOLUTIONS
+def test_add_zref_with_offset_origin(tmp_path, n_pixels, pixel_size):
+    """DTM with a non-zero origin (realistic Lambert 93 coordinates).
+
+    Verifies that the coordinate transform (transform.c / transform.f) is correctly
+    used to locate pixel centres — not just relative pixel indices.
+
+    DTM covers X=[700000, 700010], Y=[6400000, 6400010].
+    A flat DTM at _GROUND_Z is used; one point is placed at a known pixel centre.
+    """
+    x_origin, y_origin = 700000.0, 6400000.0
+    west, south = x_origin, y_origin
+    east, north = x_origin + n_pixels * pixel_size, y_origin + n_pixels * pixel_size
+
+    data = np.full((n_pixels, n_pixels), _GROUND_Z)
+    transform = from_bounds(west, south, east, north, n_pixels, n_pixels)
+    dtm_path = tmp_path / f"dtm_offset_{n_pixels}.tif"
+    with rasterio.open(
+        dtm_path, "w", driver="GTiff", height=n_pixels, width=n_pixels,
+        count=1, dtype="float32", transform=transform, nodata=_DTM_NODATA,
+    ) as dst:
+        dst.write(data.astype("float32"), 1)
+
+    # Centre du pixel (col=3, row=2) dans les coordonnées du MNT décalé
+    x = west + (3 + 0.5) * pixel_size
+    y = north - (2 + 0.5) * pixel_size
+    result = add_Zref(_make_points([(x, y, _GROUND_Z + 7.0)]), str(dtm_path), nodata_value=_NODATA_VALUE)
+
+    assert "Z_ref" in result.dtype.names
+    np.testing.assert_allclose(result["Z_ref"][0], 7.0, atol=1e-3)
+
+
 # ── filter_z_by_height ─────────────────────────────────────────────────────────
 
 def _make_points_with_zref(zref_values: list) -> np.ndarray:
