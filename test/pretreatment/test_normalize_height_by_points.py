@@ -10,12 +10,6 @@ _NODATA_VALUE = -9999.0
 _GROUND_Z = 100.0
 _DTM_NODATA = -9999.0
 
-# DTM covers X=[0, 10], Y=[0, 10]
-_DTM_WEST, _DTM_SOUTH, _DTM_EAST, _DTM_NORTH = 0.0, 0.0, 10.0, 10.0
-
-# 1 m resolution → 10×10 pixels ; 0.5 m resolution (LiDAR HD native) → 20×20 pixels
-_RESOLUTIONS = pytest.mark.parametrize("n_pixels,pixel_size", [(10, 1.0), (20, 0.5)], ids=["1m", "0.5m"])
-
 _LAS_DTYPE = np.dtype(
     [
         ("X", np.float64),
@@ -29,10 +23,11 @@ _LAS_DTYPE = np.dtype(
 )
 
 
-def _make_dtm(path: Path, data: np.ndarray) -> str:
+def _make_dtm(path: Path, data: np.ndarray, bounds: tuple) -> str:
     """Write a single-band float32 GeoTIFF from a 2-D array."""
+    west, south, east, north = bounds
     height, width = data.shape
-    transform = from_bounds(_DTM_WEST, _DTM_SOUTH, _DTM_EAST, _DTM_NORTH, width, height)
+    transform = from_bounds(west, south, east, north, width, height)
     with rasterio.open(
         path, "w", driver="GTiff", height=height, width=width,
         count=1, dtype="float32", transform=transform, nodata=_DTM_NODATA,
@@ -51,35 +46,44 @@ def _make_points(rows: list) -> np.ndarray:
     return pts
 
 
-def _pixel_centre(col, row, pixel_size):
+def _pixel_centre(col, row, pixel_size, west, north):
     """Return the geographic (x, y) centre of a pixel given its col/row indices."""
-    x = (col + 0.5) * pixel_size
-    y = _DTM_NORTH - (row + 0.5) * pixel_size
+    x = west + (col + 0.5) * pixel_size
+    y = north - (row + 0.5) * pixel_size
     return x, y
 
 
 # ── add_Zref ───────────────────────────────────────────────────────────────────
 
-@_RESOLUTIONS
-def test_add_zref_flat_dtm(tmp_path, n_pixels, pixel_size):
-    """On a flat DTM, Z_ref = Z - Z_sol for each point; output is an ndarray with a Z_ref field.
+@pytest.mark.parametrize("n_pixels,pixel_size,west,south", [
+    (10, 1.0, 0.0,      0.0),       # 1 m, origin at (0, 0)
+    (20, 0.5, 0.0,      0.0),       # 0.5 m, origin at (0, 0)
+    (10, 1.0, 700000.0, 6400000.0), # 1 m, realistic Lambert-93 origin
+    (20, 0.5, 700000.0, 6400000.0), # 0.5 m, realistic Lambert-93 origin
+], ids=["1m_origin0", "0.5m_origin0", "1m_offset", "0.5m_offset"])
+def test_add_zref_flat_dtm(tmp_path, n_pixels, pixel_size, west, south):
+    """On a flat DTM, Z_ref = Z - Z_sol for a point at a known pixel centre.
 
-    Points are placed at the centre of known pixels (col=3, row=2) and (col=8, row=7).
+    Parametrised over two resolutions and two origins (including a realistic
+    Lambert-93 offset) to verify that the rasterio transform is correctly
+    applied and not just relative pixel indices.
     """
-    data = np.full((n_pixels, n_pixels), _GROUND_Z)
-    dtm = _make_dtm(tmp_path / f"dtm_flat_{n_pixels}.tif", data)
+    north = south + n_pixels * pixel_size
+    east = west + n_pixels * pixel_size
+    bounds = (west, south, east, north)
 
-    x1, y1 = _pixel_centre(3, 2, pixel_size)
-    x2, y2 = _pixel_centre(8, 7, pixel_size)
-    result = add_Zref(_make_points([(x1, y1, 105.0), (x2, y2, 110.0)]), dtm, nodata_value=_NODATA_VALUE)
+    data = np.full((n_pixels, n_pixels), _GROUND_Z)
+    dtm = _make_dtm(tmp_path / f"dtm_flat_{n_pixels}_{int(west)}.tif", data, bounds)
+
+    x, y = _pixel_centre(3, 2, pixel_size, west, north)
+    result = add_Zref(_make_points([(x, y, _GROUND_Z + 7.0)]), dtm, nodata_value=_NODATA_VALUE)
 
     assert isinstance(result, np.ndarray)
     assert "Z_ref" in result.dtype.names
-    np.testing.assert_allclose(result["Z_ref"][0], 5.0, atol=1e-3)
-    np.testing.assert_allclose(result["Z_ref"][1], 10.0, atol=1e-3)
+    np.testing.assert_allclose(result["Z_ref"][0], 7.0, atol=1e-3)
 
 
-@_RESOLUTIONS
+@pytest.mark.parametrize("n_pixels,pixel_size", [(10, 1.0), (20, 0.5)], ids=["1m", "0.5m"])
 def test_add_zref_non_flat_dtm(tmp_path, n_pixels, pixel_size):
     """On a non-flat DTM, checks bilinear interpolation, nodata handling, and out-of-extent points.
 
@@ -90,6 +94,8 @@ def test_add_zref_non_flat_dtm(tmp_path, n_pixels, pixel_size):
     - p2: centre of the nodata pixel -> Z_ref = nodata_value
     - p3: outside DTM extent -> Z_ref = nodata_value
     """
+    west, south, north = 0.0, 0.0, n_pixels * pixel_size
+    bounds = (west, south, n_pixels * pixel_size, north)
     col_slope = 3 * n_pixels // 4   # col 7 (1m) or col 15 (0.5m), far from the nodata pixel
     row_interp = n_pixels // 2      # row 5 (1m) or row 10 (0.5m)
 
@@ -97,12 +103,12 @@ def test_add_zref_non_flat_dtm(tmp_path, n_pixels, pixel_size):
     data[:, col_slope] = 102.0
     data[2, 2] = _DTM_NODATA
 
-    dtm = _make_dtm(tmp_path / f"dtm_slope_{n_pixels}.tif", data)
+    dtm = _make_dtm(tmp_path / f"dtm_slope_{n_pixels}.tif", data, bounds)
 
     # x_mid: midpoint between the centres of col_slope-1 and col_slope
-    x_mid = col_slope * pixel_size
-    _, y_interp = _pixel_centre(0, row_interp, pixel_size)
-    x_nodata, y_nodata = _pixel_centre(2, 2, pixel_size)
+    x_mid = west + col_slope * pixel_size
+    _, y_interp = _pixel_centre(0, row_interp, pixel_size, west, north)
+    x_nodata, y_nodata = _pixel_centre(2, 2, pixel_size, west, north)
 
     result = add_Zref(
         _make_points([(x_mid, y_interp, 111.0), (x_nodata, y_nodata, 110.0), (999.0, 999.0, 110.0)]),
@@ -113,38 +119,6 @@ def test_add_zref_non_flat_dtm(tmp_path, n_pixels, pixel_size):
     np.testing.assert_allclose(result["Z_ref"][0], 10.0, atol=1e-3)  # bilinear interpolation
     assert result["Z_ref"][1] == _NODATA_VALUE                        # nodata
     assert result["Z_ref"][2] == _NODATA_VALUE                        # outside extent
-
-
-@_RESOLUTIONS
-def test_add_zref_with_offset_origin(tmp_path, n_pixels, pixel_size):
-    """DTM with a non-zero origin (realistic Lambert 93 coordinates).
-
-    Verifies that the coordinate transform (transform.c / transform.f) is correctly
-    used to locate pixel centres — not just relative pixel indices.
-
-    DTM covers X=[700000, 700010], Y=[6400000, 6400010].
-    A flat DTM at _GROUND_Z is used; one point is placed at a known pixel centre.
-    """
-    x_origin, y_origin = 700000.0, 6400000.0
-    west, south = x_origin, y_origin
-    east, north = x_origin + n_pixels * pixel_size, y_origin + n_pixels * pixel_size
-
-    data = np.full((n_pixels, n_pixels), _GROUND_Z)
-    transform = from_bounds(west, south, east, north, n_pixels, n_pixels)
-    dtm_path = tmp_path / f"dtm_offset_{n_pixels}.tif"
-    with rasterio.open(
-        dtm_path, "w", driver="GTiff", height=n_pixels, width=n_pixels,
-        count=1, dtype="float32", transform=transform, nodata=_DTM_NODATA,
-    ) as dst:
-        dst.write(data.astype("float32"), 1)
-
-    # Centre du pixel (col=3, row=2) dans les coordonnées du MNT décalé
-    x = west + (3 + 0.5) * pixel_size
-    y = north - (2 + 0.5) * pixel_size
-    result = add_Zref(_make_points([(x, y, _GROUND_Z + 7.0)]), str(dtm_path), nodata_value=_NODATA_VALUE)
-
-    assert "Z_ref" in result.dtype.names
-    np.testing.assert_allclose(result["Z_ref"][0], 7.0, atol=1e-3)
 
 
 # ── filter_z_by_height ─────────────────────────────────────────────────────────
@@ -158,28 +132,13 @@ def _make_points_with_zref(zref_values: list) -> np.ndarray:
     return pts
 
 
-def test_filter_z_removes_high_points():
-    """Points with Z_ref > height_filter are removed."""
-    # Z_ref = 5.0 (kept), 85.0 (removed with default 80), 50.0 (kept)
-    pts = _make_points_with_zref([5.0, 85.0, 50.0])
-    result = filter_z_by_height(pts)
-    assert len(result) == 2
-    np.testing.assert_allclose(sorted(result["Z_ref"]), [5.0, 50.0], atol=1e-3)
-
-
-def test_filter_z_removes_low_points():
-    """Points with Z_ref < min_height_filter are removed."""
-    # Z_ref = -5.0 (removed), 5.0 (kept)
-    pts = _make_points_with_zref([-5.0, 5.0])
-    result = filter_z_by_height(pts)
-    assert len(result) == 1
-    np.testing.assert_allclose(result["Z_ref"][0], 5.0, atol=1e-3)
-
-
-def test_filter_z_custom_bounds():
-    """Custom min_height_filter and height_filter values are respected."""
-    # Z_ref = 5.0 (kept), 15.0 (removed with height_filter=10), -1.0 (removed with min=-0.5)
-    pts = _make_points_with_zref([5.0, 15.0, -1.0])
-    result = filter_z_by_height(pts, min_height_filter=-0.5, height_filter=10)
-    assert len(result) == 1
-    np.testing.assert_allclose(result["Z_ref"][0], 5.0, atol=1e-3)
+@pytest.mark.parametrize("zref_values,min_h,max_h,expected", [
+    ([5.0, 85.0, 50.0], -3,   80, [5.0, 50.0]), # default bounds: high point removed
+    ([-5.0, 5.0],       -3,   80, [5.0]),        # default bounds: low point removed
+    ([5.0, 15.0, -1.0], -0.5, 10, [5.0]),        # custom bounds: high and low removed
+], ids=["removes_high", "removes_low", "custom_bounds"])
+def test_filter_z_by_height(zref_values, min_h, max_h, expected):
+    """Points outside [min_height_filter, height_filter] are removed."""
+    result = filter_z_by_height(_make_points_with_zref(zref_values), min_height_filter=min_h, height_filter=max_h)
+    assert len(result) == len(expected)
+    np.testing.assert_allclose(sorted(result["Z_ref"]), sorted(expected), atol=1e-3)
