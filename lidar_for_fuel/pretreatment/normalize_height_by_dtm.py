@@ -79,8 +79,11 @@ def add_Zref(
         nodata = src.nodata
         transform = src.transform
         height, width = data.shape
+        # rasterio stores the transform at pixel corners (top-left edge).
+        # +0.5 converts corners to pixel centres — where faceraster interpolated the DTM Z values.
+        # Without it, RegularGridInterpolator would be anchored on pixel edges, not centres.
         xs = transform.c + (np.arange(width) + 0.5) * transform.a
-        ys = transform.f + (np.arange(height) + 0.5) * transform.e  # decreasing (e < 0)
+        ys = transform.f + (np.arange(height) + 0.5) * transform.e  # e < 0 → Y decreasing
 
     # Replace nodata with NaN
     if nodata is not None:
