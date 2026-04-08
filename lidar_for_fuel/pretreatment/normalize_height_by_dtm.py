@@ -4,7 +4,9 @@ using a pre-computed DTM raster (GeoTIFF).
 
 Interpolation strategy:
     - Bilinear interpolation (RegularGridInterpolator, method='linear'):
-      works directly on geographic coordinates — no manual pixel-index conversion.
+      the grid is defined in geographic coordinates (pixel centres computed from the
+      rasterio transform); LiDAR points are queried directly in that same space,
+      without converting to pixel row/col indices.
     - NoData fallback: points on NoData pixels or outside the DTM extent
       receive Z_ref = nodata_value (default: -9999).
 """
