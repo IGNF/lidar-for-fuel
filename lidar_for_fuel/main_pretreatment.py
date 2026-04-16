@@ -15,6 +15,7 @@ from omegaconf import DictConfig
 
 from lidar_for_fuel.pretreatment.download_dtm_from_geoplateforme import download_dtm
 from lidar_for_fuel.pretreatment.filter_outliers import remove_outliers
+from lidar_for_fuel.pretreatment.add_trajectory import add_trajectory_to_points
 from lidar_for_fuel.pretreatment.filter_points_by_date import filter_by_date
 from lidar_for_fuel.pretreatment.filter_points_by_dimension_values import (
     filter_by_dimension_values,
@@ -47,6 +48,13 @@ def main(config: DictConfig):
 
     if not os.path.isdir(input_dir):
         raise FileNotFoundError(f"""The input directory ({input_dir}) doesn't exist.""")
+    
+    trajectory_dir = config.io.input_trajectory_dir
+    if trajectory_dir is None:
+        raise ValueError("""config.io.input_trajectory_dir is empty, please provide an input directory in the configuration""")
+
+    if not os.path.isdir(trajectory_dir):
+        raise FileNotFoundError(f"""The input directory ({trajectory_dir}) doesn't exist.""")
 
     output_dir = config.io.output_dir
     if output_dir is None:
@@ -98,14 +106,26 @@ def main(config: DictConfig):
             )
             points_with_zref = add_Zref(points, geotiff_path, nodata_value)
             points_filter_z_by_height= filter_z_by_height(points_with_zref, min_height_filter, height_filter)
+        
+        #print(f"Available fields in points: {points_filter_z_by_height.dtype.names}")
+
+        logging.info(f"\nAdd easting, northing and elevation from trajectory of 1 for tile : {tilename}")
+        points_with_trajectory = add_trajectory_to_points(points_filter_z_by_height, trajectory_dir)
 
         logging.info(f"\nFilter outliers of 1 for tile : {tilename}")
-        pipeline_with_zref = pdal.Pipeline(arrays=[points_filter_z_by_height])
+        pipeline_with_zref = pdal.Pipeline(arrays=[points_with_trajectory])
         mean_k = config.pretreatment.filter_outlier.mean_k
         multiplier = config.pretreatment.filter_outlier.multiplier
-        las = remove_outliers(pipeline_with_zref, mean_k, multiplier)
+        pipeline_outliers = remove_outliers(pipeline_with_zref, mean_k, multiplier)
 
-        return las
+        logging.info(f"\nSave result for tile : {tilename}")
+        output_path = os.path.join(output_dir, tilename + "_pretraited.laz")
+        pipeline_save = pipeline_outliers | pdal.Writer.las(
+            filename=output_path,
+            minor_version=4,
+            extra_dims="all",
+        )
+        pipeline_save.execute()
 
     if initial_las_filename:
         # Launch pretreatment by one tile:
