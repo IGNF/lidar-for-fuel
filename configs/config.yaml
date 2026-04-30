@@ -18,7 +18,7 @@ tile_geometry:
   tile_coord_scale: 1000  # coords in tile names are in km
   tile_width: 1000
  
-pretreatment: 
+preprocessed: 
   filter:
     dimension: Classification
     keep_values: [1, 2, 3, 4, 5, 9, 17, 64, 65, 67]   # Classes to keep 
