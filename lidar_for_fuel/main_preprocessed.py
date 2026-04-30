@@ -1,0 +1,141 @@
+#!/usr/bin/env python3
+"""
+Main script for LiDAR file validation in fPC preprocessed pipeline.
+Validates single file or all files in directory.
+"""
+
+import logging
+import os
+import tempfile
+
+import pdal
+
+import hydra
+from omegaconf import DictConfig
+
+from lidar_for_fuel.preprocessed.download_dtm_from_geoplateforme import download_dtm
+from lidar_for_fuel.preprocessed.filter_outliers import remove_outliers
+from lidar_for_fuel.preprocessed.add_trajectory import add_trajectory_to_points
+from lidar_for_fuel.preprocessed.filter_points_by_date import filter_by_date
+from lidar_for_fuel.preprocessed.filter_points_by_dimension_values import (
+    filter_by_dimension_values,
+)
+from lidar_for_fuel.preprocessed.normalize_height_by_dtm import (
+    add_Zref,
+    filter_z_by_height,
+)
+from lidar_for_fuel.preprocessed.validate_lidar_file import check_lidar_file
+
+logger = logging.getLogger(__name__)
+
+
+@hydra.main(config_path="../configs/", config_name="config.yaml", version_base="1.2")
+def main(config: DictConfig):
+    """Normalize and add various attributes of the input LAS/LAZ file and save it as LAS file.
+
+    It can run either on a single file, or on each file of a folder
+
+    Args:
+        config (DictConfig): hydra configuration (configs/configs_lidro.yaml by default)
+        It contains the algorithm parameters and the input/output parameters
+    """
+    logging.basicConfig(level=logging.INFO)
+
+    # Check input/output files and folders
+    input_dir = config.io.input_dir
+    if input_dir is None:
+        raise ValueError("""config.io.input_dir is empty, please provide an input directory in the configuration""")
+
+    if not os.path.isdir(input_dir):
+        raise FileNotFoundError(f"""The input directory ({input_dir}) doesn't exist.""")
+    
+    trajectory_dir = config.io.input_trajectory_dir
+    if trajectory_dir is None:
+        raise ValueError("""config.io.input_trajectory_dir is empty, please provide an input directory in the configuration""")
+
+    if not os.path.isdir(trajectory_dir):
+        raise FileNotFoundError(f"""The input directory ({trajectory_dir}) doesn't exist.""")
+
+    output_dir = config.io.output_dir
+    if output_dir is None:
+        raise ValueError("""config.io.output_dir is empty, please provide an input directory in the configuration""")
+
+    os.makedirs(output_dir, exist_ok=True)
+
+    # If input filename is not provided, runs on the whole input_dir directory
+    initial_las_filename = config.io.input_filename
+
+    def main_on_one_tile(filename):
+        """Lauch main.py on one tile
+
+        Args:
+            filename (str): filename to the LAS file
+        """
+        tilename = os.path.splitext(filename)[0]  # filename to the LAS file
+        input_filename = os.path.join(input_dir, filename)  # path to the LAS file
+        srid = config.io.spatial_reference
+
+        logging.info(f"\nCheck data of 1 for tile : {tilename}")
+        pipeline_check_lidar = check_lidar_file(input_filename, srid)
+
+        logging.info(f"\nDownload DTM of 1 for tile : {tilename}")
+        dtm_layer = config.dtm.download.dtm_layer
+        tile_width = config.tile_geometry.tile_width
+        resolution = config.dtm.download.resolution
+        timeout = config.dtm.download.timeout
+        epsg = config.dtm.download.epsg
+        logging.info(f"\nFilter deviation day of 1 for tile : {tilename}")
+        deviation_days = config.preprocessed.filter_date.deviation_days
+        gpstime_ref = config.preprocessed.filter_date.gpstime_ref
+        pipeline_filter_date = filter_by_date(pipeline_check_lidar, deviation_days, gpstime_ref)
+
+        logging.info(f"\nFilter dimension/values (classfication) of 1 for tile : {tilename}")
+        dimension = config.preprocessed.filter.dimension
+        values = config.preprocessed.filter.keep_values
+        pipeline_filter_dimension = filter_by_dimension_values(pipeline_filter_date, dimension, values)
+
+        logging.info(f"\nNormalize height of 1 for tile : {tilename}")
+        pipeline_filter_dimension.execute()
+        points = pipeline_filter_dimension.arrays[0]
+        nodata_value = config.dtm.nodata_value
+        min_height_filter = config.preprocessed.normalize.min_height_filter
+        height_filter = config.preprocessed.normalize.height_filter
+        with tempfile.TemporaryDirectory() as tmp_dtm_dir:
+            geotiff_path = download_dtm(
+                filename, input_dir, dtm_layer, tmp_dtm_dir, epsg, tile_width, resolution, timeout
+            )
+            points_with_zref = add_Zref(points, geotiff_path, nodata_value)
+            points_filter_z_by_height= filter_z_by_height(points_with_zref, min_height_filter, height_filter)
+        
+        #print(f"Available fields in points: {points_filter_z_by_height.dtype.names}")
+
+        logging.info(f"\nAdd easting, northing and elevation from trajectory of 1 for tile : {tilename}")
+        points_with_trajectory = add_trajectory_to_points(points_filter_z_by_height, trajectory_dir)
+
+        logging.info(f"\nFilter outliers of 1 for tile : {tilename}")
+        pipeline_with_zref = pdal.Pipeline(arrays=[points_with_trajectory])
+        mean_k = config.preprocessed.filter_outlier.mean_k
+        multiplier = config.preprocessed.filter_outlier.multiplier
+        pipeline_outliers = remove_outliers(pipeline_with_zref, mean_k, multiplier)
+
+        logging.info(f"\nSave result for tile : {tilename}")
+        output_path = os.path.join(output_dir, tilename + "_pretraited.laz")
+        pipeline_save = pipeline_outliers | pdal.Writer.las(
+            filename=output_path,
+            minor_version=4,
+            extra_dims="all",
+        )
+        pipeline_save.execute()
+
+    if initial_las_filename:
+        # Launch preprocessed by one tile:
+        main_on_one_tile(initial_las_filename)
+
+    else:
+        # Lauch preprocessed tile by tile
+        for file in os.listdir(input_dir):
+            main_on_one_tile(file)
+
+
+if __name__ == "__main__":
+    main()

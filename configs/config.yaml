@@ -9,6 +9,7 @@ work_dir: ${hydra:runtime.cwd}
 io:
   input_filename: null
   input_dir: null
+  input_trajectory_dir: null
   output_dir: null
   # Spatial reference to use to override the one from input las.
   spatial_reference: EPSG:2154
@@ -17,10 +18,10 @@ tile_geometry:
   tile_coord_scale: 1000  # coords in tile names are in km
   tile_width: 1000
  
-pretreatment: 
+preprocessed: 
   filter:
     dimension: Classification
-    keep_values: [1, 2, 3, 4, 5, 9, 66]   # Classes to keep 
+    keep_values: [1, 2, 3, 4, 5, 9, 17, 64, 65, 67]   # Classes to keep 
   filter_date:
     deviation_days: 14
       # ISO-8601 UTC string corresponding to gpstime == 0.
