@@ -4,7 +4,7 @@ import laspy
 import numpy as np
 import pdal
 
-from lidar_for_fuel.pretreatment.filter_outliers import remove_outliers
+from lidar_for_fuel.preprocessed.filter_outliers import remove_outliers
 
 _LAS_DTYPE = np.dtype(
     [
