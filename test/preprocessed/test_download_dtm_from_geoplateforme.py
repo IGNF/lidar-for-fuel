@@ -8,7 +8,7 @@ from pathlib import Path
 
 import rasterio
 
-from lidar_for_fuel.pretreatment.download_dtm_from_geoplateforme import download_dtm
+from lidar_for_fuel.preprocessed.download_dtm_from_geoplateforme import download_dtm
 
 TMP_PATH = Path("./tmp/download_dtm")
 SAMPLE_INPUT_DIR = "./data/pointcloud"
