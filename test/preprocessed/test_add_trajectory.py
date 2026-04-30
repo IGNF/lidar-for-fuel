@@ -4,7 +4,7 @@ import laspy
 import numpy as np
 import pytest
 
-from lidar_for_fuel.pretreatment.add_trajectory import (
+from lidar_for_fuel.preprocessed.add_trajectory import (
     add_trajectory_to_points,
 )
 
