@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Main script for LiDAR file validation in fPC pretreatment pipeline.
+Main script for LiDAR file validation in fPC preprocessed pipeline.
 Validates single file or all files in directory.
 """
 
@@ -13,18 +13,18 @@ import pdal
 import hydra
 from omegaconf import DictConfig
 
-from lidar_for_fuel.pretreatment.download_dtm_from_geoplateforme import download_dtm
-from lidar_for_fuel.pretreatment.filter_outliers import remove_outliers
-from lidar_for_fuel.pretreatment.add_trajectory import add_trajectory_to_points
-from lidar_for_fuel.pretreatment.filter_points_by_date import filter_by_date
-from lidar_for_fuel.pretreatment.filter_points_by_dimension_values import (
+from lidar_for_fuel.preprocessed.download_dtm_from_geoplateforme import download_dtm
+from lidar_for_fuel.preprocessed.filter_outliers import remove_outliers
+from lidar_for_fuel.preprocessed.add_trajectory import add_trajectory_to_points
+from lidar_for_fuel.preprocessed.filter_points_by_date import filter_by_date
+from lidar_for_fuel.preprocessed.filter_points_by_dimension_values import (
     filter_by_dimension_values,
 )
-from lidar_for_fuel.pretreatment.normalize_height_by_dtm import (
+from lidar_for_fuel.preprocessed.normalize_height_by_dtm import (
     add_Zref,
     filter_z_by_height,
 )
-from lidar_for_fuel.pretreatment.validate_lidar_file import check_lidar_file
+from lidar_for_fuel.preprocessed.validate_lidar_file import check_lidar_file
 
 logger = logging.getLogger(__name__)
 
@@ -85,21 +85,21 @@ def main(config: DictConfig):
         timeout = config.dtm.download.timeout
         epsg = config.dtm.download.epsg
         logging.info(f"\nFilter deviation day of 1 for tile : {tilename}")
-        deviation_days = config.pretreatment.filter_date.deviation_days
-        gpstime_ref = config.pretreatment.filter_date.gpstime_ref
+        deviation_days = config.preprocessed.filter_date.deviation_days
+        gpstime_ref = config.preprocessed.filter_date.gpstime_ref
         pipeline_filter_date = filter_by_date(pipeline_check_lidar, deviation_days, gpstime_ref)
 
         logging.info(f"\nFilter dimension/values (classfication) of 1 for tile : {tilename}")
-        dimension = config.pretreatment.filter.dimension
-        values = config.pretreatment.filter.keep_values
+        dimension = config.preprocessed.filter.dimension
+        values = config.preprocessed.filter.keep_values
         pipeline_filter_dimension = filter_by_dimension_values(pipeline_filter_date, dimension, values)
 
         logging.info(f"\nNormalize height of 1 for tile : {tilename}")
         pipeline_filter_dimension.execute()
         points = pipeline_filter_dimension.arrays[0]
         nodata_value = config.dtm.nodata_value
-        min_height_filter = config.pretreatment.normalize.min_height_filter
-        height_filter = config.pretreatment.normalize.height_filter
+        min_height_filter = config.preprocessed.normalize.min_height_filter
+        height_filter = config.preprocessed.normalize.height_filter
         with tempfile.TemporaryDirectory() as tmp_dtm_dir:
             geotiff_path = download_dtm(
                 filename, input_dir, dtm_layer, tmp_dtm_dir, epsg, tile_width, resolution, timeout
@@ -114,8 +114,8 @@ def main(config: DictConfig):
 
         logging.info(f"\nFilter outliers of 1 for tile : {tilename}")
         pipeline_with_zref = pdal.Pipeline(arrays=[points_with_trajectory])
-        mean_k = config.pretreatment.filter_outlier.mean_k
-        multiplier = config.pretreatment.filter_outlier.multiplier
+        mean_k = config.preprocessed.filter_outlier.mean_k
+        multiplier = config.preprocessed.filter_outlier.multiplier
         pipeline_outliers = remove_outliers(pipeline_with_zref, mean_k, multiplier)
 
         logging.info(f"\nSave result for tile : {tilename}")
@@ -128,11 +128,11 @@ def main(config: DictConfig):
         pipeline_save.execute()
 
     if initial_las_filename:
-        # Launch pretreatment by one tile:
+        # Launch preprocessed by one tile:
         main_on_one_tile(initial_las_filename)
 
     else:
-        # Lauch pretreatment tile by tile
+        # Lauch preprocessed tile by tile
         for file in os.listdir(input_dir):
             main_on_one_tile(file)
 

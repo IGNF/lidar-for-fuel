@@ -3,7 +3,7 @@ import numpy as np
 import pdal
 import pytest
 
-from lidar_for_fuel.pretreatment.filter_points_by_dimension_values import (
+from lidar_for_fuel.preprocessed.filter_points_by_dimension_values import (
     filter_by_dimension_values,
 )
 

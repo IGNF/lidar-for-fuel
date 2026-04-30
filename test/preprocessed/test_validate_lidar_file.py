@@ -5,7 +5,7 @@ from pathlib import Path
 import pdal
 import pytest
 
-from lidar_for_fuel.pretreatment.validate_lidar_file import check_lidar_file
+from lidar_for_fuel.preprocessed.validate_lidar_file import check_lidar_file
 
 TMP_PATH = Path("./tmp/check_lidar")
 SAMPLE_LAS = "./data/pointcloud/test_semis_2022_0897_6577_LA93_IGN69_decimation.laz"

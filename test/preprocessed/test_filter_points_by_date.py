@@ -6,7 +6,7 @@ import numpy as np
 import pdal
 import pytest
 
-from lidar_for_fuel.pretreatment.filter_points_by_date import filter_by_date
+from lidar_for_fuel.preprocessed.filter_points_by_date import filter_by_date
 
 _SECONDS_PER_DAY = 86_400.0
 _EPSILON = 1e-3
