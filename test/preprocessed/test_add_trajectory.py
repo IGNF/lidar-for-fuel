@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 import laspy
@@ -15,10 +16,75 @@ _FILTERED_LAS = Path("data/pointcloud/test_semis_2024_0751_6690_LA93_IGN69_filte
 _PRETRAITED_LAS = Path("data/pointcloud/test_semis_2024_0751_6690_LA93_IGN69_filter_trajectory_1311_pretraited.laz")
 
 
-@pytest.mark.skipif(
-    not _FILTERED_LAS.exists() or not _PRETRAITED_LAS.exists() or not _REAL_TRAJ_FOLDER.exists(),
-    reason="Real data files absent (filtered tile or pre-treated tile missing)",
-)
+def _make_points(psid_values: list[int], gps_times: list[float]) -> np.ndarray:
+    dtype = np.dtype([("PointSourceId", np.uint16), ("GpsTime", np.float64)])
+    arr = np.zeros(len(psid_values), dtype=dtype)
+    arr["PointSourceId"] = psid_values
+    arr["GpsTime"] = gps_times
+    return arr
+
+
+def _write_trajectory(
+    folder: Path,
+    axis_id: int,
+    timestamps: list[float],
+    eastings: list[float],
+    northings: list[float],
+    elevations: list[float],
+) -> None:
+    features = [
+        {
+            "type": "Feature",
+            "geometry": {"type": "Point", "coordinates": [e, n]},
+            "properties": {"z": float(z), "timestamp": float(t)},
+        }
+        for t, e, n, z in zip(timestamps, eastings, northings, elevations)
+    ]
+    path = folder / f"traj_axe_{axis_id}_axe_{axis_id}.json"
+    path.write_text(json.dumps({"type": "FeatureCollection", "features": features}))
+
+
+def test_missing_trajectory_produces_nan(tmp_path):
+    """All points with an unmatched PointSourceId must get NaN in all three fields."""
+    points = _make_points(psid_values=[99, 99], gps_times=[1000.0, 2000.0])
+
+    result = add_trajectory_to_points(points, str(tmp_path))
+
+    assert "Easting" in result.dtype.names
+    assert np.all(np.isnan(result["Easting"]))
+    assert np.all(np.isnan(result["Northing"]))
+    assert np.all(np.isnan(result["Elevation"]))
+
+
+def test_mixed_psid_nan_only_for_missing(tmp_path):
+    """Points with a matching trajectory are interpolated; the rest get NaN."""
+    psids = [1, 1, 99]
+    times = [100.0, 200.0, 500.0]
+    points = _make_points(psids, times)
+
+    _write_trajectory(
+        tmp_path,
+        axis_id=1,
+        timestamps=[50.0, 150.0, 250.0],
+        eastings=[700_000.0, 700_100.0, 700_200.0],
+        northings=[6_500_000.0, 6_500_100.0, 6_500_200.0],
+        elevations=[1500.0, 1510.0, 1520.0],
+    )
+
+    result = add_trajectory_to_points(points, str(tmp_path))
+
+    mask_known = result["PointSourceId"] == 1
+    mask_missing = result["PointSourceId"] == 99
+
+    assert not np.any(np.isnan(result["Easting"][mask_known]))
+    assert not np.any(np.isnan(result["Northing"][mask_known]))
+    assert not np.any(np.isnan(result["Elevation"][mask_known]))
+
+    assert np.all(np.isnan(result["Easting"][mask_missing]))
+    assert np.all(np.isnan(result["Northing"][mask_missing]))
+    assert np.all(np.isnan(result["Elevation"][mask_missing]))
+
+
 def test_add_trajectory_against_r_reference():
     """Compare our linear interpolation against the R reference (nearest-neighbour).
 
