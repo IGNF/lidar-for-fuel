@@ -34,6 +34,8 @@ preprocessed:
   normalize:
     min_height_filter: -3
     height_filter: 80
+  trajectory:
+    nodata: 0
 
 dtm:
   download:
