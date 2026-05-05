@@ -115,6 +115,7 @@ def _load_trajectory(trajectory_path: Path) -> tuple[np.ndarray, np.ndarray, np.
 def add_trajectory_to_points(
     points: np.ndarray,
     trajectory_folder: str,
+    nodata: int = 0,
 ) -> np.ndarray:
     """Enrich LiDAR points with the interpolated sensor position.
 
@@ -152,6 +153,8 @@ def add_trajectory_to_points(
             ``PointSourceId`` (or ``point_source_id``) and ``GpsTime``
             (or ``gps_time``).
         trajectory_folder: Folder containing the JSON trajectory files.
+        nodata: Value assigned to Easting, Northing and Elevation for points
+            whose PointSourceId has no matching trajectory file. Default: 0.
 
     Returns:
         np.ndarray: Structured numpy array identical to the input, enriched
@@ -161,7 +164,7 @@ def add_trajectory_to_points(
         - ``Northing``  — Interpolated sensor northing.
         - ``Elevation`` — Interpolated sensor altitude.
 
-        Points with no associated trajectory receive ``NaN``.
+        Points with no associated trajectory receive *nodata*.
 
     Raises:
         FileNotFoundError: If *trajectory_folder* does not exist.
@@ -181,13 +184,13 @@ def add_trajectory_to_points(
 
     # Steps 2 & 3: interpolation per cluster
     n = len(points)
-    easting_out = np.full(n, np.nan, dtype=np.float64)
-    northing_out = np.full(n, np.nan, dtype=np.float64)
-    elevation_out = np.full(n, np.nan, dtype=np.float64)
+    easting_out = np.full(n, nodata, dtype=np.float64)
+    northing_out = np.full(n, nodata, dtype=np.float64)
+    elevation_out = np.full(n, nodata, dtype=np.float64)
 
     for psid in psids:
         if psid not in axis_index:
-            logger.warning("No trajectory found for PointSourceId %d → fields set to NaN.", psid)
+            logger.warning("No trajectory found for PointSourceId %d → fields set to %s.", psid, nodata)
             continue
 
         # Step 2: load and sort the trajectory

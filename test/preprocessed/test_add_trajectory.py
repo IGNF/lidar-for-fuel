@@ -44,20 +44,20 @@ def _write_trajectory(
     path.write_text(json.dumps({"type": "FeatureCollection", "features": features}))
 
 
-def test_missing_trajectory_produces_nan(tmp_path):
-    """All points with an unmatched PointSourceId must get NaN in all three fields."""
+def test_missing_trajectory_produces_nodata(tmp_path):
+    """All points with an unmatched PointSourceId must get nodata (0) in all three fields."""
     points = _make_points(psid_values=[99, 99], gps_times=[1000.0, 2000.0])
 
-    result = add_trajectory_to_points(points, str(tmp_path))
+    result = add_trajectory_to_points(points, str(tmp_path), nodata=0)
 
     assert "Easting" in result.dtype.names
-    assert np.all(np.isnan(result["Easting"]))
-    assert np.all(np.isnan(result["Northing"]))
-    assert np.all(np.isnan(result["Elevation"]))
+    assert np.all(result["Easting"] == 0)
+    assert np.all(result["Northing"] == 0)
+    assert np.all(result["Elevation"] == 0)
 
 
-def test_mixed_psid_nan_only_for_missing(tmp_path):
-    """Points with a matching trajectory are interpolated; the rest get NaN."""
+def test_mixed_psid_nodata_only_for_missing(tmp_path):
+    """Points with a matching trajectory are interpolated; the rest get nodata (0)."""
     psids = [1, 1, 99]
     times = [100.0, 200.0, 500.0]
     points = _make_points(psids, times)
@@ -71,18 +71,18 @@ def test_mixed_psid_nan_only_for_missing(tmp_path):
         elevations=[1500.0, 1510.0, 1520.0],
     )
 
-    result = add_trajectory_to_points(points, str(tmp_path))
+    result = add_trajectory_to_points(points, str(tmp_path), nodata=0)
 
     mask_known = result["PointSourceId"] == 1
     mask_missing = result["PointSourceId"] == 99
 
-    assert not np.any(np.isnan(result["Easting"][mask_known]))
-    assert not np.any(np.isnan(result["Northing"][mask_known]))
-    assert not np.any(np.isnan(result["Elevation"][mask_known]))
+    assert not np.any(result["Easting"][mask_known] == 0)
+    assert not np.any(result["Northing"][mask_known] == 0)
+    assert not np.any(result["Elevation"][mask_known] == 0)
 
-    assert np.all(np.isnan(result["Easting"][mask_missing]))
-    assert np.all(np.isnan(result["Northing"][mask_missing]))
-    assert np.all(np.isnan(result["Elevation"][mask_missing]))
+    assert np.all(result["Easting"][mask_missing] == 0)
+    assert np.all(result["Northing"][mask_missing] == 0)
+    assert np.all(result["Elevation"][mask_missing] == 0)
 
 
 def test_add_trajectory_against_r_reference():
