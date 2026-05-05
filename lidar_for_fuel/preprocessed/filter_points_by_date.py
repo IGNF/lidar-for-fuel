@@ -78,12 +78,13 @@ def filter_by_date(
     n_retained = int(
         np.sum((unix_time >= max(day_lo, 0) * _SECONDS_PER_DAY) & (unix_time < (day_hi + 1) * _SECONDS_PER_DAY))
     )
-    pct_removed = (1 - n_retained / n_total) * 100
-    if pct_removed > 0:
+    n_removed = n_total - n_retained
+    pct_removed = n_removed / n_total * 100
+    if n_removed > 0:
         warnings.warn(
-            f"Careful {round(pct_removed)} % of the returns were removed because they had a "
-            f"deviation of days around the most abundant date greater than your threshold "
-            f"({deviation_days} days).",
+            f"Careful {n_removed} / {n_total} ({pct_removed:.1f} %) of the returns were removed "
+            f"because they had a deviation of days around the most abundant date greater than your "
+            f"threshold ({deviation_days} days).",
             UserWarning,
             stacklevel=2,
         )
