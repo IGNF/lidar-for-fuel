@@ -110,7 +110,8 @@ def main(config: DictConfig):
         #print(f"Available fields in points: {points_filter_z_by_height.dtype.names}")
 
         logging.info(f"\nAdd easting, northing and elevation from trajectory of 1 for tile : {tilename}")
-        points_with_trajectory = add_trajectory_to_points(points_filter_z_by_height, trajectory_dir)
+        trajectory_nodata = config.preprocessed.trajectory.nodata
+        points_with_trajectory = add_trajectory_to_points(points_filter_z_by_height, trajectory_dir, trajectory_nodata)
 
         logging.info(f"\nFilter outliers of 1 for tile : {tilename}")
         pipeline_with_zref = pdal.Pipeline(arrays=[points_with_trajectory])
@@ -119,10 +120,11 @@ def main(config: DictConfig):
         pipeline_outliers = remove_outliers(pipeline_with_zref, mean_k, multiplier)
 
         logging.info(f"\nSave result for tile : {tilename}")
-        output_path = os.path.join(output_dir, tilename + "_pretraited.laz")
+        output_path = os.path.join(output_dir, tilename + ".laz")
         pipeline_save = pipeline_outliers | pdal.Writer.las(
             filename=output_path,
             minor_version=4,
+            forward="all",
             extra_dims="all",
         )
         pipeline_save.execute()
