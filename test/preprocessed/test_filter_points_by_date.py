@@ -42,7 +42,7 @@ def test_multiday_filters_correct_number_of_points_and_warns(rng):
 
     pipeline = _make_pipeline(gpstime, rng)
 
-    with pytest.warns(UserWarning, match=r"% of the returns were removed"):
+    with pytest.warns(UserWarning, match=r"\%) of the returns were removed"):
         result_pipeline = filter_by_date(pipeline, deviation_days=_DEVIATION_DAYS, gpstime_ref=_GPSTIME_REF)
 
     result_pipeline.execute()
@@ -123,7 +123,7 @@ def test_gpstime_window_correctness(rng):
     gpstime_input = np.concatenate([gpstime_per_day, gpstime_modal])
     pipeline = _make_pipeline(gpstime_input, rng)
 
-    with pytest.warns(UserWarning, match=r"% of the returns were removed"):
+    with pytest.warns(UserWarning, match=r"\%) of the returns were removed"):
         result_pipeline = filter_by_date(pipeline, deviation_days=DEVIATION_DAY, gpstime_ref=GPSTIME_REF)
 
     # Check filters.range limits in the PDAL pipeline JSON
