@@ -49,6 +49,11 @@ dtm:
   output_subfolder: "DTM"
   nodata_value: -9999  # h_abg value assigned to points on NoData DTM pixels
 
+pad_profil:
+  # --- Angle de scan ---
+  scanning_angle: true          # utiliser l'angle réel (false → cos_theta = 1)
+  limit_flight_agl: 800         # (m) garde-fou hauteur de vol minimale
+
 hydra:
   output_subdir: null
   run:
