@@ -4,6 +4,10 @@ import laspy
 import numpy as np
 import pdal
 
+<<<<<<< HEAD
+=======
+<<<<<<<< HEAD:test/preprocessed/test_filter_outliers.py
+>>>>>>> 8f1bacb (refacto add_trajectory : name fileds, configs, main_preprocessing)
 <<<<<<<< HEAD:test/preprocessing/test_filter_outliers.py
 <<<<<<< HEAD:test/preprocessing/test_filter_outliers.py
 from lidar_for_fuel.preprocessing.filter_outliers import remove_outliers
@@ -13,6 +17,12 @@ from lidar_for_fuel.pretreatment.filter_outliers import remove_outliers
 ========
 from lidar_for_fuel.preprocessed.filter_outliers import remove_outliers
 >>>>>>>> fc1ae78 (rename pretreatment -> preprocessed):test/preprocessed/test_filter_outliers.py
+<<<<<<< HEAD
+=======
+========
+from lidar_for_fuel.preprocessing.filter_outliers import remove_outliers
+>>>>>>>> 8f1bacb (refacto add_trajectory : name fileds, configs, main_preprocessing):test/preprocessing/test_filter_outliers.py
+>>>>>>> 8f1bacb (refacto add_trajectory : name fileds, configs, main_preprocessing)
 
 _LAS_DTYPE = np.dtype(
     [
