@@ -3,11 +3,9 @@ from pathlib import Path
 
 import laspy
 import numpy as np
-import pytest
+import pdal
 
-from lidar_for_fuel.preprocessed.add_trajectory import (
-    add_trajectory_to_points,
-)
+from lidar_for_fuel.preprocessing.add_trajectory import add_trajectory_to_points
 
 _REAL_TRAJ_FOLDER = Path("data/trajectory")
 
@@ -50,10 +48,10 @@ def test_missing_trajectory_produces_nodata(tmp_path):
 
     result = add_trajectory_to_points(points, str(tmp_path), nodata=0)
 
-    assert "Easting" in result.dtype.names
-    assert np.all(result["Easting"] == 0)
-    assert np.all(result["Northing"] == 0)
-    assert np.all(result["Elevation"] == 0)
+    assert "X_sensor" in result.dtype.names
+    assert np.all(result["X_sensor"] == 0)
+    assert np.all(result["Y_sensor"] == 0)
+    assert np.all(result["Z_sensor"] == 0)
 
 
 def test_mixed_psid_nodata_only_for_missing(tmp_path):
@@ -76,13 +74,13 @@ def test_mixed_psid_nodata_only_for_missing(tmp_path):
     mask_known = result["PointSourceId"] == 1
     mask_missing = result["PointSourceId"] == 99
 
-    assert not np.any(result["Easting"][mask_known] == 0)
-    assert not np.any(result["Northing"][mask_known] == 0)
-    assert not np.any(result["Elevation"][mask_known] == 0)
+    assert not np.any(result["X_sensor"][mask_known] == 0)
+    assert not np.any(result["Y_sensor"][mask_known] == 0)
+    assert not np.any(result["Z_sensor"][mask_known] == 0)
 
-    assert np.all(result["Easting"][mask_missing] == 0)
-    assert np.all(result["Northing"][mask_missing] == 0)
-    assert np.all(result["Elevation"][mask_missing] == 0)
+    assert np.all(result["X_sensor"][mask_missing] == 0)
+    assert np.all(result["Y_sensor"][mask_missing] == 0)
+    assert np.all(result["Z_sensor"][mask_missing] == 0)
 
 
 def test_add_trajectory_against_r_reference():
@@ -93,56 +91,64 @@ def test_add_trajectory_against_r_reference():
     (numpy.interp). Results should be close but not identical.
 
     Checks:
-    - Fields Easting, Northing, Elevation are present in the result.
+    - Fields X_sensor, Y_sensor, Z_sensor are present in the result.
     - No NaN values (the PointSourceId in the tile has an associated trajectory).
-    - Easting/Northing/Elevation values are within coherent Lambert-93 ranges.
+    - X_sensor/Y_sensor/Z_sensor values are within coherent Lambert-93 ranges.
     - The deviation from the R reference is less than 5 m for position and altitude
       (conservative bound given the trajectory sampling frequency).
     """
     # ── Compute our linear interpolation ─────────────────────────────────────
-    points = laspy.read(str(_FILTERED_LAS)).points.array
+    pipeline = pdal.Reader.las(filename=str(_FILTERED_LAS)).pipeline()
+    pipeline.execute()
+    points = pipeline.arrays[0]
     result = add_trajectory_to_points(points, str(_REAL_TRAJ_FOLDER))
 
     # ── Load the R reference ──────────────────────────────────────────────────
     las_ref = laspy.read(str(_PRETRAITED_LAS))
 
     # ── 1. Field presence ─────────────────────────────────────────────────────
-    assert "Easting" in result.dtype.names
-    assert "Northing" in result.dtype.names
-    assert "Elevation" in result.dtype.names
+    assert "X_sensor" in result.dtype.names
+    assert "Y_sensor" in result.dtype.names
+    assert "Z_sensor" in result.dtype.names
 
     # ── 2. No NaN values ──────────────────────────────────────────────────────
-    assert not np.any(np.isnan(result["Easting"])), "Unexpected NaN in Easting."
-    assert not np.any(np.isnan(result["Northing"])), "Unexpected NaN in Northing."
-    assert not np.any(np.isnan(result["Elevation"])), "Unexpected NaN in Elevation."
+    assert not np.any(np.isnan(result["X_sensor"])), "Unexpected NaN in X_sensor."
+    assert not np.any(np.isnan(result["Y_sensor"])), "Unexpected NaN in Y_sensor."
+    assert not np.any(np.isnan(result["Z_sensor"])), "Unexpected NaN in Z_sensor."
 
     # ── 3. Coherent Lambert-93 geographic ranges ──────────────────────────────
-    assert result["Easting"].min() > 100_000, "Easting out of Lambert-93 range."
-    assert result["Easting"].max() < 1_300_000, "Easting out of Lambert-93 range."
-    assert result["Northing"].min() > 6_000_000, "Northing out of Lambert-93 range."
-    assert result["Northing"].max() < 7_200_000, "Northing out of Lambert-93 range."
+    assert result["X_sensor"].min() > 100_000, "X_sensor out of Lambert-93 range."
+    assert result["X_sensor"].max() < 1_300_000, "X_sensor out of Lambert-93 range."
+    assert result["Y_sensor"].min() > 6_000_000, "Y_sensor out of Lambert-93 range."
+    assert result["Y_sensor"].max() < 7_200_000, "Y_sensor out of Lambert-93 range."
 
     # ── 4. Comparison against the R reference ────────────────────────────────
-    ref_easting = np.asarray(las_ref["Easting"])
-    ref_northing = np.asarray(las_ref["Northing"])
-    ref_elevation = np.asarray(las_ref["Elevation"])
+    ref_easting = np.asarray(las_ref["X_sensor"])
+    ref_northing = np.asarray(las_ref["Y_sensor"])
+    ref_elevation = np.asarray(las_ref["Z_sensor"])
 
-    assert len(result) == len(ref_easting), (
-        f"Point count mismatch: result={len(result)}, reference={len(ref_easting)}."
-    )
+    assert len(result) == len(
+        ref_easting
+    ), f"Point count mismatch: result={len(result)}, reference={len(ref_easting)}."
 
     # Tolerance of 5 m: maximum expected difference between linear interpolation
     # and nearest-neighbour for a trajectory sampled at ~200 Hz (5 ms steps)
     # with an aircraft flying at ~80 m/s (max displacement ~0.4 m per step).
     np.testing.assert_allclose(
-        result["Easting"], ref_easting, atol=5.0,
-        err_msg="Easting too far from R reference (>5 m).",
+        result["X_sensor"],
+        ref_easting,
+        atol=5.0,
+        err_msg="X_sensor too far from R reference (>5 m).",
     )
     np.testing.assert_allclose(
-        result["Northing"], ref_northing, atol=5.0,
-        err_msg="Northing too far from R reference (>5 m).",
+        result["Y_sensor"],
+        ref_northing,
+        atol=5.0,
+        err_msg="Y_sensor too far from R reference (>5 m).",
     )
     np.testing.assert_allclose(
-        result["Elevation"], ref_elevation, atol=5.0,
-        err_msg="Elevation too far from R reference (>5 m).",
+        result["Z_sensor"],
+        ref_elevation,
+        atol=5.0,
+        err_msg="Z_sensor too far from R reference (>5 m).",
     )

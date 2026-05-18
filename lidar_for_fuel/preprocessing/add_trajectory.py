@@ -1,11 +1,10 @@
-
 """
 Module to associate sensor trajectories with LiDAR points.
 
 Context
 -------
 During an airborne LiDAR acquisition, the aircraft records its position
-(Easting, Northing, Elevation) at high frequency in trajectory files.
+(X_sensor, Y_sensor, Z_sensor) at high frequency in trajectory files.
 Each LiDAR point is fired from a flight axis identified by its
 ``PointSourceId`` field.
 
@@ -17,8 +16,8 @@ This module:
 3. For each cluster of points sharing the same ``PointSourceId``, performs
    **linear interpolation** of the sensor position at the ``GpsTime`` of
    each LiDAR point.
-4. Returns the numpy array enriched with the fields ``Easting``, ``Northing``
-   and ``Elevation`` (sensor position).
+4. Returns the numpy array enriched with the fields ``X_sensor``, ``Y_sensor``
+   and ``Z_sensor`` (sensor position).
 
 Expected trajectory file format
 --------------------------------
@@ -88,7 +87,7 @@ def _load_trajectory(trajectory_path: Path) -> tuple[np.ndarray, np.ndarray, np.
         trajectory_path (Path): Path to the JSON trajectory file.
 
     Returns:
-        tuple: ``(timestamps, eastings, northings, elevations)`` as float64
+        tuple: ``(timestamps, x_sensors, y_sensors, z_sensors)`` as float64
         numpy arrays, sorted in ascending timestamp order.
 
     Raises:
@@ -97,11 +96,11 @@ def _load_trajectory(trajectory_path: Path) -> tuple[np.ndarray, np.ndarray, np.
     gdf = gpd.read_file(trajectory_path)
 
     # Extract X, Y from the 2D geometry
-    eastings = gdf.geometry.x.to_numpy(dtype=np.float64)
-    northings = gdf.geometry.y.to_numpy(dtype=np.float64)
+    x_sensors = gdf.geometry.x.to_numpy(dtype=np.float64)
+    y_sensors = gdf.geometry.y.to_numpy(dtype=np.float64)
 
     # Extract Z and timestamp from the properties
-    elevations = gdf["z"].to_numpy(dtype=np.float64)
+    z_sensors = gdf["z"].to_numpy(dtype=np.float64)
     timestamps = gdf["timestamp"].to_numpy(dtype=np.float64)
 
     if len(timestamps) == 0:
@@ -109,7 +108,7 @@ def _load_trajectory(trajectory_path: Path) -> tuple[np.ndarray, np.ndarray, np.
 
     # Sort by ascending timestamp (required by np.interp)
     sort_idx = np.argsort(timestamps)
-    return timestamps[sort_idx], eastings[sort_idx], northings[sort_idx], elevations[sort_idx]
+    return timestamps[sort_idx], x_sensors[sort_idx], y_sensors[sort_idx], z_sensors[sort_idx]
 
 
 def add_trajectory_to_points(
@@ -136,15 +135,15 @@ def add_trajectory_to_points(
         the two trajectory instants bracketing each LiDAR ``GpsTime``:
 
             alpha    = (t_LiDAR - t_before) / (t_after - t_before)
-            Easting  = E_before  + alpha * (E_after  - E_before)
-            Northing = N_before  + alpha * (N_after  - N_before)
-            Elevation= Z_before  + alpha * (Z_after  - Z_before)
+            X_sensor = X_before + alpha * (X_after - X_before)
+            Y_sensor = Y_before + alpha * (Y_after - Y_before)
+            Z_sensor = Z_before + alpha * (Z_after - Z_before)
 
         If ``GpsTime`` falls outside the trajectory range, ``numpy.interp``
         returns the boundary value (flat extrapolation).
 
     Step 4 — Append fields to the structured array
-        The three fields ``Easting``, ``Northing``, ``Elevation`` are appended
+        The three fields ``X_sensor``, ``Y_sensor``, ``Z_sensor`` are appended
         to the structured array via ``numpy.lib.recfunctions``.
 
     Args:
@@ -153,16 +152,16 @@ def add_trajectory_to_points(
             ``PointSourceId`` (or ``point_source_id``) and ``GpsTime``
             (or ``gps_time``).
         trajectory_folder: Folder containing the JSON trajectory files.
-        nodata: Value assigned to Easting, Northing and Elevation for points
+        nodata: Value assigned to X_sensor, Y_sensor and Z_sensor for points
             whose PointSourceId has no matching trajectory file. Default: 0.
 
     Returns:
         np.ndarray: Structured numpy array identical to the input, enriched
         with three additional float64 fields:
 
-        - ``Easting``   — Interpolated sensor easting at the point GpsTime.
-        - ``Northing``  — Interpolated sensor northing.
-        - ``Elevation`` — Interpolated sensor altitude.
+        - ``X_sensor`` — Interpolated sensor easting at the point GpsTime.
+        - ``Y_sensor`` — Interpolated sensor northing.
+        - ``Z_sensor`` — Interpolated sensor altitude.
 
         Points with no associated trajectory receive *nodata*.
 
@@ -173,9 +172,9 @@ def add_trajectory_to_points(
     if not traj_folder.exists():
         raise FileNotFoundError(f"Trajectory folder not found: {trajectory_folder}")
 
-    # Detect naming convention (PDAL = PascalCase, laspy = snake_case)
-    psid_field = "PointSourceId" if "PointSourceId" in points.dtype.names else "point_source_id"
-    gpstime_field = "GpsTime" if "GpsTime" in points.dtype.names else "gps_time"
+    # Detect naming convention
+    psid_field = "PointSourceId"  
+    gpstime_field = "GpsTime"
 
     # Step 1: PointSourceId → trajectory mapping
     axis_index = _build_axis_index(traj_folder)
@@ -184,9 +183,9 @@ def add_trajectory_to_points(
 
     # Steps 2 & 3: interpolation per cluster
     n = len(points)
-    easting_out = np.full(n, nodata, dtype=np.float64)
-    northing_out = np.full(n, nodata, dtype=np.float64)
-    elevation_out = np.full(n, nodata, dtype=np.float64)
+    x_sensor_out = np.full(n, nodata, dtype=np.float64)
+    y_sensor_out = np.full(n, nodata, dtype=np.float64)
+    z_sensor_out = np.full(n, nodata, dtype=np.float64)
 
     for psid in psids:
         if psid not in axis_index:
@@ -194,8 +193,14 @@ def add_trajectory_to_points(
             continue
 
         # Step 2: load and sort the trajectory
-        traj_times, traj_e, traj_n, traj_z = _load_trajectory(axis_index[psid])
-        logger.info("Trajectory %s: %d points (%.2f → %.2f s).", axis_index[psid].name, len(traj_times), traj_times[0], traj_times[-1])
+        traj_times, traj_x, traj_y, traj_z = _load_trajectory(axis_index[psid])
+        logger.info(
+            "Trajectory %s: %d points (%.2f → %.2f s).",
+            axis_index[psid].name,
+            len(traj_times),
+            traj_times[0],
+            traj_times[-1],
+        )
 
         # Step 3: linear interpolation (np.interp = piecewise-linear)
         mask = points[psid_field] == psid
@@ -203,17 +208,17 @@ def add_trajectory_to_points(
 
         # np.interp(x, xp, fp): linear interpolation of fp at points x,
         # with xp assumed ascending; boundary values used for extrapolation.
-        easting_out[mask] = np.interp(gps_times, traj_times, traj_e)
-        northing_out[mask] = np.interp(gps_times, traj_times, traj_n)
-        elevation_out[mask] = np.interp(gps_times, traj_times, traj_z)
+        x_sensor_out[mask] = np.interp(gps_times, traj_times, traj_x)
+        y_sensor_out[mask] = np.interp(gps_times, traj_times, traj_y)
+        z_sensor_out[mask] = np.interp(gps_times, traj_times, traj_z)
 
         logger.info("PointSourceId %d: %d points interpolated.", psid, int(mask.sum()))
 
     # Step 4: append fields to the structured array
     points = rfn.append_fields(
         points,
-        names=["Easting", "Northing", "Elevation"],
-        data=[easting_out, northing_out, elevation_out],
+        names=["X_sensor", "Y_sensor", "Z_sensor"],
+        data=[x_sensor_out, y_sensor_out, z_sensor_out],
         dtypes=[np.float64, np.float64, np.float64],
         usemask=False,
     )
