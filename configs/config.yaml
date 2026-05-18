@@ -17,17 +17,19 @@ io:
 tile_geometry:
   tile_coord_scale: 1000  # coords in tile names are in km
   tile_width: 1000
- 
-preprocessed: 
-  filter:
-    dimension: Classification
-    keep_values: [1, 2, 3, 4, 5, 9, 17, 64, 65, 67]   # Classes to keep 
+
+commons: 
   filter_date:
     deviation_days: 14
       # ISO-8601 UTC string corresponding to gpstime == 0.
       # Default matches the R reference: as.POSIXct("2011-09-14 01:46:40")
       # Override this value if your LiDAR data uses a different GPS time origin.
     gpstime_ref: "2011-09-14 01:46:40"
+
+preprocessing:
+  filter:
+    dimension: Classification
+    keep_values: [1, 2, 3, 4, 5, 9, 17, 64, 67]   # Classes to keep 
   filter_outlier:
     mean_k: 5
     multiplier: 10
@@ -45,7 +47,7 @@ dtm:
     epsg: 2154
   input_filename: null
   output_subfolder: "DTM"
-  nodata_value: -9999  # Z_ref value assigned to points on NoData DTM pixels
+  nodata_value: -9999  # h_abg value assigned to points on NoData DTM pixels
 
 hydra:
   output_subdir: null
