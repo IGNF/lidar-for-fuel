@@ -39,4 +39,3 @@ def test_check_lidar_file_unsupported_extension():
 def test_check_lidar_file_not_exists():
     with pytest.raises(FileNotFoundError):
         check_lidar_file("nonexistent.laz", "EPSG:2154")
-

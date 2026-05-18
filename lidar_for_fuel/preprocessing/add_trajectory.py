@@ -173,7 +173,7 @@ def add_trajectory_to_points(
         raise FileNotFoundError(f"Trajectory folder not found: {trajectory_folder}")
 
     # Detect naming convention
-    psid_field = "PointSourceId"
+    psid_field = "PointSourceId"  
     gpstime_field = "GpsTime"
 
     # Step 1: PointSourceId → trajectory mapping
@@ -211,6 +211,8 @@ def add_trajectory_to_points(
         x_sensor_out[mask] = np.interp(gps_times, traj_times, traj_x)
         y_sensor_out[mask] = np.interp(gps_times, traj_times, traj_y)
         z_sensor_out[mask] = np.interp(gps_times, traj_times, traj_z)
+
+        logger.info("PointSourceId %d: %d points interpolated.", psid, int(mask.sum()))
 
     # Step 4: append fields to the structured array
     points = rfn.append_fields(
