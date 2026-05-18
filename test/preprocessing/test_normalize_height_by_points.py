@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 <<<<<<< HEAD:test/preprocessing/test_normalize_height_by_points.py
 from pathlib import Path
 
@@ -9,11 +10,19 @@ from pathlib import Path
 import numpy as np
 import pdal
 >>>>>>> 1609350 (add function normalize height):test/pretreatment/test_normalize_height_by_points.py
+=======
+from pathlib import Path
+
+import numpy as np
+>>>>>>> 8f1bacb (refacto add_trajectory : name fileds, configs, main_preprocessing)
 import pytest
 import rasterio
 from rasterio.transform import from_bounds
 
+<<<<<<< HEAD
 <<<<<<< HEAD:test/preprocessing/test_normalize_height_by_points.py
+=======
+>>>>>>> 8f1bacb (refacto add_trajectory : name fileds, configs, main_preprocessing)
 from lidar_for_fuel.preprocessing.normalize_height_by_dtm import (
     add_h_abg,
     filter_z_by_height,
@@ -22,6 +31,7 @@ from lidar_for_fuel.preprocessing.normalize_height_by_dtm import (
 _NODATA_VALUE = -9999.0
 _GROUND_Z = 100.0
 _DTM_NODATA = -9999.0
+<<<<<<< HEAD
 =======
 from lidar_for_fuel.pretreatment.normalize_height_by_points import add_Zref
 
@@ -34,6 +44,8 @@ _DTM_NODATA = -9999.0  # nodata sentinel used inside the DTM raster
 _DTM_WEST, _DTM_SOUTH, _DTM_EAST, _DTM_NORTH = 0.0, 0.0, 10.0, 10.0
 _DTM_WIDTH = _DTM_HEIGHT = 10
 >>>>>>> 1609350 (add function normalize height):test/pretreatment/test_normalize_height_by_points.py
+=======
+>>>>>>> 8f1bacb (refacto add_trajectory : name fileds, configs, main_preprocessing)
 
 _LAS_DTYPE = np.dtype(
     [
@@ -48,21 +60,28 @@ _LAS_DTYPE = np.dtype(
 )
 
 
+<<<<<<< HEAD
 <<<<<<< HEAD:test/preprocessing/test_normalize_height_by_points.py
+=======
+>>>>>>> 8f1bacb (refacto add_trajectory : name fileds, configs, main_preprocessing)
 def _make_dtm(path: Path, data: np.ndarray, bounds: tuple) -> str:
     """Write a single-band float32 GeoTIFF from a 2-D array."""
     west, south, east, north = bounds
     height, width = data.shape
     transform = from_bounds(west, south, east, north, width, height)
+<<<<<<< HEAD
 =======
 def _make_dtm(path: Path, data: np.ndarray) -> str:
     """Write a single-band float32 GeoTIFF from a 2-D array."""
     transform = from_bounds(_DTM_WEST, _DTM_SOUTH, _DTM_EAST, _DTM_NORTH, _DTM_WIDTH, _DTM_HEIGHT)
 >>>>>>> 1609350 (add function normalize height):test/pretreatment/test_normalize_height_by_points.py
+=======
+>>>>>>> 8f1bacb (refacto add_trajectory : name fileds, configs, main_preprocessing)
     with rasterio.open(
         path,
         "w",
         driver="GTiff",
+<<<<<<< HEAD
 <<<<<<< HEAD:test/preprocessing/test_normalize_height_by_points.py
         height=height,
         width=width,
@@ -70,6 +89,10 @@ def _make_dtm(path: Path, data: np.ndarray) -> str:
         height=_DTM_HEIGHT,
         width=_DTM_WIDTH,
 >>>>>>> 1609350 (add function normalize height):test/pretreatment/test_normalize_height_by_points.py
+=======
+        height=height,
+        width=width,
+>>>>>>> 8f1bacb (refacto add_trajectory : name fileds, configs, main_preprocessing)
         count=1,
         dtype="float32",
         transform=transform,
@@ -79,6 +102,7 @@ def _make_dtm(path: Path, data: np.ndarray) -> str:
     return str(path)
 
 
+<<<<<<< HEAD
 <<<<<<< HEAD:test/preprocessing/test_normalize_height_by_points.py
 def _make_points(rows: list) -> np.ndarray:
     """Build a structured point array from a list of (x, y, z) tuples."""
@@ -91,12 +115,19 @@ def _make_flat_dtm(path: Path) -> str:
 def _make_pipeline(rows: list) -> pdal.Pipeline:
     """Build an unexecuted pipeline from a list of (x, y, z) tuples."""
 >>>>>>> 1609350 (add function normalize height):test/pretreatment/test_normalize_height_by_points.py
+=======
+def _make_points(rows: list) -> np.ndarray:
+    """Build a structured point array from a list of (x, y, z) tuples."""
+>>>>>>> 8f1bacb (refacto add_trajectory : name fileds, configs, main_preprocessing)
     pts = np.zeros(len(rows), dtype=_LAS_DTYPE)
     for i, (x, y, z) in enumerate(rows):
         pts[i]["X"] = x
         pts[i]["Y"] = y
         pts[i]["Z"] = z
+<<<<<<< HEAD
 <<<<<<< HEAD:test/preprocessing/test_normalize_height_by_points.py
+=======
+>>>>>>> 8f1bacb (refacto add_trajectory : name fileds, configs, main_preprocessing)
     return pts
 
 
@@ -206,6 +237,7 @@ def test_filter_z_by_height(h_abg_values, min_h, max_h, expected):
     result = filter_z_by_height(_make_points_with_h_abg(h_abg_values), min_height_filter=min_h, height_filter=max_h)
     assert len(result) == len(expected)
     np.testing.assert_allclose(sorted(result["h_abg"]), sorted(expected), atol=1e-3)
+<<<<<<< HEAD
 =======
     return pdal.Pipeline(json.dumps({"pipeline": []}), arrays=[pts])
 
@@ -262,3 +294,5 @@ def test_zref_outside_extent(tmp_path):
     result.execute()
     assert result.arrays[0]["Z_ref"][0] == pytest.approx(_NODATA_VALUE)
 >>>>>>> 1609350 (add function normalize height):test/pretreatment/test_normalize_height_by_points.py
+=======
+>>>>>>> 8f1bacb (refacto add_trajectory : name fileds, configs, main_preprocessing)

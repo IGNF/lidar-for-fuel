@@ -33,7 +33,11 @@ def preprocess_one_tile(
     output_path: str,
     srid: str = "EPSG:2154",
     filter_dimension: str = "Classification",
+<<<<<<< HEAD
     filter_values: list = [1, 2, 3, 4, 5, 9, 17, 64, 67],
+=======
+    filter_values: list = [1, 2, 3, 4, 5, 9, 17, 64, 67], 
+>>>>>>> 8f1bacb (refacto add_trajectory : name fileds, configs, main_preprocessing)
     nodata_value: float = -9999.0,
     min_height_filter: float = -3.0,
     height_filter: float = 80.0,
