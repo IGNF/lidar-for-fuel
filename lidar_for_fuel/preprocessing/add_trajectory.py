@@ -173,7 +173,7 @@ def add_trajectory_to_points(
         raise FileNotFoundError(f"Trajectory folder not found: {trajectory_folder}")
 
     # Detect naming convention
-    psid_field = "PointSourceId"  
+    psid_field = "PointSourceId"
     gpstime_field = "GpsTime"
 
     # Step 1: PointSourceId → trajectory mapping
