@@ -212,8 +212,6 @@ def add_trajectory_to_points(
         y_sensor_out[mask] = np.interp(gps_times, traj_times, traj_y)
         z_sensor_out[mask] = np.interp(gps_times, traj_times, traj_z)
 
-        logger.info("PointSourceId %d: %d points interpolated.", psid, int(mask.sum()))
-
     # Step 4: append fields to the structured array
     points = rfn.append_fields(
         points,
