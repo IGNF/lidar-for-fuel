@@ -1,10 +1,11 @@
-# 
+# v0.1.0
 - Add function "check lidar data"
 - Add function "filter by deviation day"
 - Add function "filter by dimension / values"
 - Add function "detect and remove outliers"
 - Add function "download DTM LIDAR HD from Geoplateforme"
-- Add function "Normalize height"
+- Add function "normalize height"
+- ADD function "add trajectory"
 
 # v0.0.2
 - Add folder "configs" in Dockerfile
