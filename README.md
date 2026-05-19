@@ -5,7 +5,7 @@ This repo contains the code [lidarForFuel](https://github.com/oliviermartin7/Lid
 
 ## Content
 
-lidarforfuel aims to compute fuel metrics from airborne LiDAR data and map them at a large scale. Currently, two R functions have been developed: 1) fPCpretreatment: pretreatment of a point cloud and 2) fCBDprofile_fuelmetrics: computing fuel metrics. These functions can be used either at the plot scale for specific analyses on small areas or at a large scale using a catalog of LiDAR tiles from the lidR package.
+lidarforfuel aims to compute fuel metrics from airborne LiDAR data and map them at a large scale. Currently, two R functions have been developed: 1) fPCpretreatment: pretreatment of a point cloud 2) pad_metrics: calculate PAD and 3) ffuelmetrics2Rast(): computing fuel metrics. These functions can be used either at the plot scale for specific analyses on small areas or at a large scale using a catalog of LiDAR tiles from the lidR package.
 
 ![Illustration summarising the global approach!](img/readme_1_general.png)
 
@@ -25,8 +25,12 @@ This library can be used in different ways:
 
 * `.github/`: folder containing issue templates and GitHub Actions;
 * `.vscode/`: folder containing a VS Code configuration for the project;
+* `configs/`: folder containing YAML file to configure the code;
 * `doc/`: folder containing documentation .md files (e.g., install.md);
+* `data/`: folder containing data for tests;
 * `img/`: folder containing images;
+* `lidar_for_fuel/`: folder contains the code;
+* `scripts/`: folder contains examples for lauching the code;
 * `tests/`: scripts and instructions for running tests;
 * `README.md`: this file
 
