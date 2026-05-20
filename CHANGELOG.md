@@ -6,6 +6,7 @@
 - Add function "download DTM LIDAR HD from Geoplateforme"
 - Add function "normalize height"
 - ADD function "add trajectory"
+- Update version for cicc_deploy.yml
 
 # v0.0.2
 - Add folder "configs" in Dockerfile
