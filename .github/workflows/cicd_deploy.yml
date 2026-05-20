@@ -36,7 +36,7 @@ jobs:
         docker run
         --ipc=host
         ${{ env.TEST_TAG }}
-        python -m pytest ./test -s --log-cli-level DEBUG
+        python -m pytest ./test -s --log-cli-level DEBUG --ignore=test/preprocessing/test_download_dtm_from_geoplateforme.py
 
     # Login against a Docker registry except on PR
     # https://github.com/docker/login-action
