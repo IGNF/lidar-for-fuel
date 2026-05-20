@@ -72,3 +72,4 @@ To test the docker image: `make docker-test`
 |Nom|Prénom|mail|fonction|
 |---|---|---|---|
 |DUPAYS|Malvina|malvina.dupays@ign.fr|DSI IGN|
+|VAUCHIER|Lea|lea.vauchiers@ign.fr|DSI IGN|
