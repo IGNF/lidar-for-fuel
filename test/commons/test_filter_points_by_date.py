@@ -131,11 +131,7 @@ def test_gpstime_window_correctness(rng):
     range_stages = [s for s in pipeline_spec["pipeline"] if isinstance(s, dict) and s.get("type") == "filters.range"]
     assert len(range_stages) == 1
     limits_str = range_stages[0]["limits"]
-<<<<<<< HEAD
     inner = limits_str[len("GpsTime["):-1]
-=======
-    inner = limits_str[len("GpsTime[") : -1]
->>>>>>> 8f1bacb (refacto add_trajectory : name fileds, configs, main_preprocessing)
     parsed_t_min, parsed_t_max = (float(v) for v in inner.split(":"))
 
     assert parsed_t_min == pytest.approx(EXPECTED_T_MIN, abs=1e-6)
