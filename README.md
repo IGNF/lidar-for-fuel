@@ -1,11 +1,14 @@
-# LidarForFuel industrialiazation
+# LidarForFuel industrialization
 
 This repo contains the code [lidarForFuel](https://github.com/oliviermartin7/LidarForFuel) written with R and developped by Olivier Martin : that code be re-written to accommodate specified changes to industralization.
 
 
 ## Content
 
-lidarforfuel aims to compute fuel metrics from airborne LiDAR data and map them at a large scale. Currently, two R functions have been developed: 1) fPCpretreatment: pretreatment of a point cloud 2) pad_metrics: calculate PAD and 3) ffuelmetrics2Rast(): computing fuel metrics. These functions can be used either at the plot scale for specific analyses on small areas or at a large scale using a catalog of LiDAR tiles from the lidR package.
+lidarforfuel aims to compute fuel metrics from airborne LiDAR data and map them at a large scale. Currently, two R functions have been developed:
+1) fPCpretreatment: pretreatment of a point cloud
+2) pad_metrics: calculate PAD and
+3) ffuelmetrics2Rast(): computing fuel metrics. These functions can be used either at the plot scale for specific analyses on small areas or at a large scale using a catalog of LiDAR tiles from the lidR package.
 
 ![Illustration summarising the global approach!](img/readme_1_general.png)
 
@@ -66,9 +69,10 @@ To build a docker image with the library installed: `make docker-build`
 To test the docker image: `make docker-test`
 
 
-# Contacts 
+# Contacts
 
 
-|Nom|Prénom|mail|fonction|
-|---|---|---|---|
-|DUPAYS|Malvina|malvina.dupays@ign.fr|DSI IGN|
+| Nom      | Prénom  | mail                  | fonction |
+| -------- | ------- | --------------------- | -------- |
+| DUPAYS   | Malvina | malvina.dupays@ign.fr | DSI IGN  |
+| VAUCHIER | Lea     | lea.vauchier@ign.fr   | DSI IGN  |
