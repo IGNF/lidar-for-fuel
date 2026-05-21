@@ -24,6 +24,9 @@ pretreatment:
       # Default matches the R reference: as.POSIXct("2011-09-14 01:46:40")
       # Override this value if your LiDAR data uses a different GPS time origin.
     gpstime_ref: "2011-09-14 01:46:40"
+  filter_outlier:
+    mean_k: 5
+    multiplier: 10
 
 hydra:
   output_subdir: null
