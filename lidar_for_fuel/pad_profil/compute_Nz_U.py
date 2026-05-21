@@ -1,13 +1,11 @@
 """
-Compute the scan angle correction factor "cos_theta" for PAD calculation.
+Compute Nz_U, the vertical component of the unit pulse vector (plane → point).
 
-The "cos_theta" factor corrects for the obliqueness of LiDAR pulses:
     flight_agl = Elevation - Zref                     (sensor height above ground)
     norm_U     = ||(X-Easting, Y-Northing, agl)||     (pulse vector norm)
-    Nz_U       = flight_agl / norm_U                  (vertical component, normalised)
-    cos_theta  = mean(|Nz_U|) over vegetation + ground points
+    Nz_U       = flight_agl / norm_U  =  cos(θ)       (θ = angle from nadir)
 
-Reference: Pimont et al. (2018); R source: pad_metrics.R L128-141.
+Nz_U is used downstream as cos_theta to correct PAD for the scanning angle.
 """
 import logging
 import numpy as np
@@ -15,18 +13,20 @@ import numpy as np
 logger = logging.getLogger(__name__)
 
 
-def compute_cos_theta(
+def Nz_U(
     X: np.ndarray,
     Y: np.ndarray,
     Zref: np.ndarray,
     Easting: np.ndarray,
     Northing: np.ndarray,
     Elevation: np.ndarray,
-    Classification: np.ndarray,
     scanning_angle: bool = True,
     limit_flight_agl: float = 800.0,
-) -> float | None:
-    """Compute the mean cosine of the scan zenith angle ("cos_theta").
+) -> np.ndarray | None:
+    """Compute the vertical component of the unit pulse vector (Nz_U = cos θ).
+
+    Nz_U is the cosine of the scanning angle from nadir. It is used as
+    ``cos_theta`` in the PAD calculation to correct for oblique pulses.
 
     Args:
         X: Point easting coordinate (Lambert-93, m).
@@ -35,15 +35,15 @@ def compute_cos_theta(
         Easting: Sensor easting at the point's acquisition time (m).
         Northing: Sensor northing at the point's acquisition time (m).
         Elevation: Sensor altitude at the point's acquisition time (m).
-        Classification: LiDAR classification code for each point.
-        scanning_angle: If False, returns 1.0 (vertical pulses assumed).
+        scanning_angle: If False, returns 1.0 (vertical pulses assumed, no correction).
         limit_flight_agl: Minimum acceptable mean sensor height above ground (m).
-            Below this threshold the trajectory is considered aberrant:
+            Below this threshold the trajectory is considered aberrant and
             None is returned with a warning.
 
     Returns:
-        cos_theta in (0, 1] averaged over vegetation and ground points,
-        or None if the flight height guard fails.
+        Nz_U (= cos θ): vertical component of the unit pulse vector (array),
+        or 1.0 if ``scanning_angle`` is False,
+        or None if the trajectory is aberrant.
     """
     if not scanning_angle:
         return 1.0
@@ -53,9 +53,8 @@ def compute_cos_theta(
 
     if mean_agl < limit_flight_agl:
         logger.warning(
-            "cos_theta: mean flight height above ground (%.1f m) is below "
-            "limit_flight_agl (%.1f m). "
-            "Pixel set to NaN. Check trajectory or disable scanning_angle.",
+            "NULL return: mean flight AGL (%.1f m) is below the threshold (%.1f m). "
+            "Check your trajectory and avoid using scanning_angle if it is uncertain.",
             mean_agl,
             limit_flight_agl,
         )
@@ -63,6 +62,4 @@ def compute_cos_theta(
 
     norm_U = np.sqrt((X - Easting) ** 2 + (Y - Northing) ** 2 + flight_agl ** 2)
     Nz_U = flight_agl / norm_U
-
-    veg_gnd_mask = (Classification >= 5) | (Classification == 9)
-    return float(np.mean(np.abs(Nz_U[veg_gnd_mask])))
+    return Nz_U
