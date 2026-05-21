@@ -1,5 +1,6 @@
 # 
 - Add function "check lidar data"
+- Add function "filter by deviation day"
 
 # v0.0.2
 - Add folder "configs" in Dockerfile
