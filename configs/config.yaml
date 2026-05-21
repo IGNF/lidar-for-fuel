@@ -30,12 +30,19 @@ pretreatment:
   filter_outlier:
     mean_k: 5
     multiplier: 10
+  normalize:
+    min_height_filter: -3
+    height_filter: 80
 
 dtm:
   download:
     resolution: 0.5 # Pixel size in metres
     dtm_layer : "IGNF_LIDAR-HD_MNT_ELEVATION.ELEVATIONGRIDCOVERAGE.LAMB93"
+    timeout: 60
+    epsg: 2154
+  input_filename: null
   output_subfolder: "DTM"
+  nodata_value: -9999  # Z_ref value assigned to points on NoData DTM pixels
 
 hydra:
   output_subdir: null

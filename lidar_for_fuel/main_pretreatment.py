@@ -6,14 +6,22 @@ Validates single file or all files in directory.
 
 import logging
 import os
+import tempfile
+
+import pdal
 
 import hydra
 from omegaconf import DictConfig
 
+from lidar_for_fuel.pretreatment.download_dtm_from_geoplateforme import download_dtm
 from lidar_for_fuel.pretreatment.filter_outliers import remove_outliers
 from lidar_for_fuel.pretreatment.filter_points_by_date import filter_by_date
 from lidar_for_fuel.pretreatment.filter_points_by_dimension_values import (
     filter_by_dimension_values,
+)
+from lidar_for_fuel.pretreatment.normalize_height_by_dtm import (
+    add_Zref,
+    filter_z_by_height,
 )
 from lidar_for_fuel.pretreatment.validate_lidar_file import check_lidar_file
 
@@ -46,7 +54,7 @@ def main(config: DictConfig):
 
     os.makedirs(output_dir, exist_ok=True)
 
-    # If input filename is not provided, lidro runs on the whole input_dir directory
+    # If input filename is not provided, runs on the whole input_dir directory
     initial_las_filename = config.io.input_filename
 
     def main_on_one_tile(filename):
@@ -58,9 +66,16 @@ def main(config: DictConfig):
         tilename = os.path.splitext(filename)[0]  # filename to the LAS file
         input_filename = os.path.join(input_dir, filename)  # path to the LAS file
         srid = config.io.spatial_reference
+
         logging.info(f"\nCheck data of 1 for tile : {tilename}")
         pipeline_check_lidar = check_lidar_file(input_filename, srid)
 
+        logging.info(f"\nDownload DTM of 1 for tile : {tilename}")
+        dtm_layer = config.dtm.download.dtm_layer
+        tile_width = config.tile_geometry.tile_width
+        resolution = config.dtm.download.resolution
+        timeout = config.dtm.download.timeout
+        epsg = config.dtm.download.epsg
         logging.info(f"\nFilter deviation day of 1 for tile : {tilename}")
         deviation_days = config.pretreatment.filter_date.deviation_days
         gpstime_ref = config.pretreatment.filter_date.gpstime_ref
@@ -71,10 +86,24 @@ def main(config: DictConfig):
         values = config.pretreatment.filter.keep_values
         pipeline_filter_dimension = filter_by_dimension_values(pipeline_filter_date, dimension, values)
 
+        logging.info(f"\nNormalize height of 1 for tile : {tilename}")
+        pipeline_filter_dimension.execute()
+        points = pipeline_filter_dimension.arrays[0]
+        nodata_value = config.dtm.nodata_value
+        min_height_filter = config.pretreatment.normalize.min_height_filter
+        height_filter = config.pretreatment.normalize.height_filter
+        with tempfile.TemporaryDirectory() as tmp_dtm_dir:
+            geotiff_path = download_dtm(
+                filename, input_dir, dtm_layer, tmp_dtm_dir, epsg, tile_width, resolution, timeout
+            )
+            points_with_zref = add_Zref(points, geotiff_path, nodata_value)
+            points_filter_z_by_height= filter_z_by_height(points_with_zref, min_height_filter, height_filter)
+
         logging.info(f"\nFilter outliers of 1 for tile : {tilename}")
+        pipeline_with_zref = pdal.Pipeline(arrays=[points_filter_z_by_height])
         mean_k = config.pretreatment.filter_outlier.mean_k
         multiplier = config.pretreatment.filter_outlier.multiplier
-        las = remove_outliers(pipeline_filter_dimension, mean_k, multiplier)
+        las = remove_outliers(pipeline_with_zref, mean_k, multiplier)
 
         return las
 
