@@ -9,6 +9,7 @@ work_dir: ${hydra:runtime.cwd}
 io:
   input_filename: null
   input_dir: null
+  input_trajectory_dir: null
   output_dir: null
   # Spatial reference to use to override the one from input las.
   spatial_reference: EPSG:2154
@@ -16,23 +17,27 @@ io:
 tile_geometry:
   tile_coord_scale: 1000  # coords in tile names are in km
   tile_width: 1000
- 
-pretreatment: 
-  filter:
-    dimension: Classification
-    keep_values: [1, 2, 3, 4, 5, 9, 66]   # Classes to keep 
+
+commons: 
   filter_date:
     deviation_days: 14
       # ISO-8601 UTC string corresponding to gpstime == 0.
       # Default matches the R reference: as.POSIXct("2011-09-14 01:46:40")
       # Override this value if your LiDAR data uses a different GPS time origin.
     gpstime_ref: "2011-09-14 01:46:40"
+
+preprocessing:
+  filter:
+    dimension: Classification
+    keep_values: [1, 2, 3, 4, 5, 9, 17, 64, 67]   # Classes to keep 
   filter_outlier:
     mean_k: 5
     multiplier: 10
   normalize:
     min_height_filter: -3
     height_filter: 80
+  trajectory:
+    nodata: 0
 
 dtm:
   download:
@@ -42,7 +47,7 @@ dtm:
     epsg: 2154
   input_filename: null
   output_subfolder: "DTM"
-  nodata_value: -9999  # Z_ref value assigned to points on NoData DTM pixels
+  nodata_value: -9999  # h_abg value assigned to points on NoData DTM pixels
 
 hydra:
   output_subdir: null
