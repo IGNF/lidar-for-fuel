@@ -39,6 +39,14 @@ preprocessing:
   trajectory:
     nodata: 0
 
+pad_prodil:
+  filter:
+    dimension: Classification
+    keep_values: [1, 2, 3, 4, 5, 9]   # Classes to keep 
+  Nz_U:
+    limit_flight_agl: 800
+    scanning_angle: True
+
 dtm:
   download:
     resolution: 0.5 # Pixel size in metres
