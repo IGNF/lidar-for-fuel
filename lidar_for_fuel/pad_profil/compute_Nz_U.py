@@ -2,7 +2,7 @@
 Compute Nz_U, the vertical component of the unit pulse vector (plane → point).
 
     flight_agl = Elevation - h_abg                     (sensor height above ground)
-    norm_U     = ||(X-X_sensor, Y-Northing, agl)||     (pulse vector norm)
+    norm_u     = ||(x-x_sensor, y-y_sensor, agl)||      (pulse vector norm)
     Nz_U       = flight_agl / norm_U  =  cos(θ)       (θ = angle from nadir)
 
 Nz_U is used downstream as cos_theta to correct PAD for the scanning angle.
@@ -13,13 +13,13 @@ import numpy as np
 logger = logging.getLogger(__name__)
 
 
-def Nz_U(
-    X: np.ndarray,
-    Y: np.ndarray,
+def compute_Nz_U(
+    x: np.ndarray,
+    y: np.ndarray,
     h_abg: np.ndarray,
-    X_sensor: np.ndarray,
-    Y_sensor: np.ndarray,
-    Z_sensor: np.ndarray,
+    x_sensor: np.ndarray,
+    y_sensor: np.ndarray,
+    z_sensor: np.ndarray,
     scanning_angle: bool = True,
     limit_flight_agl: float = 800.0,
 ) -> np.ndarray | None:
@@ -29,12 +29,12 @@ def Nz_U(
     ``cos_theta`` in the PAD calculation to correct for oblique pulses.
 
     Args:
-        X: Point easting coordinate (Lambert-93, m).
-        Y: Point northing coordinate (Lambert-93, m).
+        x: Point easting coordinate (Lambert-93, m).
+        y: Point northing coordinate (Lambert-93, m).
         h_abg: Ground elevation at each point (from DTM, field ``h_abg``, m).
-        X_sensor: Sensor easting at the point's acquisition time (m).
-        Y_sensor: Sensor northing at the point's acquisition time (m).
-        Z_sensor: Sensor altitude at the point's acquisition time (m).
+        x_sensor: Sensor easting at the point's acquisition time (m).
+        y_sensor: Sensor northing at the point's acquisition time (m).
+        z_sensor: Sensor altitude at the point's acquisition time (m).
         scanning_angle: If False, returns 1.0 (vertical pulses assumed, no correction).
         limit_flight_agl: Minimum acceptable mean sensor height above ground (m).
             Below this threshold the trajectory is considered aberrant and
@@ -48,7 +48,7 @@ def Nz_U(
     if not scanning_angle:
         return 1.0
 
-    flight_agl = Z_sensor - h_abg
+    flight_agl = z_sensor - h_abg
     mean_agl = float(np.mean(flight_agl))
 
     if mean_agl < limit_flight_agl:
@@ -60,6 +60,6 @@ def Nz_U(
         )
         return None
 
-    norm_U = np.sqrt((X - X_sensor) ** 2 + (Y - Y_sensor) ** 2 + flight_agl ** 2)
-    Nz_U = flight_agl / norm_U
-    return Nz_U
+    norm_u = np.sqrt((x - x_sensor) ** 2 + (y - y_sensor) ** 2 + flight_agl ** 2)
+    nz_u = flight_agl / norm_u
+    return nz_u

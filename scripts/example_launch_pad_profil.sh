@@ -1,4 +1,4 @@
-# For lauching pad_profil
+# For launching pad_profil
 python -m lidar_for_fuel.main_pad_profil \
   io.input_dir=./data/pointcloud/ \
   io.input_filename=test_semis_2024_0751_6690_LA93_IGN69.laz  \

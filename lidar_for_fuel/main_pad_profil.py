@@ -12,7 +12,7 @@ import hydra
 import pdal
 from omegaconf import DictConfig
 
-from lidar_for_fuel.pad_profil.compute_Nz_U import Nz_U
+from lidar_for_fuel.pad_profil.compute_Nz_U import compute_Nz_U
 from lidar_for_fuel.pad_profil.validate_lidar_preprocessing_file import check_lidar_file
 
 logger = logging.getLogger(__name__)
@@ -37,24 +37,20 @@ def pad_profil_one_tile(
             None is returned with a warning.
 
     """
-    try:
-        check_lidar_file(input_filename)
-    except (ValueError, FileNotFoundError) as e:
-        logger.error("Validation failed for %s: %s — tile skipped.", input_filename, e)
-        return
+    check_lidar_file(input_filename)
 
     pipeline = pdal.Pipeline() | pdal.Reader.las(filename=input_filename, override_srs=srid, nosrs=True)
     pipeline.execute()
     points = pipeline.arrays[0]
 
-    X = points["X"].astype(np.float64)
-    Y = points["Y"].astype(np.float64)
+    x = points["X"].astype(np.float64)
+    y = points["Y"].astype(np.float64)
     h_abg = points["h_abg"].astype(np.float64)
-    X_sensor = points["X_sensor"].astype(np.float64)
-    Y_sensor = points["Y_sensor"].astype(np.float64)
-    Z_sensor = points["Z_sensor"].astype(np.float64)
+    x_sensor = points["X_sensor"].astype(np.float64)
+    y_sensor = points["Y_sensor"].astype(np.float64)
+    z_sensor = points["Z_sensor"].astype(np.float64)
 
-    nz_u = Nz_U(X, Y, h_abg, X_sensor, Y_sensor, Z_sensor, scanning_angle, limit_flight_agl)
+    nz_u = compute_Nz_U(x, y, h_abg, x_sensor, y_sensor, z_sensor, scanning_angle, limit_flight_agl)
     if nz_u is None:
         logger.warning("Nz_U could not be computed for %s — tile skipped.", input_filename)
         return
@@ -62,7 +58,7 @@ def pad_profil_one_tile(
 
 @hydra.main(config_path="../configs/", config_name="config.yaml", version_base="1.2")
 def main(config: DictConfig):
-    """ Compute PAD metrics from the input LAS/LAZ file and save it as severals RASTER file.
+    """ Compute PAD metrics from the input LAS/LAZ file and save it as several RASTER files.
 
     It can run either on a single file, or on each file of a folder.
 

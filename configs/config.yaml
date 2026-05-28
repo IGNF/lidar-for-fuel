@@ -39,13 +39,14 @@ preprocessing:
   trajectory:
     nodata: 0
 
-pad_prodil:
+pad_profile:
   filter:
     dimension: Classification
     keep_values: [1, 2, 3, 4, 5, 9]   # Classes to keep 
   Nz_U:
     limit_flight_agl: 800
     scanning_angle: True
+
 
 dtm:
   download:
@@ -57,10 +58,6 @@ dtm:
   output_subfolder: "DTM"
   nodata_value: -9999  # h_abg value assigned to points on NoData DTM pixels
 
-pad_profil:
-  # --- Angle de scan ---
-  scanning_angle: true          # utiliser l'angle réel (false → cos_theta = 1)
-  limit_flight_agl: 800         # (m) garde-fou hauteur de vol minimale
 
 hydra:
   output_subdir: null

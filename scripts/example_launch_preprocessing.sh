@@ -1,4 +1,4 @@
-# For lauching fPCpretrreatment
+# For launching fPCpretrreatment
 python -m lidar_for_fuel.main_preprocessing \
   io.input_dir=./data/pointcloud/ \
   io.input_trajectory_dir=./data/trajectory/ \

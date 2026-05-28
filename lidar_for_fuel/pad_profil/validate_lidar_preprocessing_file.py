@@ -1,8 +1,8 @@
 """
-LiDAR file validation utility for the PAD PROFIL pipeline.
+LiDAR file validation utility for the PAD PROFILE pipeline.
 
 Extends the base LAS/LAZ validation with a check that the four extra dimensions
-required for the PAD PROFIL processing (h_abg, X_sensor, Y_sensor, Z_sensor)
+required for the PAD PROFILE processing (h_abg, X_sensor, Y_sensor, Z_sensor)
 are present in the file. Only the file header is read so that large tiles are
 never loaded into memory during validation.
 """
@@ -17,11 +17,11 @@ REQUIRED_EXTRA_DIMS = {"h_abg", "X_sensor", "Y_sensor", "Z_sensor"}
 
 
 def check_lidar_file(input_file: str) -> None:
-    """Validate a LiDAR file (.las or .laz) for the PAD PROFIL pipeline.
+    """Validate a LiDAR file (.las or .laz) for the PAD PROFILE pipeline.
 
     In addition to the base checks (path, extension, existence), this function
     verifies that the file contains the four extra dimensions needed by the PAD
-    PROFIL processing (h_abg, X_sensor, Y_sensor, Z_sensor).
+    PROFILE processing (h_abg, X_sensor, Y_sensor, Z_sensor).
 
     Only the file header is read (via laspy) so that large tiles are never
     loaded into memory.
@@ -47,7 +47,7 @@ def check_lidar_file(input_file: str) -> None:
 
     # Read only the header — no point data is loaded
     with laspy.open(input_file) as reader:
-        present_extra_dims = {dim.name for dim in reader.header.point_format.extra_dims}
+        present_extra_dims = set(reader.header.point_format.extra_dimension_names)
 
     missing = REQUIRED_EXTRA_DIMS - present_extra_dims
     if missing:

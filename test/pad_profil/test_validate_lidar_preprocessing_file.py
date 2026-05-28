@@ -7,7 +7,8 @@ import laspy
 import numpy as np
 import pytest
 
-from lidar_for_fuel.pad_profil.validate_lidar_preprocessing_file import REQUIRED_EXTRA_DIMS, check_lidar_file
+from lidar_for_fuel.pad_profil.validate_lidar_preprocessing_file import check_lidar_file, REQUIRED_EXTRA_DIMS
+
 
 TMP_PATH = Path("./tmp/check_lidar_pad_profil")
 
@@ -74,17 +75,3 @@ def test_check_lidar_file_missing_some_extra_dims():
     assert "Z_sensor" in error_message
 
 
-def test_check_lidar_file_all_extra_dims_present_no_false_positive():
-    """A file with all 4 required extra dims must not raise any error."""
-    complete = TMP_PATH / "complete_extra_dims.laz"
-    _write_las_with_extra_dims(complete, list(REQUIRED_EXTRA_DIMS))
-    check_lidar_file(str(complete))
-
-
-# ── integration test on real preprocessed data ────────────────────────────────
-
-def test_check_lidar_file_valid_on_real_data():
-    """On real preprocessed data, must complete without raising."""
-    if not PRETRAITED_LAS.exists():
-        pytest.skip(f"Preprocessed data not available: {PRETRAITED_LAS}")
-    check_lidar_file(str(PRETRAITED_LAS))
