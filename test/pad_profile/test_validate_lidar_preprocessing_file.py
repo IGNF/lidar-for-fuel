@@ -1,4 +1,4 @@
-"""Tests for pad_profil/validate_lidar_preprocessing_file — validates extra dims h_abg, X_sensor, Y_sensor, Z_sensor."""
+"""Tests for pad_profile/validate_lidar_preprocessing_file — validates extra dims h_abg, X_sensor, Y_sensor, Z_sensor."""
 import os
 import shutil
 from pathlib import Path
@@ -7,10 +7,10 @@ import laspy
 import numpy as np
 import pytest
 
-from lidar_for_fuel.pad_profil.validate_lidar_preprocessing_file import check_lidar_file, REQUIRED_EXTRA_DIMS
+from lidar_for_fuel.pad_profile.validate_lidar_preprocessing_file import check_lidar_file, REQUIRED_EXTRA_DIMS
 
 
-TMP_PATH = Path("./tmp/check_lidar_pad_profil")
+TMP_PATH = Path("./tmp/check_lidar_pad_profile")
 
 # File produced by the preprocessing pipeline: has all 4 required extra dims.
 PRETRAITED_LAS = Path(
@@ -58,8 +58,6 @@ def test_check_lidar_file_unsupported_extension():
 
 def test_check_lidar_file_missing_all_extra_dims():
     """A raw LAS file without any extra dims must raise ValueError naming missing dims."""
-    if not RAW_LAS.exists():
-        pytest.skip(f"Raw data not available: {RAW_LAS}")
     with pytest.raises(ValueError, match="Missing required extra dimensions"):
         check_lidar_file(str(RAW_LAS))
 

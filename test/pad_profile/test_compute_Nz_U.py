@@ -5,9 +5,9 @@ import laspy
 import numpy as np
 import pytest
 
-from lidar_for_fuel.pad_profil.compute_Nz_U import compute_Nz_U
+from lidar_for_fuel.pad_profile.compute_Nz_U import compute_Nz_U
 
-_PREPROCESSED_LAS= Path(
+_PREPROCESSING_LAS= Path(
     "data/pointcloud/test_semis_2024_0751_6690_LA93_IGN69_filter_trajectory_1311_pretraited.laz"
 )
 
@@ -73,10 +73,10 @@ def test_compute_Nz_U(n, flight_agl, horizontal_offset, scanning_angle, limit_fl
 
 def test_compute_Nz_U_on_real_data():
     """On real preprocessed data, all Nz_U values must be in (0, 1]."""
-    if not _PREPROCESSED_LAS.exists():
-        pytest.skip(f"Real data not available: {_PREPROCESSED_LAS}")
+    if not _PREPROCESSING_LAS.exists():
+        pytest.skip(f"Real data not available: {_PREPROCESSING_LAS}")
 
-    las = laspy.read(str(_PREPROCESSED_LAS))
+    las = laspy.read(str(_PREPROCESSING_LAS))
     x = np.asarray(las.x, dtype=np.float64)
     y = np.asarray(las.y, dtype=np.float64)
     h_abg = np.asarray(las["h_abg"], dtype=np.float64)

@@ -12,13 +12,13 @@ import hydra
 import pdal
 from omegaconf import DictConfig
 
-from lidar_for_fuel.pad_profil.compute_Nz_U import compute_Nz_U
-from lidar_for_fuel.pad_profil.validate_lidar_preprocessing_file import check_lidar_file
+from lidar_for_fuel.pad_profile.compute_Nz_U import compute_Nz_U
+from lidar_for_fuel.pad_profile.validate_lidar_preprocessing_file import check_lidar_file
 
 logger = logging.getLogger(__name__)
 
 
-def pad_profil_one_tile(
+def pad_profile_one_tile(
     input_filename: str,
     output_path: str,
     srid: str = "EPSG:2154",
@@ -82,13 +82,13 @@ def main(config: DictConfig):
 
     def main_on_one_tile(filename):
         logging.info(f"\nProcessing tile : {os.path.splitext(filename)[0]}")
-        pad_profil_one_tile(
+        pad_profile_one_tile(
             input_filename=os.path.join(input_dir, filename),
             output_path=os.path.join(output_dir, os.path.splitext(filename)[0] + ".laz"),
             srid=config.io.spatial_reference,
             nodata_value=config.dtm.nodata_value,
-            scanning_angle=config.pad_profil.Nz_U.scanning_angle,
-            limit_flight_agl=config.pad_profil.Nz_U.limit_flight_agl,
+            scanning_angle=config.pad_profile.Nz_U.scanning_angle,
+            limit_flight_agl=config.pad_profile.Nz_U.limit_flight_agl,
         )
 
     if initial_las_filename:
