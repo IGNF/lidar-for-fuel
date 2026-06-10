@@ -29,19 +29,19 @@ def compute_Nz_U(
     ``cos_theta`` in the PAD calculation to correct for oblique pulses.
 
     Args:
-        x: Point easting coordinate (Lambert-93, m).
-        y: Point northing coordinate (Lambert-93, m).
-        h_abg: Ground elevation at each point (from DTM, field ``h_abg``, m).
-        x_sensor: Sensor easting at the point's acquisition time (m).
-        y_sensor: Sensor northing at the point's acquisition time (m).
-        z_sensor: Sensor altitude at the point's acquisition time (m).
-        scanning_angle: If False, returns 1.0 (vertical pulses assumed, no correction).
-        limit_flight_agl: Minimum acceptable mean sensor height above ground (m).
+        x (np.ndarray): Point easting coordinate.
+        y (np.ndarray): Point northing coordinate.
+        h_abg (np.ndarray): Ground elevation at each point (m).
+        x_sensor (np.ndarray): Sensor easting at the point's acquisition time (m).
+        y_sensor (np.ndarray): Sensor northing at the point's acquisition time (m).
+        z_sensor (np.ndarray): Sensor altitude at the point's acquisition time (m).
+        scanning_angle (bool): If False, returns 1.0 (vertical pulses assumed, no correction).
+        limit_flight_agl (float): Minimum acceptable mean sensor height above ground (m).
             Below this threshold the trajectory is considered aberrant and
             None is returned with a warning.
 
     Returns:
-        Nz_U (= cos θ): vertical component of the unit pulse vector (array),
+        Nz_U (np.ndarray): vertical component of the unit pulse vector (array),
         or 1.0 if ``scanning_angle`` is False,
         or None if the trajectory is aberrant.
     """

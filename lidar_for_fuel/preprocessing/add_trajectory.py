@@ -147,12 +147,12 @@ def add_trajectory_to_points(
         to the structured array via ``numpy.lib.recfunctions``.
 
     Args:
-        points: Structured numpy array of LiDAR points (from ``las.points.array``
+        points (np.ndarray): Structured numpy array of LiDAR points (from ``las.points.array``
             or a PDAL pipeline array), containing at least the fields
             ``PointSourceId`` (or ``point_source_id``) and ``GpsTime``
             (or ``gps_time``).
-        trajectory_folder: Folder containing the JSON trajectory files.
-        nodata: Value assigned to X_sensor, Y_sensor and Z_sensor for points
+        trajectory_folder (str): Folder containing the JSON trajectory files.
+        nodata (int): Value assigned to X_sensor, Y_sensor and Z_sensor for points
             whose PointSourceId has no matching trajectory file. Default: 0.
 
     Returns:

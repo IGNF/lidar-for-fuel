@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Main script for LiDAR file validation in PAD PROFIL.
+Main script for LiDAR file validation in PAD PROFILE.
 Validates single file or all files in directory.
 """
 
@@ -25,14 +25,14 @@ def pad_profile_one_tile(
     scanning_angle: bool = True,
     limit_flight_agl: float = 800,
 ) -> None:
-    """Run the full pad profil pipeline on one tile.
+    """Run the full pad profile pipeline on one tile.
 
     Args:
-        input_filename: Path to the input LAS/LAZ file.
-        output_path: Path for the output LAZ file.
-        srid: Spatial reference of the input file. Default: EPSG:2154.
-        scanning_angle: If False, returns 1.0 (vertical pulses assumed, no correction).
-        limit_flight_agl: Minimum acceptable mean sensor height above ground (m).
+        input_filename (str): Path to the input LAS/LAZ file.
+        output_path (str): Path for the output LAZ file.
+        srid (str): Spatial reference of the input file. Default: EPSG:2154.
+        scanning_angle (bool): If False, returns 1.0 (vertical pulses assumed, no correction).
+        limit_flight_agl (float): Minimum acceptable mean sensor height above ground (m).
             Below this threshold the trajectory is considered aberrant and
             None is returned with a warning.
 

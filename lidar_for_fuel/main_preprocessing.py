@@ -54,24 +54,24 @@ def preprocess_one_tile(
     call while keeping the download step as the default production behaviour.
 
     Args:
-        input_filename: Path to the input LAS/LAZ file.
-        trajectory_dir: Folder containing JSON trajectory files.
-        output_path: Path for the output LAZ file.
-        srid: Spatial reference of the input file. Default: EPSG:2154.
-        filter_dimension: LiDAR dimension used for class filtering. Default: Classification.
-        filter_values: Classification values to keep (config.preprocessing.filter.keep_values).
-        nodata_value: Value assigned to h_abg for NoData DTM pixels. Default: -9999.
-        min_height_filter: Minimum height above ground to keep (m). Default: -3.
-        height_filter: Maximum height above ground to keep (m). Default: 80.
-        trajectory_nodata: Value for sensor fields when no trajectory is found. Default: 0.
-        mean_k: Number of nearest neighbours for outlier detection. Default: 5.
-        multiplier: Standard deviation multiplier for outlier detection. Default: 10.
-        dtm_layer: IGN Géoplateforme layer identifier for DTM download.
-        dtm_epsg: EPSG code for DTM download. Default: 2154.
-        tile_width: Tile width in metres. Default: 1000.
-        dtm_resolution: DTM pixel size in metres. Default: 0.5.
-        dtm_timeout: Timeout in seconds for the DTM download. Default: 60.
-        dtm_path: Path to an existing DTM GeoTIFF. If provided, skips the download.
+        input_filename (str): Path to the input LAS/LAZ file.
+        trajectory_dir (str): Folder containing JSON trajectory files.
+        output_path (str): Path for the output LAZ file.
+        srid (str): Spatial reference of the input file. Default: EPSG:2154.
+        filter_dimension (str): LiDAR dimension used for class filtering. Default: Classification.
+        filter_values (list): Classification values to keep (config.preprocessing.filter.keep_values).
+        nodata_value (float): Value assigned to h_abg for NoData DTM pixels. Default: -9999.
+        min_height_filter (float): Minimum height above ground to keep (m). Default: -3.
+        height_filter (float): Maximum height above ground to keep (m). Default: 80.
+        trajectory_nodata (int): Value for sensor fields when no trajectory is found. Default: 0.
+        mean_k (int): Number of nearest neighbours for outlier detection. Default: 5.
+        multiplier (float): Standard deviation multiplier for outlier detection. Default: 10.
+        dtm_layer (str): IGN Géoplateforme layer identifier for DTM download.
+        dtm_epsg (int): EPSG code for DTM download. Default: 2154.
+        tile_width (int): Tile width in metres. Default: 1000.
+        dtm_resolution (float): DTM pixel size in metres. Default: 0.5.
+        dtm_timeout (int): Timeout in seconds for the DTM download. Default: 60.
+        dtm_path (str): Path to an existing DTM GeoTIFF. If provided, skips the download.
     """
     pipeline = check_lidar_file(input_filename, srid)
     pipeline = filter_by_dimension_values(pipeline, filter_dimension, filter_values)

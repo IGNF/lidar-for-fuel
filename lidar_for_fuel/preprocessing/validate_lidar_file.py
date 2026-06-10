@@ -14,7 +14,7 @@ def check_lidar_file(input_file: str, spatial_ref: str) -> pdal.Pipeline:
     Validate and load a LiDAR file (.las or .laz).
 
     Args:
-        input_file: Path to .las or .laz file.
+        input_file (str): Path to .las or .laz file.
         spatial_ref (str): spatial reference to use when reading las file.
 
     Returns:

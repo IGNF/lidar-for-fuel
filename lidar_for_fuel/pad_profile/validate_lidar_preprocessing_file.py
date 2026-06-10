@@ -27,7 +27,7 @@ def check_lidar_file(input_file: str) -> None:
     loaded into memory.
 
     Args:
-        input_file: Path to .las or .laz file.
+        input_file (str): Path to .las or .laz file.
 
     Raises:
         ValueError: If the input path is not a non-empty string, if the file
