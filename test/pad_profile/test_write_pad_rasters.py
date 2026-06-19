@@ -297,15 +297,15 @@ def test_pad_values_above_cap_are_clipped_to_5(tmp_path):
         assert data[0, 0, 0] == pytest.approx(5.0)
 
 
-def test_misaligned_dalle_origin_raises_value_error_and_writes_nothing(tmp_path):
+def test_non_positive_shape_raises_value_error_and_writes_nothing(tmp_path):
     points = _make_points(2, REFERENCE_ORIGIN_X, REFERENCE_ORIGIN_Y, 1, 1)
 
     with pytest.raises(ValueError):
         write_pad_rasters(
             **points,
-            origin_x=REFERENCE_ORIGIN_X + 5.0,
+            origin_x=REFERENCE_ORIGIN_X,
             origin_y=REFERENCE_ORIGIN_Y,
-            n_rows=1,
+            n_rows=0,
             n_cols=1,
             output_dir=str(tmp_path),
             scanning_angle=False,
@@ -314,6 +314,29 @@ def test_misaligned_dalle_origin_raises_value_error_and_writes_nothing(tmp_path)
         )
 
     assert list(tmp_path.iterdir()) == []
+
+
+def test_dalle_native_origin_not_aligned_to_cosiafrance_grid_does_not_raise(tmp_path):
+    # Real LiDAR HD tile origin (round km value) -- must work without raising,
+    # since CosiaFrance recalage is deferred to a separate future step.
+    origin_x, origin_y = 985000.0, 6271000.0
+    points = _make_points(2, origin_x, origin_y, 1, 1)
+
+    paths = write_pad_rasters(
+        **points,
+        origin_x=origin_x,
+        origin_y=origin_y,
+        n_rows=1,
+        n_cols=1,
+        output_dir=str(tmp_path),
+        scanning_angle=False,
+        use_cover=False,
+        limit_N_points=0,
+    )
+
+    with rasterio.open(paths["pad_profile_1m"]) as src:
+        assert src.transform.c == origin_x
+        assert src.transform.f == origin_y
 
 
 def test_mismatched_array_lengths_raises_value_error(tmp_path):

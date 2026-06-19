@@ -12,48 +12,24 @@ from lidar_for_fuel.pad_profile.pad_output_grid import (
 )
 
 
-def test_build_dalle_transform_aligned_origin_returns_affine():
-    origin_x = REFERENCE_ORIGIN_X + 50 * PIXEL_SIZE
-    origin_y = REFERENCE_ORIGIN_Y - 30 * PIXEL_SIZE
+def test_build_dalle_transform_uses_dalle_native_origin():
+    # Native LiDAR HD tile origin (round km value), not aligned with the CosiaFrance
+    # reference grid -- must NOT raise (recalage is deferred to a separate future step).
+    origin_x = 985000.0
+    origin_y = 6271000.0
 
-    transform = build_dalle_transform(origin_x, origin_y, n_rows=10, n_cols=10)
+    transform = build_dalle_transform(origin_x, origin_y, n_rows=100, n_cols=100)
 
     expected = Affine.translation(origin_x, origin_y) * Affine.scale(PIXEL_SIZE, -PIXEL_SIZE)
     assert transform == expected
 
 
-def test_build_dalle_transform_exact_reference_origin_is_valid():
+def test_build_dalle_transform_at_reference_origin_still_works():
     transform = build_dalle_transform(REFERENCE_ORIGIN_X, REFERENCE_ORIGIN_Y, n_rows=5, n_cols=5)
     assert transform.a == PIXEL_SIZE
     assert transform.e == -PIXEL_SIZE
     assert transform.c == REFERENCE_ORIGIN_X
     assert transform.f == REFERENCE_ORIGIN_Y
-
-
-def test_build_dalle_transform_misaligned_x_raises_value_error():
-    origin_x = REFERENCE_ORIGIN_X + 5.0  # not a multiple of 10 m
-    origin_y = REFERENCE_ORIGIN_Y
-
-    with pytest.raises(ValueError):
-        build_dalle_transform(origin_x, origin_y, n_rows=5, n_cols=5)
-
-
-def test_build_dalle_transform_misaligned_y_raises_value_error():
-    origin_x = REFERENCE_ORIGIN_X
-    origin_y = REFERENCE_ORIGIN_Y + 3.3
-
-    with pytest.raises(ValueError):
-        build_dalle_transform(origin_x, origin_y, n_rows=5, n_cols=5)
-
-
-def test_build_dalle_transform_within_float_tolerance_is_valid():
-    # Offset by 1e-9 m should still be treated as an exact multiple of 10 m.
-    origin_x = REFERENCE_ORIGIN_X + 20 * PIXEL_SIZE + 1e-9
-    origin_y = REFERENCE_ORIGIN_Y - 20 * PIXEL_SIZE - 1e-9
-
-    transform = build_dalle_transform(origin_x, origin_y, n_rows=5, n_cols=5)
-    assert transform.c == pytest.approx(origin_x)
-    assert transform.f == pytest.approx(origin_y)
 
 
 @pytest.mark.parametrize("n_rows,n_cols", [(0, 5), (5, 0), (-1, 5), (5, -1)])

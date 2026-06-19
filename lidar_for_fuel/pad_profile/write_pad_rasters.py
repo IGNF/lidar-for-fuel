@@ -1,7 +1,9 @@
 """
 Orchestrate PAD output rasters for one dalle: bin raw points into 10 m pixels
-aligned to the CosiaFrance reference grid, compute 6 per-pixel products via
-`pad_metrics_core`/`filter_gpstime`, and write 6 COG GeoTIFFs.
+on the dalle's own native origin, compute 6 per-pixel products via
+`pad_metrics_core`/`filter_gpstime`, and write 6 COG GeoTIFFs. Recalage onto the
+CosiaFrance national reference grid is deferred to a separate future step
+(see `pad_output_grid.py`).
 
 Per pixel group:
 - `pad_metrics_core(dz=1, nlayers=60, keep_N=True)` feeds `pad_profile_1m`
@@ -130,8 +132,7 @@ def write_pad_rasters(
             file path.
 
     Raises:
-        ValueError: If the dalle origin is not aligned with the CosiaFrance reference
-            grid, or `n_rows`/`n_cols` are not positive (propagated from
+        ValueError: If `n_rows`/`n_cols` are not positive (propagated from
             `build_dalle_transform`); if the per-point arrays don't all have the same
             length; or if `pad_metrics_kwargs` includes a reserved key (`dz`, `nlayers`,
             `keep_N`). No files are written in any of these cases.

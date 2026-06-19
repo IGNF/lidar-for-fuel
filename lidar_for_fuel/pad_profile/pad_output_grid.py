@@ -1,36 +1,32 @@
 """
-CosiaFrance reference grid constants and per-dalle transform/binning helpers.
+Per-dalle transform/binning helpers, plus the CosiaFrance reference grid constants.
 
-PAD output rasters must align to the FMA `CosiaFrance_V16.tif` reference grid
-(EPSG:2154, 10 m pixels, France-wide). A dalle's own raster origin must be
-congruent with this global grid, i.e. its offset from the reference origin
-must be an exact multiple of the pixel size; otherwise points cannot be
-binned into a grid-aligned raster and a `ValueError` is raised.
+PAD output rasters are written using the dalle's own native origin (e.g. derived
+from the IGN LiDAR HD tiling convention) at the project's standard 10 m / EPSG:2154
+grid. Recalage onto the FMA `CosiaFrance_V16.tif` national reference grid
+(France-wide, same resolution/CRS but a different, sub-pixel-offset origin) is
+deferred to a separate future step and is NOT enforced here: real LiDAR HD dalle
+origins (round km values) are not grid-aligned with the CosiaFrance origin to
+within a multiple of the pixel size, so requiring that alignment at this stage
+would reject all real input data.
 """
 
 import numpy as np
 from rasterio.transform import Affine
 
+# CosiaFrance national reference grid -- kept for the future recalage step, not
+# used by build_dalle_transform (see module docstring).
 REFERENCE_ORIGIN_X = 98039.69
 REFERENCE_ORIGIN_Y = 7111486.70
 PIXEL_SIZE = 10.0
 REFERENCE_CRS = "EPSG:2154"
 
-_ALIGNMENT_TOLERANCE = 1e-6
-
-
-def _is_aligned(offset: float, pixel_size: float, tolerance: float = _ALIGNMENT_TOLERANCE) -> bool:
-    """Return True if `offset` is an exact multiple of `pixel_size`, within float tolerance."""
-    remainder = offset % pixel_size
-    return remainder <= tolerance or (pixel_size - remainder) <= tolerance
-
 
 def build_dalle_transform(origin_x: float, origin_y: float, n_rows: int, n_cols: int) -> Affine:
-    """Build/validate the rasterio Affine transform for one dalle's output raster.
+    """Build the rasterio Affine transform for one dalle's output raster.
 
-    The dalle's origin (top-left corner) must be grid-aligned with the CosiaFrance
-    reference grid: `(origin_x - REFERENCE_ORIGIN_X)` and `(REFERENCE_ORIGIN_Y - origin_y)`
-    must both be exact multiples of `PIXEL_SIZE` (within float tolerance).
+    Uses the dalle's own native origin (top-left corner) -- no alignment check
+    against the CosiaFrance reference grid (see module docstring).
 
     Args:
         origin_x (float): Dalle raster origin, top-left X (m, EPSG:2154).
@@ -43,23 +39,10 @@ def build_dalle_transform(origin_x: float, origin_y: float, n_rows: int, n_cols:
             10 m pixels, north-up (negative Y pixel size).
 
     Raises:
-        ValueError: If `origin_x`/`origin_y` are not grid-aligned with the
-            CosiaFrance reference grid, or if `n_rows`/`n_cols` are not
-            positive integers.
+        ValueError: If `n_rows`/`n_cols` are not positive integers.
     """
     if n_rows <= 0 or n_cols <= 0:
         raise ValueError(f"n_rows and n_cols must be positive integers, got n_rows={n_rows}, n_cols={n_cols}")
-
-    offset_x = origin_x - REFERENCE_ORIGIN_X
-    offset_y = REFERENCE_ORIGIN_Y - origin_y
-
-    if not _is_aligned(offset_x, PIXEL_SIZE) or not _is_aligned(offset_y, PIXEL_SIZE):
-        raise ValueError(
-            "Misaligned dalle origin: offset from the CosiaFrance reference grid origin "
-            f"(X={REFERENCE_ORIGIN_X}, Y={REFERENCE_ORIGIN_Y}) must be an exact multiple of "
-            f"{PIXEL_SIZE} m. Got origin_x={origin_x}, origin_y={origin_y} "
-            f"(offset_x={offset_x}, offset_y={offset_y})."
-        )
 
     return Affine.translation(origin_x, origin_y) * Affine.scale(PIXEL_SIZE, -PIXEL_SIZE)
 
