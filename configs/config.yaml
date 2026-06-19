@@ -49,6 +49,20 @@ dtm:
   output_subfolder: "DTM"
   nodata_value: -9999  # h_abg value assigned to points on NoData DTM pixels
 
+pad_profile:
+  input_dir: null
+  input_filename: null
+  output_dir: null
+  # pad_metrics_core kwargs -- null means "use pad_metrics_core's own default"
+  G: null
+  omega: null
+  scanning_angle: null
+  use_cover: null
+  cover_type: null
+  height_cover: null
+  limit_N_points: null
+  limit_flight_agl: null
+
 hydra:
   output_subdir: null
   run:
