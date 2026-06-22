@@ -1,0 +1,167 @@
+#!/usr/bin/env python3
+"""
+Main script for computing PAD (Plant Area Density) metrics pixel by pixel.
+Runs on a single pre-processed LAS/LAZ tile or all tiles in a directory.
+"""
+
+import logging
+import os
+
+import numpy as np
+import hydra
+import pdal
+from omegaconf import DictConfig
+
+from lidar_for_fuel.pad_profile.calculate_pad_profile import pad_metrics_core
+from lidar_for_fuel.pad_profile.validate_lidar_preprocessing_file import check_lidar_file
+
+logger = logging.getLogger(__name__)
+
+PIXEL_SIZE = 10.0
+
+
+def pad_profile_one_tile(
+    input_filename: str,
+    output_path: str,
+    srid: str = "EPSG:2154",
+    scanning_angle: bool = True,
+    limit_N_points: int = 0,
+    limit_flight_agl: float = 800,
+    deviation_days: float = np.inf,
+    gpstime_ref: str = "2011-09-14 01:46:40",
+) -> dict:
+    """Compute PAD metrics pixel by pixel for one tile.
+
+    Bins the tile's points into a 10 m grid, then calls `pad_metrics_core` on each
+    pixel's own points (not on the tile as a whole).
+
+    Args:
+        input_filename (str): Path to the input LAS/LAZ file.
+        output_path (str): Path for the output LAZ file.
+        srid (str): Spatial reference of the input file. Default: EPSG:2154.
+        scanning_angle (bool): If False, returns 1.0 (vertical pulses assumed, no correction).
+        limit_N_points (int): Minimum point count (after temporal filter) to compute metrics.
+            Default 0.
+        limit_flight_agl (float): Minimum acceptable mean sensor height above ground (m).
+            Below this threshold the trajectory is considered aberrant and
+            None is returned with a warning.
+        deviation_days (float): Max deviation in days around the local modal acquisition
+            date, passed to `pad_metrics_core`. `inf` = no filter. Default `inf`.
+        gpstime_ref (str): UTC reference datetime for gpstime=0.
+
+    Returns:
+        dict: Mapping `(ix, iy)` pixel indices to the `pad_metrics_core` result for
+        that pixel (a metrics dict, or `None` if the pixel failed a quality guard).
+    """
+    # Validate pointclouds after preprocessing
+    check_lidar_file(input_filename)
+
+    # Extract pointclouds with attributes 
+    pipeline = pdal.Pipeline() | pdal.Reader.las(filename=input_filename, override_srs=srid, nosrs=True)
+    pipeline.execute()
+    points = pipeline.arrays[0]
+
+    x = points["X"].astype(np.float64)
+    y = points["Y"].astype(np.float64)
+    h_abg = points["h_abg"].astype(np.float64)
+    z = points["Z"].astype(np.float64)
+    gpstime = points["GpsTime"].astype(np.float64)
+    return_number = points["ReturnNumber"].astype(np.float64)
+    classification = points["Classification"].astype(np.float64)
+    x_sensor = points["X_sensor"].astype(np.float64)
+    y_sensor = points["Y_sensor"].astype(np.float64)
+    z_sensor = points["Z_sensor"].astype(np.float64)
+
+    # Calcule PAD PROFILE by PIXEL
+    min_x = float(x.min())
+    min_y = float(y.min())
+    nx = int(np.ceil((float(x.max()) - min_x) / PIXEL_SIZE)) + 1
+
+    ix = np.floor((x - min_x) / PIXEL_SIZE).astype(int)
+    iy = np.floor((y - min_y) / PIXEL_SIZE).astype(int)
+    linear_idx = ix + iy * nx
+
+    results: dict = {}
+    for cell in np.unique(linear_idx):
+        mask = linear_idx == cell
+        iy_cell = int(cell // nx)
+        ix_cell = int(cell % nx)
+
+        results[(ix_cell, iy_cell)] = pad_metrics_core(
+            gpstime=gpstime[mask],
+            x=x[mask],
+            y=y[mask],
+            h_abg=h_abg[mask],
+            z=z[mask],
+            return_number=return_number[mask],
+            classification=classification[mask],
+            x_sensor=x_sensor[mask],
+            y_sensor=y_sensor[mask],
+            z_sensor=z_sensor[mask],
+            scanning_angle=scanning_angle,
+            limit_N_points=limit_N_points,
+            limit_flight_agl=limit_flight_agl,
+            deviation_days=deviation_days,
+            gpstime_ref=gpstime_ref,
+        )
+
+    logger.info("Computed PAD metrics by pixels in %s", input_filename)
+    return results
+
+
+@hydra.main(config_path="../configs/", config_name="config.yaml", version_base="1.2")
+def main(config: DictConfig):
+    """ Compute PAD metrics from the input LAS/LAZ file and save it as several RASTER files.
+
+    It can run either on a single file, or on each file of a folder.
+
+    Args:
+        config (DictConfig): hydra configuration (configs/config.yaml by default).
+    """
+    logging.basicConfig(level=logging.INFO)
+
+    input_dir = config.io.input_dir
+    if input_dir is None:
+        raise ValueError("config.io.input_dir is empty, please provide an input directory in the configuration")
+    if not os.path.isdir(input_dir):
+        raise FileNotFoundError(f"The input directory ({input_dir}) doesn't exist.")
+
+    output_dir = config.io.output_dir
+    if output_dir is None:
+        raise ValueError("config.io.output_dir is empty, please provide an input directory in the configuration")
+    os.makedirs(output_dir, exist_ok=True)
+
+    initial_las_filename = config.io.input_filename
+
+    def main_on_one_tile(filename):
+        logging.info(f"\nProcessing tile : {os.path.splitext(filename)[0]}")
+
+        # Only override pad_metrics_core's own defaults when the config sets a value.
+        optional_kwargs = {
+            name: value
+            for name, value in (
+                ("scanning_angle", config.pad_profile.scanning_angle),
+                ("limit_N_points", config.pad_profile.limit_N_points),
+                ("limit_flight_agl", config.pad_profile.limit_flight_agl),
+            )
+            if value is not None
+        }
+
+        pad_profile_one_tile(
+            input_filename=os.path.join(input_dir, filename),
+            output_path=os.path.join(output_dir, os.path.splitext(filename)[0] + ".laz"),
+            srid=config.io.spatial_reference,
+            deviation_days=config.commons.filter_date.deviation_days,
+            gpstime_ref=config.commons.filter_date.gpstime_ref,
+            **optional_kwargs,
+        )
+
+    if initial_las_filename:
+        main_on_one_tile(initial_las_filename)
+    else:
+        for file in os.listdir(input_dir):
+            main_on_one_tile(file)
+
+
+if __name__ == "__main__":
+    main()

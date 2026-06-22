@@ -39,6 +39,15 @@ preprocessing:
   trajectory:
     nodata: 0
 
+pad_profile:
+  input_dir: null
+  input_filename: null
+  output_dir: null
+  scanning_angle: null
+  limit_N_points: null
+  limit_flight_agl: null
+
+
 dtm:
   download:
     resolution: 0.5 # Pixel size in metres
