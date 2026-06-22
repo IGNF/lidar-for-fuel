@@ -56,4 +56,4 @@ def check_lidar_file(input_file: str) -> None:
             f"Expected: {sorted(REQUIRED_EXTRA_DIMS)}."
         )
 
-    logger.info("Valid LiDAR header for PAD PROFIL: %s", input_file)
+    logger.info("Valid LiDAR header for PAD PROFILE: %s", input_file)
