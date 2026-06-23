@@ -80,8 +80,7 @@ def pad_metrics_core(
 
     # # Step 3:
     # Keep only points with classes unclassified, ground, vegetations and water
-    veg_ground_points = (classification <= 5) | (classification == 9)
-    # Calculate "cos-theta" take into account scanning angle
+    veg_ground_points = ((classification >= 1) & (classification <= 5)) | (classification == 9)
     cos_theta, mean_flight_agl = compute_cos_theta(
         x=x,
         y=y,
