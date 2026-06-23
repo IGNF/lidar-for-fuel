@@ -14,7 +14,7 @@ _EPSILON = 1e-3  # 1 ms — smaller than any realistic GpsTime resolution
 
 def filter_by_date(
     gpstime: np.ndarray,
-    deviation_days: int | float = 14,
+    deviation_days: float = np.inf,
     gpstime_ref: str = "2011-09-14 01:46:40",
 ) -> np.ndarray:
     """Filter a LiDAR point cloud keeping only points acquired within ±deviation_days
@@ -22,8 +22,9 @@ def filter_by_date(
 
     Args:
         gpstime (np.ndarray): GPS time in seconds.
-        deviation_days (int | float): Half-width of the retention window in days.
-            Pass ``math.inf`` to skip filtering entirely. Default: 14.
+        deviation_days (float): Max deviation in days around the local modal acquisition date.
+                                `inf` = no filter.
+                                Default `inf`.
         gpstime_ref (str): ISO-8601 UTC string of the GPS time reference epoch.
             Default: "2011-09-14 01:46:40".
 
@@ -76,7 +77,7 @@ def filter_by_date(
         t_max,
         pct_removed,
     )
-    
+
     # Resulting mask: True for points within the window, False for points outside
     mask = (unix_time >= max(day_lo, 0) * _SECONDS_PER_DAY) & (unix_time < (day_hi + 1) * _SECONDS_PER_DAY)
 

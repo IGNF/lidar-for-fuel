@@ -45,19 +45,24 @@ def pad_metrics_core(
         x_sensor (np.ndarray): Sensor easting at acquisition time (R's `Easting`).
         y_sensor (np.ndarray): Sensor northing (R's `Northing`).
         z_sensor (np.ndarray): Sensor altitude (R's `Elevation`).
-        scanning_angle (bool): If True, estimate cos(theta) from the trajectory. Default True.
-        limit_N_points (int): Minimum point count (after temporal filter) to compute metrics.
-            Default 0.
-        limit_flight_agl (float): Minimum acceptable mean flight height above ground (m).
-            Default 800.
-        deviation_days (float): Max deviation in days around the local modal acquisition
-            date. `inf` = no filter. Default `inf`.
+        scanning_angle (bool): If True, estimate cos(theta) from the trajectory.
+                               If False, returns 1.0 (vertical pulses assumed, no correction).
+                               Default True.
+        limit_N_points (int): Minimum number of point in the pixel/plot for computing profiles & metrics.
+                            Default 400 points.
+        limit_flight_agl (float):  Limit flight height above ground in m.
+                                   If the distance between the flight height and the ground and (Elevation - Zref)
+                                   is lower than `limit_flight_agl`, NULL is returned.
+                                   Default 800 meters.
+        deviation_days (float): Max deviation in days around the local modal acquisition date.
+                                `inf` = no filter.
+                                Default `inf`.
         gpstime_ref (str): UTC reference datetime for gpstime=0.
 
     Returns:
         float | None: cos_theta (or None if a quality guard fails).
     """
-    # # Step 1: 
+    # # Step 1:
     # Filter points by ±deviation_days around the most densely sampled calendar day.
     valid = filter_by_date(gpstime, deviation_days=deviation_days, gpstime_ref=gpstime_ref)
 
@@ -81,6 +86,7 @@ def pad_metrics_core(
     # # Step 3:
     # Keep only points with classes unclassified, ground, vegetations and water
     veg_ground_points = ((classification >= 1) & (classification <= 5)) | (classification == 9)
+
     cos_theta, mean_flight_agl = compute_cos_theta(
         x=x,
         y=y,
