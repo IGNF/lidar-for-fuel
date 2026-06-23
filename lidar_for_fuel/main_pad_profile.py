@@ -7,13 +7,15 @@ Runs on a single pre-processed LAS/LAZ tile or all tiles in a directory.
 import logging
 import os
 
-import numpy as np
 import hydra
+import numpy as np
 import pdal
 from omegaconf import DictConfig
 
 from lidar_for_fuel.pad_profile.calculate_pad_profile import pad_metrics_core
-from lidar_for_fuel.pad_profile.validate_lidar_preprocessing_file import check_lidar_file
+from lidar_for_fuel.pad_profile.validate_lidar_preprocessing_file import (
+    check_lidar_file,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -32,14 +34,18 @@ def pad_profile_one_tile(
     Args:
         input_filename (str): Path to the input LAS/LAZ file.
         srid (str): Spatial reference of the input file. Default: EPSG:2154.
-        scanning_angle (bool): If False, returns 1.0 (vertical pulses assumed, no correction).
-        limit_N_points (int): Minimum point count (after temporal filter) to compute metrics.
-            Default 0.
-        limit_flight_agl (float): Minimum acceptable mean sensor height above ground (m).
-            Below this threshold the trajectory is considered aberrant and
-            None is returned with a warning.
-        deviation_days (float): Max deviation in days around the local modal acquisition
-            date, passed to `pad_metrics_core`. `inf` = no filter. Default `inf`.
+        scanning_angle (bool): If True, estimate cos(theta) from the trajectory.
+                               If False, returns 1.0 (vertical pulses assumed, no correction).
+                               Default True.
+        limit_N_points (int): Minimum number of point in the pixel/plot for computing profiles & metrics.
+                            Default 400 points.
+        limit_flight_agl (float):  Limit flight height above ground in m.
+                                   If the distance between the flight height and the ground and (Elevation - Zref)
+                                   is lower than `limit_flight_agl`, NULL is returned.
+                                   Default 800 meters.
+        deviation_days (float): Max deviation in days around the local modal acquisition date.
+                                `inf` = no filter.
+                                Default `inf`.
         gpstime_ref (str): UTC reference datetime for gpstime=0.
 
     Returns:
@@ -48,7 +54,7 @@ def pad_profile_one_tile(
     # Validate pointclouds after preprocessing
     check_lidar_file(input_filename)
 
-    # Extract pointclouds with attributes 
+    # Extract pointclouds with attributes
     pipeline = pdal.Pipeline() | pdal.Reader.las(filename=input_filename, override_srs=srid, nosrs=True)
     pipeline.execute()
     points = pipeline.arrays[0]
@@ -66,22 +72,22 @@ def pad_profile_one_tile(
 
     # Calcule PAD PROFILE by TILE
     results = pad_metrics_core(
-            gpstime=gpstime,
-            x=x,
-            y=y,
-            h_abg=h_abg,
-            z=z,
-            return_number=return_number,
-            classification=classification,
-            x_sensor=x_sensor,
-            y_sensor=y_sensor,
-            z_sensor=z_sensor,
-            scanning_angle=scanning_angle,
-            limit_N_points=limit_N_points,
-            limit_flight_agl=limit_flight_agl,
-            deviation_days=deviation_days,
-            gpstime_ref=gpstime_ref,
-        )
+        gpstime=gpstime,
+        x=x,
+        y=y,
+        h_abg=h_abg,
+        z=z,
+        return_number=return_number,
+        classification=classification,
+        x_sensor=x_sensor,
+        y_sensor=y_sensor,
+        z_sensor=z_sensor,
+        scanning_angle=scanning_angle,
+        limit_N_points=limit_N_points,
+        limit_flight_agl=limit_flight_agl,
+        deviation_days=deviation_days,
+        gpstime_ref=gpstime_ref,
+    )
 
     logger.info("Computed PAD metrics by tiles in %s", input_filename)
     return results
@@ -89,7 +95,7 @@ def pad_profile_one_tile(
 
 @hydra.main(config_path="../configs/", config_name="config.yaml", version_base="1.2")
 def main(config: DictConfig):
-    """ Compute PAD metrics from the input LAS/LAZ file and save it as several RASTER files.
+    """Compute PAD metrics from the input LAS/LAZ file and save it as several RASTER files.
 
     It can run either on a single file, or on each file of a folder.
 
@@ -108,7 +114,7 @@ def main(config: DictConfig):
 
     def main_on_one_tile(filename):
         logging.info(f"\nProcessing tile : {os.path.splitext(filename)[0]}")
-        
+
         pad_profile_one_tile(
             input_filename=os.path.join(input_dir, filename),
             srid=config.io.spatial_reference,
