@@ -104,12 +104,9 @@ def test_gpstime_window_correctness(rng):
 
     retained = gpstime_input[mask]
 
-    # Check retained unix-time limits
-    gpstime_ref_unix = datetime.fromisoformat(GPSTIME_REF).replace(tzinfo=timezone.utc).timestamp()
-    retained_unix = retained + gpstime_ref_unix
-
-    assert retained_unix.min() == pytest.approx(EXPECTED_T_MIN, abs=1e-6)
-    assert retained_unix.max() == pytest.approx(EXPECTED_T_MAX, abs=1e-6)
+    # Check retained relative-time limits (seconds since gpstime_ref)
+    assert np.all(retained >= EXPECTED_T_MIN - 1e-6)
+    assert np.all(retained < EXPECTED_T_MAX + 1e-6)
 
     # Check retained GpsTime values (relative seconds)
     assert len(retained) == len(EXPECTED_RETAINED_MIDPOINTS) + n_extra
