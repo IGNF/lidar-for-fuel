@@ -40,7 +40,6 @@ def test_pad_profile_one_tile_groups_points_by_pixel(tmp_path):
         mock_core.return_value = {"date": 0.0}
         results = pad_profile_one_tile(
             input_filename=str(input_file),
-            output_path=str(tmp_path / "out.laz"),
         )
 
     assert mock_core.call_count == 2
@@ -62,7 +61,6 @@ def test_pad_profile_one_tile_passes_config_through_to_pad_metrics_core(tmp_path
         mock_core.return_value = None
         pad_profile_one_tile(
             input_filename=str(input_file),
-            output_path=str(tmp_path / "out.laz"),
             scanning_angle=False,
             limit_N_points=5,
             limit_flight_agl=400.0,

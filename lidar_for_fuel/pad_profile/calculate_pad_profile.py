@@ -27,7 +27,7 @@ def pad_metrics_core(
     y_sensor: np.ndarray,
     z_sensor: np.ndarray,
     scanning_angle: bool = True,
-    limit_N_points: int = 0,
+    limit_N_points: int = 400,
     limit_flight_agl: float = 800.0,
     deviation_days: float = np.inf,
     gpstime_ref: str = _DEFAULT_GPSTIME_REF,
@@ -55,7 +55,7 @@ def pad_metrics_core(
         gpstime_ref (str): UTC reference datetime for gpstime=0.
 
     Returns:
-        float : cos_theta
+        float | None: cos_theta (or None if a quality guard fails).
     """
     # # Step 1: 
     # Filter points by ±deviation_days around the most densely sampled calendar day.
