@@ -2,7 +2,6 @@ import math
 import warnings
 
 import numpy as np
-from datetime import datetime, timezone
 import pytest
 
 from lidar_for_fuel.commons.filter_points_by_date import filter_by_date
@@ -53,12 +52,12 @@ def test_infinite_deviation_returns_original_pipeline(rng):
     assert int(np.sum(mask)) == n_total
 
 
-def test_default_deviation_days_is_14():
-    """Verify that the default deviation_days is 14."""
+def test_default_deviation_days_is_inf():
+    """Verify that the default deviation_days is infinite (no filtering)."""
     import inspect
 
     sig = inspect.signature(filter_by_date)
-    assert sig.parameters["deviation_days"].default == 14
+    assert math.isinf(sig.parameters["deviation_days"].default)
 
 
 def test_negative_deviation_raises(rng):
