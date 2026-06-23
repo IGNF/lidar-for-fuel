@@ -71,3 +71,8 @@ def test_check_lidar_file_missing_some_extra_dims():
     error_message = str(exc_info.value)
     assert "Y_sensor" in error_message
     assert "Z_sensor" in error_message
+
+
+def test_check_lidar_file_valid_preprocessed_file_passes():
+    # Should not raise
+    check_lidar_file(str(PRETRAITED_LAS))
