@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Main script for computing PAD (Plant Area Density) metrics pixel by pixel.
+Main script for computing PAD (Plant Area Density) metrics by tiles.
 Runs on a single pre-processed LAS/LAZ tile or all tiles in a directory.
 """
 
@@ -17,8 +17,6 @@ from lidar_for_fuel.pad_profile.validate_lidar_preprocessing_file import check_l
 
 logger = logging.getLogger(__name__)
 
-PIXEL_SIZE = 10.0
-
 
 def pad_profile_one_tile(
     input_filename: str,
@@ -29,10 +27,7 @@ def pad_profile_one_tile(
     deviation_days: float = np.inf,
     gpstime_ref: str = "2011-09-14 01:46:40",
 ) -> dict:
-    """Compute PAD metrics pixel by pixel for one tile.
-
-    Bins the tile's points into a 10 m grid, then calls `pad_metrics_core` on each
-    pixel's own points (not on the tile as a whole).
+    """Compute PAD metrics for one tile.
 
     Args:
         input_filename (str): Path to the input LAS/LAZ file.
@@ -70,32 +65,18 @@ def pad_profile_one_tile(
     y_sensor = points["Y_sensor"].astype(np.float64)
     z_sensor = points["Z_sensor"].astype(np.float64)
 
-    # Calcule PAD PROFILE by PIXEL
-    min_x = float(x.min())
-    min_y = float(y.min())
-    nx = int(np.ceil((float(x.max()) - min_x) / PIXEL_SIZE)) + 1
-
-    ix = np.floor((x - min_x) / PIXEL_SIZE).astype(int)
-    iy = np.floor((y - min_y) / PIXEL_SIZE).astype(int)
-    linear_idx = ix + iy * nx
-
-    results: dict = {}
-    for cell in np.unique(linear_idx):
-        mask = linear_idx == cell
-        iy_cell = int(cell // nx)
-        ix_cell = int(cell % nx)
-
-        results[(ix_cell, iy_cell)] = pad_metrics_core(
-            gpstime=gpstime[mask],
-            x=x[mask],
-            y=y[mask],
-            h_abg=h_abg[mask],
-            z=z[mask],
-            return_number=return_number[mask],
-            classification=classification[mask],
-            x_sensor=x_sensor[mask],
-            y_sensor=y_sensor[mask],
-            z_sensor=z_sensor[mask],
+    # Calcule PAD PROFILE by TILE
+    results = pad_metrics_core(
+            gpstime=gpstime,
+            x=x,
+            y=y,
+            h_abg=h_abg,
+            z=z,
+            return_number=return_number,
+            classification=classification,
+            x_sensor=x_sensor,
+            y_sensor=y_sensor,
+            z_sensor=z_sensor,
             scanning_angle=scanning_angle,
             limit_N_points=limit_N_points,
             limit_flight_agl=limit_flight_agl,
@@ -103,7 +84,7 @@ def pad_profile_one_tile(
             gpstime_ref=gpstime_ref,
         )
 
-    logger.info("Computed PAD metrics by pixels in %s", input_filename)
+    logger.info("Computed PAD metrics by tiles in %s", input_filename)
     return results
 
 
@@ -128,24 +109,15 @@ def main(config: DictConfig):
 
     def main_on_one_tile(filename):
         logging.info(f"\nProcessing tile : {os.path.splitext(filename)[0]}")
-
-        # Only override pad_metrics_core's own defaults when the config sets a value.
-        optional_kwargs = {
-            name: value
-            for name, value in (
-                ("scanning_angle", config.pad_profile.scanning_angle),
-                ("limit_N_points", config.pad_profile.limit_N_points),
-                ("limit_flight_agl", config.pad_profile.limit_flight_agl),
-            )
-            if value is not None
-        }
-
+        
         pad_profile_one_tile(
             input_filename=os.path.join(input_dir, filename),
             srid=config.io.spatial_reference,
             deviation_days=config.commons.filter_date.deviation_days,
             gpstime_ref=config.commons.filter_date.gpstime_ref,
-            **optional_kwargs,
+            scanning_angle=config.pad_profile.scanning_angle,
+            limit_N_points=config.pad_profile.limit_N_points,
+            limit_flight_agl=config.pad_profile.limit_flight_agl,
         )
 
     if initial_las_filename:
