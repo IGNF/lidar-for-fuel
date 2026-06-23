@@ -43,8 +43,7 @@ def pad_profile_one_tile(
         gpstime_ref (str): UTC reference datetime for gpstime=0.
 
     Returns:
-        dict: Mapping `(ix, iy)` pixel indices to the `pad_metrics_core` result for
-        that pixel (a metrics dict, or `None` if the pixel failed a quality guard).
+        float | None: cos_theta (or None if a quality guard fails).
     """
     # Validate pointclouds after preprocessing
     check_lidar_file(input_filename)
