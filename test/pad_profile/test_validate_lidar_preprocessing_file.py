@@ -7,7 +7,7 @@ import laspy
 import numpy as np
 import pytest
 
-from lidar_for_fuel.pad_profile.validate_lidar_preprocessing_file import check_lidar_file, REQUIRED_EXTRA_DIMS
+from lidar_for_fuel.pad_profile.validate_lidar_preprocessing_file import check_lidar_file
 
 
 TMP_PATH = Path("./tmp/check_lidar_pad_profile")
