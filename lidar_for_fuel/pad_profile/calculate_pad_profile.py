@@ -31,7 +31,7 @@ def pad_metrics_core(
     limit_flight_agl: float = 800.0,
     deviation_days: float = np.inf,
     gpstime_ref: str = _DEFAULT_GPSTIME_REF,
-) -> float:
+) -> float | None:
     """Compute PAD metrics for one pixel/plot of LiDAR points.
 
     Args:
