@@ -40,12 +40,9 @@ preprocessing:
     nodata: 0
 
 pad_profile:
-  input_dir: null
-  input_filename: null
-  output_dir: null
-  scanning_angle: null
-  limit_N_points: null
-  limit_flight_agl: null
+  scanning_angle: True
+  limit_N_points: 400
+  limit_flight_agl: 800
 
 
 dtm:

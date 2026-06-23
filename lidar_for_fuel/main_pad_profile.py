@@ -22,10 +22,9 @@ PIXEL_SIZE = 10.0
 
 def pad_profile_one_tile(
     input_filename: str,
-    output_path: str,
     srid: str = "EPSG:2154",
     scanning_angle: bool = True,
-    limit_N_points: int = 0,
+    limit_N_points: int = 400,
     limit_flight_agl: float = 800,
     deviation_days: float = np.inf,
     gpstime_ref: str = "2011-09-14 01:46:40",
@@ -37,7 +36,6 @@ def pad_profile_one_tile(
 
     Args:
         input_filename (str): Path to the input LAS/LAZ file.
-        output_path (str): Path for the output LAZ file.
         srid (str): Spatial reference of the input file. Default: EPSG:2154.
         scanning_angle (bool): If False, returns 1.0 (vertical pulses assumed, no correction).
         limit_N_points (int): Minimum point count (after temporal filter) to compute metrics.
@@ -126,11 +124,6 @@ def main(config: DictConfig):
     if not os.path.isdir(input_dir):
         raise FileNotFoundError(f"The input directory ({input_dir}) doesn't exist.")
 
-    output_dir = config.io.output_dir
-    if output_dir is None:
-        raise ValueError("config.io.output_dir is empty, please provide an input directory in the configuration")
-    os.makedirs(output_dir, exist_ok=True)
-
     initial_las_filename = config.io.input_filename
 
     def main_on_one_tile(filename):
@@ -149,7 +142,6 @@ def main(config: DictConfig):
 
         pad_profile_one_tile(
             input_filename=os.path.join(input_dir, filename),
-            output_path=os.path.join(output_dir, os.path.splitext(filename)[0] + ".laz"),
             srid=config.io.spatial_reference,
             deviation_days=config.commons.filter_date.deviation_days,
             gpstime_ref=config.commons.filter_date.gpstime_ref,
