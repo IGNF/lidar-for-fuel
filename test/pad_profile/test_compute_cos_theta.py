@@ -8,8 +8,14 @@ def test_scanning_angle_false_returns_one_and_no_mean_agl():
     veg_gnd = np.array([True, False, True])
 
     cos_theta, mean_flight_agl = compute_cos_theta(
-        x=x, y=y, z=z, x_sensor=x_sensor, y_sensor=y_sensor, z_sensor=z_sensor,
-        veg_gnd=veg_gnd, scanning_angle=False,
+        x=x,
+        y=y,
+        z=z,
+        x_sensor=x_sensor,
+        y_sensor=y_sensor,
+        z_sensor=z_sensor,
+        veg_gnd=veg_gnd,
+        scanning_angle=False,
     )
 
     assert cos_theta == 1.0
@@ -22,8 +28,14 @@ def test_scanning_angle_false_with_no_veg_gnd_points_still_returns_one():
     veg_gnd = np.zeros(3, dtype=bool)
 
     cos_theta, mean_flight_agl = compute_cos_theta(
-        x=x, y=y, z=z, x_sensor=x_sensor, y_sensor=y_sensor, z_sensor=z_sensor,
-        veg_gnd=veg_gnd, scanning_angle=False,
+        x=x,
+        y=y,
+        z=z,
+        x_sensor=x_sensor,
+        y_sensor=y_sensor,
+        z_sensor=z_sensor,
+        veg_gnd=veg_gnd,
+        scanning_angle=False,
     )
 
     assert cos_theta == 1.0
@@ -39,8 +51,14 @@ def test_scanning_angle_true_sensor_directly_above_point():
     veg_gnd = np.array([True, True])
 
     cos_theta, mean_flight_agl = compute_cos_theta(
-        x=x, y=y, z=z, x_sensor=x_sensor, y_sensor=y_sensor, z_sensor=z_sensor,
-        veg_gnd=veg_gnd, scanning_angle=True,
+        x=x,
+        y=y,
+        z=z,
+        x_sensor=x_sensor,
+        y_sensor=y_sensor,
+        z_sensor=z_sensor,
+        veg_gnd=veg_gnd,
+        scanning_angle=True,
     )
 
     assert np.isclose(cos_theta, 1.0)
@@ -62,12 +80,18 @@ def test_scanning_angle_true_with_horizontal_offset():
     expected_cos_theta = abs(flight_agl / norm_u)
 
     cos_theta, mean_flight_agl = compute_cos_theta(
-        x=x, y=y, z=z, x_sensor=x_sensor, y_sensor=y_sensor, z_sensor=z_sensor,
-        veg_gnd=veg_gnd, scanning_angle=True,
+        x=x,
+        y=y,
+        z=z,
+        x_sensor=x_sensor,
+        y_sensor=y_sensor,
+        z_sensor=z_sensor,
+        veg_gnd=veg_gnd,
+        scanning_angle=True,
     )
 
-    assert np.isclose(cos_theta, expected_cos_theta)
-    assert np.isclose(mean_flight_agl, 400.0)
+    assert cos_theta == expected_cos_theta
+    assert mean_flight_agl == 400.0
 
 
 def test_scanning_angle_true_ignores_nan_in_mean_flight_agl():
@@ -78,11 +102,17 @@ def test_scanning_angle_true_ignores_nan_in_mean_flight_agl():
     veg_gnd = np.array([True, True, False])
 
     _, mean_flight_agl = compute_cos_theta(
-        x=x, y=y, z=z, x_sensor=x_sensor, y_sensor=y_sensor, z_sensor=z_sensor,
-        veg_gnd=veg_gnd, scanning_angle=True,
+        x=x,
+        y=y,
+        z=z,
+        x_sensor=x_sensor,
+        y_sensor=y_sensor,
+        z_sensor=z_sensor,
+        veg_gnd=veg_gnd,
+        scanning_angle=True,
     )
 
-    assert np.isclose(mean_flight_agl, 150.0)  # nanmean([100.0, 200.0])
+    assert mean_flight_agl == 150.0  # nanmean([100.0, 200.0])
 
 
 def test_scanning_angle_true_only_averages_over_veg_gnd():
@@ -93,9 +123,15 @@ def test_scanning_angle_true_only_averages_over_veg_gnd():
     veg_gnd = np.array([True, False, False])
 
     cos_theta, _ = compute_cos_theta(
-        x=x, y=y, z=z, x_sensor=x_sensor, y_sensor=y_sensor, z_sensor=z_sensor,
-        veg_gnd=veg_gnd, scanning_angle=True,
+        x=x,
+        y=y,
+        z=z,
+        x_sensor=x_sensor,
+        y_sensor=y_sensor,
+        z_sensor=z_sensor,
+        veg_gnd=veg_gnd,
+        scanning_angle=True,
     )
 
     # Vertical sensor above each point -> cos_theta == 1 regardless of which point is kept.
-    assert np.isclose(cos_theta, 1.0)
+    assert cos_theta == 1.0
