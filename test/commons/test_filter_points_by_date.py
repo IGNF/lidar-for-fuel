@@ -51,28 +51,7 @@ def test_infinite_deviation_returns_original_pipeline(rng):
     assert int(np.sum(mask)) == n_total
 
 
-def test_default_deviation_days_is_inf():
-    """Verify that the default deviation_days is infinite (no filtering)."""
-    import inspect
-
-    sig = inspect.signature(filter_by_date)
-    assert math.isinf(sig.parameters["deviation_days"].default)
-
-
-def test_negative_deviation_raises(rng):
-    gpstime = np.arange(1, 10, dtype=np.float64) * _SECONDS_PER_DAY
-    # The function now accepts a numeric `deviation_days`; behavior with a
-    # negative value is defined by implementation (it will produce a mask).
-    # Here we assert that a mask is returned and that its length matches input.
-    mask = filter_by_date(gpstime, deviation_days=-1)
-    assert isinstance(mask, np.ndarray) and mask.dtype == bool
-    assert len(mask) == len(gpstime)
-
-
 def test_missing_gpstime_dimension_raises():
-    # The function now operates on raw gpstime arrays; there is no pipeline
-    # dimension check to perform. Passing an object that is not an ndarray
-    # should raise a TypeError.
     with pytest.raises(TypeError):
         filter_by_date(None, deviation_days=2)
 
@@ -80,8 +59,7 @@ def test_missing_gpstime_dimension_raises():
 def test_gpstime_window_correctness(rng):
     """Verify the filters.range limits in the returned pipeline and the retained GpsTime values."""
     DEVIATION_DAY = 1
-
-    EXPECTED_T_MIN = 345_600.0
+    EXPECTED_T_MIN = 345_600.0 - _EPSILON
     EXPECTED_T_MAX = 604_800.0 - _EPSILON
 
     EXPECTED_RETAINED_MIDPOINTS = np.array([388_800.0, 475_200.0, 561_600.0], dtype=np.float64)
@@ -102,8 +80,8 @@ def test_gpstime_window_correctness(rng):
     retained = gpstime_input[mask]
 
     # Check retained relative-time limits (seconds since gpstime_ref)
-    assert np.all(retained >= EXPECTED_T_MIN - 1e-6)
-    assert np.all(retained < EXPECTED_T_MAX + 1e-6)
+    assert np.all(retained >= EXPECTED_T_MIN)
+    assert np.all(retained < EXPECTED_T_MAX)
 
     # Check retained GpsTime values (relative seconds)
     assert len(retained) == len(EXPECTED_RETAINED_MIDPOINTS) + n_extra

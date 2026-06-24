@@ -43,7 +43,8 @@ def filter_by_date(
     # Convert GPStime -> calendar day using fixed GPS epoch
     gpstime_ref_unix = _GPS_EPOCH.timestamp()
     n_total = len(gpstime)
-    _ADJUSTED_GPS_TIME_TO_STANDARD_GPS_TIME = 1e9  # See Las 1.4 specification to get information about conversion from las adjusted gps time to standard gps time
+    # See Las 1.4 specification to get information about conversion from las adjusted gps time to standard gps time
+    _ADJUSTED_GPS_TIME_TO_STANDARD_GPS_TIME = 1e9
     unix_time = gpstime + _ADJUSTED_GPS_TIME_TO_STANDARD_GPS_TIME + gpstime_ref_unix
     day_index = np.floor(unix_time / _SECONDS_PER_DAY).astype(np.int64)
 
@@ -54,7 +55,7 @@ def filter_by_date(
     # Compute the GpsTime filter window [t_min, t_max]
     day_lo = modal_day - int(deviation_days)
     day_hi = modal_day + int(deviation_days)
-    t_min = max(day_lo, 0) * _SECONDS_PER_DAY - gpstime_ref_unix
+    t_min = max(day_lo, 0) * _SECONDS_PER_DAY - gpstime_ref_unix - _EPSILON
     t_max = (day_hi + 1) * _SECONDS_PER_DAY - gpstime_ref_unix - _EPSILON
 
     # Warn about removed points
