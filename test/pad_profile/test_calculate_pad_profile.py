@@ -32,3 +32,33 @@ def test_pad_metrics_core_returns_cos_theta_between_0_and_1():
     )
 
     assert result is None or (isinstance(result, (float, int)) and 0.0 <= float(result) <= 1.0)
+
+
+def test_pad_metrics_core_returns_none_when_too_few_points():
+    """If the number of points is below `limit_N_points`, the function returns None."""
+    gpstime = np.zeros(2, dtype=np.float64)
+    points = _points(2, gpstime)
+
+    result = pad_metrics_core(
+        **points,
+        scanning_angle=False,
+        limit_N_points=5,
+        deviation_days=np.inf,
+    )
+
+    assert result is None
+
+
+def test_pad_metrics_core_scanning_angle_false_returns_one():
+    """With `scanning_angle=False` the function should return cos_theta == 1.0."""
+    gpstime = np.zeros(5, dtype=np.float64)
+    points = _points(5, gpstime)
+
+    result = pad_metrics_core(
+        **points,
+        scanning_angle=False,
+        limit_N_points=1,
+        deviation_days=np.inf,
+    )
+
+    assert result is None or np.isclose(float(result), 1.0)
