@@ -11,11 +11,13 @@ logger = logging.getLogger(__name__)
 _SECONDS_PER_DAY = 86_400.0
 _EPSILON = 1e-3  # 1 ms — smaller than any realistic GpsTime resolution
 
+# GPS epoch (fixed): 1980-01-06 00:00:00 UTC
+_GPS_EPOCH = datetime(1980, 1, 6, 0, 0, tzinfo=timezone.utc)
+
 
 def filter_by_date(
     gpstime: np.ndarray,
     deviation_days: float = np.inf,
-    gpstime_ref: str = "2011-09-14 01:46:40",
 ) -> np.ndarray:
     """Filter a LiDAR point cloud keeping only points acquired within ±deviation_days
     around the most densely sampled calendar day.
@@ -25,8 +27,7 @@ def filter_by_date(
         deviation_days (float): Max deviation in days around the local modal acquisition date.
                                 `inf` = no filter.
                                 Default `inf`.
-        gpstime_ref (str): ISO-8601 UTC string of the GPS time reference epoch.
-            Default: "2011-09-14 01:46:40".
+        Note: the GPS epoch is fixed to 1980-01-06 00:00:00 UTC.
 
     Returns:
         np.ndarray: Boolean mask, same shape as ``gpstime``, True for retained points.
@@ -39,8 +40,8 @@ def filter_by_date(
         logger.debug("deviation_days is Inf — no filtering applied.")
         return np.ones_like(gpstime, dtype=bool)
 
-    # Convert GPStime -> calendar day
-    gpstime_ref_unix = datetime.fromisoformat(gpstime_ref).replace(tzinfo=timezone.utc).timestamp()
+    # Convert GPStime -> calendar day using fixed GPS epoch
+    gpstime_ref_unix = _GPS_EPOCH.timestamp()
     n_total = len(gpstime)
     unix_time = gpstime + gpstime_ref_unix
     day_index = np.floor(unix_time / _SECONDS_PER_DAY).astype(np.int64)

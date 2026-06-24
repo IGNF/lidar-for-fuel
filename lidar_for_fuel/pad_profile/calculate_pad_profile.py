@@ -12,7 +12,6 @@ from lidar_for_fuel.pad_profile.compute_cos_theta import compute_cos_theta
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_GPSTIME_REF = "2011-09-14 01:46:40"
 _KEEP_VALUES = [1, 2, 3, 4, 5, 9]  # Classes to keep
 
 
@@ -31,7 +30,6 @@ def pad_metrics_core(
     limit_N_points: int = 400,
     limit_flight_agl: float = 800.0,
     deviation_days: float = np.inf,
-    gpstime_ref: str = _DEFAULT_GPSTIME_REF,
 ) -> float | None:
     """Compute PAD metrics for one pixel/plot of LiDAR points.
 
@@ -58,14 +56,12 @@ def pad_metrics_core(
         deviation_days (float): Max deviation in days around the local modal acquisition date.
                                 `inf` = no filter.
                                 Default `inf`.
-        gpstime_ref (str): UTC reference datetime for gpstime=0.
-
     Returns:
         float | None: cos_theta (or None if a quality guard fails).
     """
     # # Step 1:
     # Filter points by ±deviation_days around the most densely sampled calendar day.
-    valid = filter_by_date(gpstime, deviation_days=deviation_days, gpstime_ref=gpstime_ref)
+    valid = filter_by_date(gpstime, deviation_days=deviation_days)
 
     gpstime = gpstime[valid]
     x = x[valid]

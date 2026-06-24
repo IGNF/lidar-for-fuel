@@ -11,7 +11,6 @@ _EPSILON = 1e-3
 
 _N = 9
 _DEVIATION_DAYS = 2
-_GPSTIME_REF = "2023-01-01 00:00:00"
 
 
 @pytest.fixture()
@@ -25,7 +24,7 @@ def test_multiday_filters_correct_number_of_points_and_warns(rng):
     gpstime = np.concatenate([gpstime_regular, gpstime_extra])
 
     with pytest.warns(UserWarning, match=r"%\) of the returns were removed"):
-        mask = filter_by_date(gpstime, deviation_days=_DEVIATION_DAYS, gpstime_ref=_GPSTIME_REF)
+        mask = filter_by_date(gpstime, deviation_days=_DEVIATION_DAYS)
 
     n_result = int(np.sum(mask))
     expected = _DEVIATION_DAYS * 2 + _N + 1  # = 14
@@ -37,7 +36,7 @@ def test_single_day_no_filtering(rng):
     gpstime = rng.random(n_total) * _SECONDS_PER_DAY
     with warnings.catch_warnings():
         warnings.simplefilter("error")
-        mask = filter_by_date(gpstime, deviation_days=_DEVIATION_DAYS, gpstime_ref=_GPSTIME_REF)
+        mask = filter_by_date(gpstime, deviation_days=_DEVIATION_DAYS)
 
     n_result = int(np.sum(mask))
     assert n_result == n_total, f"Expected all {n_total} points to be retained, got {n_result}"
@@ -47,7 +46,7 @@ def test_infinite_deviation_returns_original_pipeline(rng):
     gpstime = np.arange(1, 101, dtype=np.float64) * _SECONDS_PER_DAY
     n_total = len(gpstime)
 
-    mask = filter_by_date(gpstime, deviation_days=math.inf, gpstime_ref=_GPSTIME_REF)
+    mask = filter_by_date(gpstime, deviation_days=math.inf)
     assert isinstance(mask, np.ndarray) and mask.dtype == bool
     assert int(np.sum(mask)) == n_total
 
@@ -65,7 +64,7 @@ def test_negative_deviation_raises(rng):
     # The function now accepts a numeric `deviation_days`; behavior with a
     # negative value is defined by implementation (it will produce a mask).
     # Here we assert that a mask is returned and that its length matches input.
-    mask = filter_by_date(gpstime, deviation_days=-1, gpstime_ref=_GPSTIME_REF)
+    mask = filter_by_date(gpstime, deviation_days=-1)
     assert isinstance(mask, np.ndarray) and mask.dtype == bool
     assert len(mask) == len(gpstime)
 
@@ -75,12 +74,11 @@ def test_missing_gpstime_dimension_raises():
     # dimension check to perform. Passing an object that is not an ndarray
     # should raise a TypeError.
     with pytest.raises(TypeError):
-        filter_by_date(None, deviation_days=2, gpstime_ref=_GPSTIME_REF)
+        filter_by_date(None, deviation_days=2)
 
 
 def test_gpstime_window_correctness(rng):
     """Verify the filters.range limits in the returned pipeline and the retained GpsTime values."""
-    GPSTIME_REF = "2023-01-01 00:00:00"
     DEVIATION_DAY = 1
 
     EXPECTED_T_MIN = 345_600.0
@@ -99,7 +97,7 @@ def test_gpstime_window_correctness(rng):
     gpstime_input = np.concatenate([gpstime_per_day, gpstime_modal])
 
     with pytest.warns(UserWarning, match=r"%\) of the returns were removed"):
-        mask = filter_by_date(gpstime_input, deviation_days=DEVIATION_DAY, gpstime_ref=GPSTIME_REF)
+        mask = filter_by_date(gpstime_input, deviation_days=DEVIATION_DAY)
 
     retained = gpstime_input[mask]
 
