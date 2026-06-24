@@ -61,4 +61,4 @@ def test_pad_metrics_core_scanning_angle_false_returns_one():
         deviation_days=np.inf,
     )
 
-    assert result is None or np.isclose(float(result), 1.0)
+    assert result == 1.0
