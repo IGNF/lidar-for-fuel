@@ -27,7 +27,6 @@ def pad_profile_one_tile(
     limit_N_points: int = 400,
     limit_flight_agl: float = 800,
     deviation_days: float = np.inf,
-    gpstime_ref: str = "2011-09-14 01:46:40",
 ) -> dict:
     """Compute PAD metrics for one tile.
 
@@ -46,8 +45,6 @@ def pad_profile_one_tile(
         deviation_days (float): Max deviation in days around the local modal acquisition date.
                                 `inf` = no filter.
                                 Default `inf`.
-        gpstime_ref (str): UTC reference datetime for gpstime=0.
-
     Returns:
         float | None: cos_theta (or None if a quality guard fails).
     """
@@ -86,7 +83,6 @@ def pad_profile_one_tile(
         limit_N_points=limit_N_points,
         limit_flight_agl=limit_flight_agl,
         deviation_days=deviation_days,
-        gpstime_ref=gpstime_ref,
     )
 
     logger.info("Computed PAD metrics by tiles in %s", input_filename)
@@ -119,7 +115,6 @@ def main(config: DictConfig):
             input_filename=os.path.join(input_dir, filename),
             srid=config.io.spatial_reference,
             deviation_days=config.commons.filter_date.deviation_days,
-            gpstime_ref=config.commons.filter_date.gpstime_ref,
             scanning_angle=config.pad_profile.scanning_angle,
             limit_N_points=config.pad_profile.limit_N_points,
             limit_flight_agl=config.pad_profile.limit_flight_agl,
