@@ -43,7 +43,8 @@ def filter_by_date(
     # Convert GPStime -> calendar day using fixed GPS epoch
     gpstime_ref_unix = _GPS_EPOCH.timestamp()
     n_total = len(gpstime)
-    unix_time = gpstime + gpstime_ref_unix
+    _ADJUSTED_GPS_TIME_TO_STANDARD_GPS_TIME = 1e9  # See Las 1.4 specification to get information about conversion from las adjusted gps time to standard gps time
+    unix_time = gpstime + _ADJUSTED_GPS_TIME_TO_STANDARD_GPS_TIME + gpstime_ref_unix
     day_index = np.floor(unix_time / _SECONDS_PER_DAY).astype(np.int64)
 
     # Find the modal day
