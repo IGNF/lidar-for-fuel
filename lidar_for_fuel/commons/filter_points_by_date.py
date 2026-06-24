@@ -10,6 +10,8 @@ logger = logging.getLogger(__name__)
 
 _SECONDS_PER_DAY = 86_400.0
 _EPSILON = 1e-3  # 1 ms — smaller than any realistic GpsTime resolution
+# See Las 1.4 specification to get information about conversion from las adjusted gps time to standard gps time
+_ADJUSTED_GPS_TIME_TO_STANDARD_GPS_TIME = 1e9
 
 # GPS epoch (fixed): 1980-01-06 00:00:00 UTC
 _GPS_EPOCH = datetime(1980, 1, 6, 0, 0, tzinfo=timezone.utc)
@@ -41,10 +43,12 @@ def filter_by_date(
         return np.ones_like(gpstime, dtype=bool)
 
     # Convert GPStime -> calendar day using fixed GPS epoch
+    # Approximation: GPS time is a continuous SI-second count with no leap-second
+    # adjustments, while unix/UTC time absorbs them. As of today the accumulated
+    # offset is ~18 s, negligible for day-level bucketing except right at a
+    # midnight boundary.
     gpstime_ref_unix = _GPS_EPOCH.timestamp()
     n_total = len(gpstime)
-    # See Las 1.4 specification to get information about conversion from las adjusted gps time to standard gps time
-    _ADJUSTED_GPS_TIME_TO_STANDARD_GPS_TIME = 1e9
     unix_time = gpstime + _ADJUSTED_GPS_TIME_TO_STANDARD_GPS_TIME + gpstime_ref_unix
     day_index = np.floor(unix_time / _SECONDS_PER_DAY).astype(np.int64)
 
@@ -55,8 +59,8 @@ def filter_by_date(
     # Compute the GpsTime filter window [t_min, t_max]
     day_lo = modal_day - int(deviation_days)
     day_hi = modal_day + int(deviation_days)
-    t_min = max(day_lo, 0) * _SECONDS_PER_DAY - gpstime_ref_unix - _EPSILON
-    t_max = (day_hi + 1) * _SECONDS_PER_DAY - gpstime_ref_unix - _EPSILON
+    t_min = max(day_lo, 0) * _SECONDS_PER_DAY - _ADJUSTED_GPS_TIME_TO_STANDARD_GPS_TIME - gpstime_ref_unix - _EPSILON
+    t_max = (day_hi + 1) * _SECONDS_PER_DAY - _ADJUSTED_GPS_TIME_TO_STANDARD_GPS_TIME - gpstime_ref_unix + _EPSILON
 
     # Warn about removed points
     n_retained = int(
