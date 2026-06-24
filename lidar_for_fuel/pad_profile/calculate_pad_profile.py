@@ -13,6 +13,7 @@ from lidar_for_fuel.pad_profile.compute_cos_theta import compute_cos_theta
 logger = logging.getLogger(__name__)
 
 _DEFAULT_GPSTIME_REF = "2011-09-14 01:46:40"
+_KEEP_VALUES = [1, 2, 3, 4, 5, 9]  # Classes to keep
 
 
 def pad_metrics_core(
@@ -85,7 +86,7 @@ def pad_metrics_core(
 
     # # Step 3:
     # Keep only points with classes unclassified, ground, vegetations and water
-    veg_ground_points = ((classification >= 1) & (classification <= 5)) | (classification == 9)
+    veg_ground_points = np.isin(classification, _KEEP_VALUES)
 
     cos_theta, mean_flight_agl = compute_cos_theta(
         x=x,
