@@ -12,7 +12,6 @@ from lidar_for_fuel.commons.filter_points_by_date import (
 )
 
 _SECONDS_PER_DAY = 86_400.0
-_EPSILON = 1e-3
 
 _N = 9
 _DEVIATION_DAYS = 2
@@ -62,7 +61,7 @@ def test_missing_gpstime_dimension_raises():
 
 
 def test_gpstime_window_correctness(rng):
-    """Verify the filters.range limits in the returned pipeline and the retained GpsTime values."""
+    """Verify the calendar-date window limits and the retained GpsTime values."""
     DEVIATION_DAY = 1
 
     EXPECTED_RETAINED_MIDPOINTS = np.array([388_800.0, 475_200.0, 561_600.0], dtype=np.float64)
@@ -71,38 +70,34 @@ def test_gpstime_window_correctness(rng):
         dtype=np.float64,
     )
 
-    # Modal day is day 5 (densest day, see gpstime_modal below). Derive the exact GpsTime
-    # window bounds from the same conversion the source uses, instead of hardcoding day*86400
-    # boundaries -- the GPS epoch + adjusted-GPS-time offset is not a multiple of one day,
-    # so a naive day*86400 boundary does not match the real filtering threshold.
-    gpstime_ref_unix = _GPS_EPOCH.timestamp()
-    unix_time_modal_day = 5.5 * _SECONDS_PER_DAY + _ADJUSTED_GPS_TIME_TO_STANDARD_GPS_TIME + gpstime_ref_unix
-    modal_day_index = int(unix_time_modal_day // _SECONDS_PER_DAY)
-    day_lo = modal_day_index - DEVIATION_DAY
-    day_hi = modal_day_index + DEVIATION_DAY
-    EXPECTED_T_MIN = (
-        max(day_lo, 0) * _SECONDS_PER_DAY - _ADJUSTED_GPS_TIME_TO_STANDARD_GPS_TIME - gpstime_ref_unix - _EPSILON
-    )
-    EXPECTED_T_MAX = (
-        (day_hi + 1) * _SECONDS_PER_DAY - _ADJUSTED_GPS_TIME_TO_STANDARD_GPS_TIME - gpstime_ref_unix + _EPSILON
-    )
-
     n_days = 10
     gpstime_per_day = (np.arange(n_days, dtype=np.float64) + 0.5) * _SECONDS_PER_DAY
     n_extra = 20
     gpstime_modal = (rng.random(n_extra) + 5) * _SECONDS_PER_DAY
     gpstime_input = np.concatenate([gpstime_per_day, gpstime_modal])
 
+    # Modal day is day 5 (densest day, see gpstime_modal above): expected window is
+    # [day 4, day 6] inclusive. Convert through the same calendar-date logic as the
+    # source instead of hardcoding day*86400 boundaries.
+    utcdate = np.array(
+        _GPS_EPOCH + np.array(_ADJUSTED_GPS_TIME_TO_STANDARD_GPS_TIME + gpstime_input, dtype="timedelta64[s]"),
+        dtype="datetime64[D]",
+    )
+    modal_date = utcdate[5]
+    EXPECTED_DATE_MIN = modal_date - np.timedelta64(DEVIATION_DAY, "D")
+    EXPECTED_DATE_MAX = modal_date + np.timedelta64(DEVIATION_DAY, "D")
+
     with pytest.warns(UserWarning, match=r"%\) of the returns were removed"):
         mask = filter_by_date(gpstime_input, deviation_days=DEVIATION_DAY)
 
     retained = gpstime_input[mask]
+    retained_dates = utcdate[mask]
 
-    # Check retained relative-time limits (seconds since gpstime_ref)
-    assert np.all(retained >= EXPECTED_T_MIN)
-    assert np.all(retained < EXPECTED_T_MAX)
+    # Check retained calendar-date limits
+    assert np.all(retained_dates >= EXPECTED_DATE_MIN)
+    assert np.all(retained_dates <= EXPECTED_DATE_MAX)
 
-    # Check retained GpsTime values (relative seconds)
+    # Check retained GpsTime values
     assert len(retained) == len(EXPECTED_RETAINED_MIDPOINTS) + n_extra
     for ref_val in EXPECTED_RETAINED_MIDPOINTS:
         assert np.sum(retained == ref_val) == 1
@@ -110,31 +105,22 @@ def test_gpstime_window_correctness(rng):
         assert excl_val not in retained
 
 
-def test_logged_gpstime_window_matches_formula(caplog):
-    """The debug-logged GpsTime window must be expressed in GpsTime units (LAS adjusted
-    GPS time), not raw unix time, with a ±EPSILON margin around the day boundaries."""
+def test_logged_date_window_matches_modal_day(caplog):
+    """The debug-logged date window must be the modal calendar day ± deviation_days."""
     deviation_days = 2
     gpstime = np.full(5, 100.5 * _SECONDS_PER_DAY, dtype=np.float64)
 
-    gpstime_ref_unix = _GPS_EPOCH.timestamp()
-    unix_time = gpstime[0] + _ADJUSTED_GPS_TIME_TO_STANDARD_GPS_TIME + gpstime_ref_unix
-    modal_day = int(unix_time // _SECONDS_PER_DAY)
-    day_lo = modal_day - deviation_days
-    day_hi = modal_day + deviation_days
-    expected_t_min = (
-        max(day_lo, 0) * _SECONDS_PER_DAY - _ADJUSTED_GPS_TIME_TO_STANDARD_GPS_TIME - gpstime_ref_unix - _EPSILON
-    )
-    expected_t_max = (
-        (day_hi + 1) * _SECONDS_PER_DAY - _ADJUSTED_GPS_TIME_TO_STANDARD_GPS_TIME - gpstime_ref_unix + _EPSILON
-    )
+    utctime = _GPS_EPOCH + np.array(_ADJUSTED_GPS_TIME_TO_STANDARD_GPS_TIME + gpstime, dtype="timedelta64[s]")
+    modal_date = np.array(utctime, dtype="datetime64[D]")[0]
+    window = np.timedelta64(deviation_days, "D")
 
     with caplog.at_level(logging.DEBUG, logger="lidar_for_fuel.commons.filter_points_by_date"):
         filter_by_date(gpstime, deviation_days=deviation_days)
 
-    window_records = [r for r in caplog.records if "GpsTime window" in r.msg]
+    window_records = [r for r in caplog.records if "Date window" in r.msg]
     assert len(window_records) == 1
-    logged_modal_day, logged_t_min, logged_t_max, _ = window_records[0].args
+    logged_modal_day, logged_lo, logged_hi, _ = window_records[0].args
 
-    assert logged_modal_day == modal_day
-    assert logged_t_min == expected_t_min
-    assert logged_t_max == expected_t_max
+    assert logged_modal_day == modal_date
+    assert logged_lo == modal_date - window
+    assert logged_hi == modal_date + window

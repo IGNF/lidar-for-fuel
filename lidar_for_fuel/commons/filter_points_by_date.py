@@ -48,10 +48,11 @@ def filter_by_date(
     utcdate = np.array(utctime, dtype="datetime64[D]")
 
     unique_days, counts = np.unique(utcdate, return_counts=True)
-    modal_day = int(unique_days[counts.argmax()])
+    modal_day = unique_days[counts.argmax()]
 
     # Resulting mask: True for points within the window, False for points outside
-    retained_mask = np.logical_and(utcdate >= modal_day - deviation_days, utcdate <= modal_day + deviation_days)
+    window = np.timedelta64(int(deviation_days), "D")
+    retained_mask = np.logical_and(utcdate >= modal_day - window, utcdate <= modal_day + window)
 
     n_retained = np.sum(retained_mask)
     n_removed = len(retained_mask) - n_retained
@@ -68,10 +69,10 @@ def filter_by_date(
         )
 
     logger.debug(
-        "Modal day: %d | GpsTime window [%.1f, %.1f] | %.1f%% points removed",
+        "Modal day: %s | Date window [%s, %s] | %.1f%% points removed",
         modal_day,
-        modal_day - deviation_days,
-        modal_day + deviation_days,
+        modal_day - window,
+        modal_day + window,
         pct_removed,
     )
 
