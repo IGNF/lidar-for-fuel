@@ -2,19 +2,16 @@
 import logging
 import math
 import warnings
-from datetime import datetime, timezone
 
 import numpy as np
 
 logger = logging.getLogger(__name__)
 
-_SECONDS_PER_DAY = 86_400.0
-_EPSILON = 1e-3  # 1 ms — smaller than any realistic GpsTime resolution
 # See Las 1.4 specification to get information about conversion from las adjusted gps time to standard gps time
 _ADJUSTED_GPS_TIME_TO_STANDARD_GPS_TIME = 1e9
 
 # GPS epoch (fixed): 1980-01-06 00:00:00 UTC
-_GPS_EPOCH = datetime(1980, 1, 6, 0, 0, tzinfo=timezone.utc)
+_GPS_EPOCH = np.datetime64("1980-01-06T00:00")
 
 
 def filter_by_date(
@@ -47,26 +44,19 @@ def filter_by_date(
     # adjustments, while unix/UTC time absorbs them. As of today the accumulated
     # offset is ~18 s, negligible for day-level bucketing except right at a
     # midnight boundary.
-    gpstime_ref_unix = _GPS_EPOCH.timestamp()
-    n_total = len(gpstime)
-    unix_time = gpstime + _ADJUSTED_GPS_TIME_TO_STANDARD_GPS_TIME + gpstime_ref_unix
-    day_index = np.floor(unix_time / _SECONDS_PER_DAY).astype(np.int64)
+    utctime = _GPS_EPOCH + np.array(_ADJUSTED_GPS_TIME_TO_STANDARD_GPS_TIME + gpstime, dtype="timedelta64[s]")
+    utcdate = np.array(utctime, dtype="datetime64[D]")
 
-    # Find the modal day
-    unique_days, counts = np.unique(day_index, return_counts=True)
+    unique_days, counts = np.unique(utcdate, return_counts=True)
     modal_day = int(unique_days[counts.argmax()])
 
-    # Compute the GpsTime filter window [t_min, t_max]
-    day_lo = modal_day - int(deviation_days)
-    day_hi = modal_day + int(deviation_days)
-    t_min = max(day_lo, 0) * _SECONDS_PER_DAY - _ADJUSTED_GPS_TIME_TO_STANDARD_GPS_TIME - gpstime_ref_unix - _EPSILON
-    t_max = (day_hi + 1) * _SECONDS_PER_DAY - _ADJUSTED_GPS_TIME_TO_STANDARD_GPS_TIME - gpstime_ref_unix + _EPSILON
+    # Resulting mask: True for points within the window, False for points outside
+    retained_mask = np.logical_and(utcdate >= modal_day - deviation_days, utcdate <= modal_day + deviation_days)
 
-    # Warn about removed points
-    n_retained = int(
-        np.sum((unix_time >= max(day_lo, 0) * _SECONDS_PER_DAY) & (unix_time < (day_hi + 1) * _SECONDS_PER_DAY))
-    )
-    n_removed = n_total - n_retained
+    n_retained = np.sum(retained_mask)
+    n_removed = len(retained_mask) - n_retained
+
+    n_total = len(gpstime)
     pct_removed = n_removed / n_total * 100
     if n_removed > 0:
         warnings.warn(
@@ -80,12 +70,9 @@ def filter_by_date(
     logger.debug(
         "Modal day: %d | GpsTime window [%.1f, %.1f] | %.1f%% points removed",
         modal_day,
-        t_min,
-        t_max,
+        modal_day - deviation_days,
+        modal_day + deviation_days,
         pct_removed,
     )
 
-    # Resulting mask: True for points within the window, False for points outside
-    mask = (unix_time >= max(day_lo, 0) * _SECONDS_PER_DAY) & (unix_time < (day_hi + 1) * _SECONDS_PER_DAY)
-
-    return mask
+    return retained_mask
