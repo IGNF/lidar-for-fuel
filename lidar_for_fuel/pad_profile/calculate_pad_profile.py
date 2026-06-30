@@ -27,14 +27,14 @@ def pad_metrics_core(
     x_sensor: np.ndarray,
     y_sensor: np.ndarray,
     z_sensor: np.ndarray,
-    scanning_angle: bool = True,
-    limit_N_points: int = 400,
-    limit_flight_agl: float = 800.0,
-    deviation_days: float = np.inf,
-    z0: float = 0.0,
-    dz: float = 1.0,
-    nlayers: int | None = 60,
-    ground_margin: float = 0.1,
+    scanning_angle: bool,
+    limit_N_points: int,
+    limit_flight_agl: float,
+    deviation_days: float,
+    z0: float,
+    dz: float,
+    nlayers: int | None,
+    ground_margin: float,
 ) -> tuple[float, np.ndarray, np.ndarray, np.ndarray] | None:
     """Compute PAD metrics for one pixel/plot of LiDAR points.
 

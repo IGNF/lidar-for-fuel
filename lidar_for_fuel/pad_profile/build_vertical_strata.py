@@ -8,11 +8,11 @@ import numpy as np
 
 
 def build_vertical_strata(
-    z0: float = 0.0,
-    dz: float = 1.0,
-    nlayers: int | None = 60,
-    ground_margin: float = 0.1,
-    h_abg: np.ndarray | None = None,
+    z0: float,
+    dz: float,
+    nlayers: int | None,
+    ground_margin: float,
+    h_abg: np.ndarray | None,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Build the break sequence used to bin point heights into PAD strata.
 
@@ -29,12 +29,10 @@ def build_vertical_strata(
             only when `nlayers` is None. Ignored otherwise. (R's `Z`).
 
     Returns:
-        tuple[np.ndarray, np.ndarray]: `(breaks, min_layer)`.
+        tuple[np.ndarray, np.ndarray]: `(breaks, min_layer_theory)`.
         `breaks` starts with `-np.inf` and ends with `z_max_pad`; the break at
         exact height 0 is shifted up by `ground_margin`.
-        `min_layer` is `breaks[:-1]` captured *before* the "theoretical" ground-margin shift
-        (so it still reports the unshifted stratum lower bound); its first
-        element is `-np.inf` (the below-ground stratum, dropped by the caller).
+        `min_layer_theory` is `breaks[:-1]` theoretical min height for each layer (not considering ground-margin).
 
     Raises:
         ValueError: If `nlayers` is None and `h_abg` is not provided or is empty.
@@ -61,10 +59,10 @@ def build_vertical_strata(
 
     # Capture each stratum's lower bound *before* the ground-margin shift
     # below, by dropping the last edge.
-    min_layer = breaks[:-1].copy()
+    min_layer_theory = breaks[:-1].copy()
 
     # Push the ground-level edge up by ground_margin, so points within [0, ground_margin]
     # fall into the dropped stratum instead of the first real one.
     breaks[breaks == 0.0] += ground_margin
 
-    return breaks, min_layer
+    return breaks, min_layer_theory
