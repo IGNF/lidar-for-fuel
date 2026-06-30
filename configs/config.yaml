@@ -39,7 +39,10 @@ pad_profile:
   scanning_angle: True
   limit_N_points: 400
   limit_flight_agl: 800
-
+  z0: 0.0
+  dz: 1.0
+  nlayers: 60
+  ground_margin: 0.1
 
 dtm:
   download:

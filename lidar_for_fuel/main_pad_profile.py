@@ -27,6 +27,10 @@ def pad_profile_one_tile(
     limit_N_points: int = 400,
     limit_flight_agl: float = 800,
     deviation_days: float = np.inf,
+    z0: float = 0.0,
+    dz: float = 1.0,
+    nlayers: int | None = 60,
+    ground_margin: float = 0.1,
 ) -> dict:
     """Compute PAD metrics for one tile.
 
@@ -45,6 +49,13 @@ def pad_profile_one_tile(
         deviation_days (float): Max deviation in days around the local modal acquisition date.
                                 `inf` = no filter.
                                 Default `inf`.
+        z0 (float): Bottom height of the first stratum (m). Default 0.
+        dz (float): Stratum thickness (m). Default 1.
+        nlayers (int | None): Number of strata above z0. If None, derived from
+            `max(h_abg)`. Default 60.
+        ground_margin (float): Margin above `z0` excluded from the first stratum
+            (m). Default 0.1.
+
     Returns:
         float | None: cos_theta (or None if a quality guard fails).
     """
@@ -83,6 +94,10 @@ def pad_profile_one_tile(
         limit_N_points=limit_N_points,
         limit_flight_agl=limit_flight_agl,
         deviation_days=deviation_days,
+        z0=z0,
+        dz=dz,
+        nlayers=nlayers,
+        ground_margin=ground_margin,
     )
 
     logger.info("Computed PAD metrics by tiles in %s", input_filename)
@@ -118,6 +133,10 @@ def main(config: DictConfig):
             scanning_angle=config.pad_profile.scanning_angle,
             limit_N_points=config.pad_profile.limit_N_points,
             limit_flight_agl=config.pad_profile.limit_flight_agl,
+            z0=config.pad_profile.z0,
+            dz=config.pad_profile.dz,
+            nlayers=config.pad_profile.nlayers,
+            ground_margin=config.pad_profile.ground_margin,
         )
 
     if initial_las_filename:
