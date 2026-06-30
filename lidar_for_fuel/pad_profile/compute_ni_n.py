@@ -24,10 +24,10 @@ def _bin_counts(values: np.ndarray, breaks: np.ndarray) -> np.ndarray:
 def compute_ni_n(
     h_abg: np.ndarray,
     veg_gnd: np.ndarray,
-    z0: float = 0.0,
-    dz: float = 1.0,
-    nlayers: int | None = 60,
-    ground_margin: float = 0.1,
+    z0: float,
+    dz: float,
+    nlayers: int | None,
+    ground_margin: float,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Count vegetation/ground hits (Ni) and entering rays (N) per vertical stratum.
 
