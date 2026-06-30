@@ -82,7 +82,7 @@ def test_ni_n_min_layer_for_scenario(h_abg, veg_gnd, kwargs, expected_ni, expect
     ni, n, min_layer = compute_ni_n(h_abg, veg_gnd, **kwargs)
     np.testing.assert_array_equal(ni, expected_ni)
     np.testing.assert_array_equal(n, expected_n)
-    assert np.allclose(min_layer, expected_min_layer)
+    np.testing.assert_array_equal(min_layer, expected_min_layer)
 
 
 # ── output length, explicit nlayers vs nlayers=None ──────────────────────────────
