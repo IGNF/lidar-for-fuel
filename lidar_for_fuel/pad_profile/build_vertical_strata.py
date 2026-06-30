@@ -32,7 +32,7 @@ def build_vertical_strata(
         tuple[np.ndarray, np.ndarray]: `(breaks, min_layer)`.
         `breaks` starts with `-np.inf` and ends with `z_max_pad`; the break at
         exact height 0 is shifted up by `ground_margin`.
-        `min_layer` is `breaks[:-1]` captured *before* the ground-margin shift
+        `min_layer` is `breaks[:-1]` captured *before* the "theoretical" ground-margin shift
         (so it still reports the unshifted stratum lower bound); its first
         element is `-np.inf` (the below-ground stratum, dropped by the caller).
 
