@@ -9,6 +9,7 @@ import numpy as np
 
 from lidar_for_fuel.commons.filter_points_by_date import filter_by_date
 from lidar_for_fuel.pad_profile.compute_cos_theta import compute_cos_theta
+from lidar_for_fuel.pad_profile.compute_ni_n import compute_ni_n
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +31,11 @@ def pad_metrics_core(
     limit_N_points: int = 400,
     limit_flight_agl: float = 800.0,
     deviation_days: float = np.inf,
-) -> float | None:
+    z0: float = 0.0,
+    dz: float = 1.0,
+    nlayers: int | None = 60,
+    ground_margin: float = 0.1,
+) -> tuple[float, np.ndarray, np.ndarray, np.ndarray] | None:
     """Compute PAD metrics for one pixel/plot of LiDAR points.
 
     Args:
@@ -56,8 +61,23 @@ def pad_metrics_core(
         deviation_days (float): Max deviation in days around the local modal acquisition date.
                                 `inf` = no filter.
                                 Default `inf`.
+        z0 (float): Bottom height of the first stratum (m). Default 0.
+        dz (float): Stratum thickness (m). Default 1.
+        nlayers (int | None): Number of strata above z0. If None, derived from
+            `max(h_abg)`. Default 60.
+        ground_margin (float): Margin above `z0` excluded from the first stratum
+            (m). Default 0.1.
+
     Returns:
-        float | None: cos_theta (or None if a quality guard fails).
+        tuple[float, np.ndarray, np.ndarray, np.ndarray] | None: `(cos_theta, ni, n,
+        min_layer)`, or None if a quality guard fails.
+            cos_theta: scan angle factor (1.0 if `scanning_angle=False`).
+            ni: vegetation/ground hit count per stratum.
+            n: cumulative entering-ray count per stratum (non-decreasing). A
+                point below the ground margin still counts toward every
+                stratum's `n` via the cumulative sum, since a ray ending there
+                had to pass through every stratum above it on the way down.
+            min_layer: lower height bound of each stratum (m), pre-ground-margin-shift.
     """
     # # Step 1:
     # Filter points by ±deviation_days around the most densely sampled calendar day.
@@ -84,6 +104,8 @@ def pad_metrics_core(
     # Keep only points with classes unclassified, ground, vegetations and water
     veg_ground_points = np.isin(classification, _KEEP_VALUES)
 
+    # # Step 4:
+    # Calculate "cos_theta"
     cos_theta, mean_flight_agl = compute_cos_theta(
         x=x,
         y=y,
@@ -103,4 +125,9 @@ def pad_metrics_core(
         )
         return None
 
-    return cos_theta
+    # # Step 5:
+    # Create a sequence to make strata
+    # Then, get number of returns intercepted and "pulses" entering in each strata
+    Ni, N, min_layer = compute_ni_n(h_abg, veg_ground_points, z0, dz, nlayers, ground_margin)
+
+    return cos_theta, Ni, N, min_layer
