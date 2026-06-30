@@ -19,7 +19,7 @@ def test_min_layer_first_element_is_neginf():
 def test_inner_breaks_spacing():
     breaks, _ = build_vertical_strata(z0=0.0, dz=1.0, nlayers=60, ground_margin=0.1)
     inner = breaks[2:]  # skip -Inf and the shifted 0.1 break
-    assert np.allclose(np.diff(inner), 1.0)
+    assert np.all(np.diff(inner) == 1.0)
 
 
 def test_returns_independent_arrays():
@@ -68,7 +68,7 @@ def test_breaks_shape_and_top(z0, dz, nlayers, expected_n_breaks, expected_n_min
 )
 def test_ground_margin_shift(z0, ground_margin, expected_break_1):
     breaks, min_layer = build_vertical_strata(z0=z0, dz=1.0, nlayers=10, ground_margin=ground_margin)
-    assert breaks[1] == pytest.approx(expected_break_1)
+    assert breaks[1] == expected_break_1
     # min_layer is captured before the shift: always reports the unshifted z0
     assert min_layer[1] == z0
 
@@ -87,7 +87,7 @@ def test_ground_margin_shift(z0, ground_margin, expected_break_1):
 )
 def test_nlayers_none_derives_top_from_h_abg(h_abg, dz, expected_last_break):
     breaks, _ = build_vertical_strata(z0=0.0, dz=dz, nlayers=None, h_abg=h_abg)
-    assert breaks[-1] == pytest.approx(expected_last_break)
+    assert breaks[-1] == expected_last_break
 
 
 @pytest.mark.parametrize("h_abg", [None, np.array([])], ids=["none", "empty_array"])
