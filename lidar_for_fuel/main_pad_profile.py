@@ -131,13 +131,13 @@ def main(config: DictConfig):
             input_filename=os.path.join(input_dir, filename),
             srid=config.io.spatial_reference,
             deviation_days=config.commons.filter_date.deviation_days,
-            scanning_angle=config.pad_profile.scanning_angle,
-            limit_N_points=config.pad_profile.limit_N_points,
-            limit_flight_agl=config.pad_profile.limit_flight_agl,
-            z0=config.pad_profile.z0,
-            dz=config.pad_profile.dz,
-            nlayers=config.pad_profile.nlayers,
-            ground_margin=config.pad_profile.ground_margin,
+            scanning_angle=config.pad_profile.cos_theta.scanning_angle,
+            limit_N_points=config.pad_profile.cos_theta.limit_N_points,
+            limit_flight_agl=config.pad_profile.cos_theta.limit_flight_agl,
+            z0=config.pad_profile.compute_ni_n.z0,
+            dz=config.pad_profile.compute_ni_n.dz,
+            nlayers=config.pad_profile.compute_ni_n.nlayers,
+            ground_margin=config.pad_profile.compute_ni_n.ground_margin,
         )
 
     if initial_las_filename:
