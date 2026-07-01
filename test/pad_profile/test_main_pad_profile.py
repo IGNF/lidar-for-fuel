@@ -34,7 +34,7 @@ def test_pad_profile_one_tile_real_las_returns_coherent_output_values():
         ground_margin=0.1,
     )
 
-    cos_theta, ni, n, min_layer = result
+    cos_theta, ni, n, min_layer, nrd = result
     assert isinstance(cos_theta, (float, int)), "Expected a numeric cos_theta value"
     assert 0.0 <= float(cos_theta) <= 1.0
-    assert len(ni) == len(n) == len(min_layer)
+    assert len(ni) == len(n) == len(min_layer) == len(nrd)
