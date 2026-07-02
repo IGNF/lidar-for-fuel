@@ -1,3 +1,11 @@
+- Add function "compute cos theta"
+- Add function "build vertical strata"
+- Add function "compute Ni and N"
+- Add function "calculate the fractions of incoming rays intercepted for each "NRD" stratum"
+- Add function "compute Gap Fraction"
+- Add function "calculate PAD profile"
+
+
 # v0.1.0
 - Add function "check lidar data"
 - Add function "filter by deviation day"
