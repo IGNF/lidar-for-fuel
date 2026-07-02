@@ -10,6 +10,7 @@ import numpy as np
 from lidar_for_fuel.commons.filter_points_by_date import filter_by_date
 from lidar_for_fuel.pad_profile.compute_cos_theta import compute_cos_theta
 from lidar_for_fuel.pad_profile.compute_ni_n import compute_ni_n
+from lidar_for_fuel.pad_profile.compute_nrd import compute_nrd
 
 logger = logging.getLogger(__name__)
 
@@ -69,8 +70,8 @@ def pad_metrics_core(
             (m). Default 0.1.
 
     Returns:
-        tuple[float, np.ndarray, np.ndarray, np.ndarray] | None: `(cos_theta, ni, n,
-        min_layer)`, or None if a quality guard fails.
+        tuple[float, np.ndarray, np.ndarray, np.ndarray, np.ndarray] | None: `(cos_theta, ni, n,
+        min_layer, nrd)`, or None if a quality guard fails.
             cos_theta: scan angle factor (1.0 if `scanning_angle=False`).
             ni: vegetation/ground hit count per stratum.
             n: cumulative entering-ray count per stratum (non-decreasing). A
@@ -78,6 +79,7 @@ def pad_metrics_core(
                 stratum's `n` via the cumulative sum, since a ray ending there
                 had to pass through every stratum above it on the way down.
             min_layer: lower height bound of each stratum (m), pre-ground-margin-shift.
+            ndr: fractions of incoming rays intercepted for each "NRD" stratum..
     """
     # # Step 1:
     # Filter points by ±deviation_days around the most densely sampled calendar day.
@@ -130,4 +132,8 @@ def pad_metrics_core(
     # Then, get number of returns intercepted and "pulses" entering in each strata
     Ni, N, min_layer = compute_ni_n(h_abg, veg_ground_points, z0, dz, nlayers, ground_margin)
 
-    return cos_theta, Ni, N, min_layer
+    # # Step 6:
+    # Compute the fractions of incoming rays intercepted for each "NRD" stratum.
+    NRD = compute_nrd(Ni, N)
+
+    return cos_theta, Ni, N, min_layer, NRD
