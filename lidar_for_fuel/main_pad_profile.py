@@ -31,7 +31,7 @@ def pad_profile_one_tile(
     dz: float,
     nlayers: int | None,
     ground_margin: float,
-) -> tuple[float, np.ndarray, np.ndarray, np.ndarray] | None:
+) -> tuple[float, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray] | None:
     """Compute PAD metrics for one tile.
 
     Args:
@@ -57,8 +57,8 @@ def pad_profile_one_tile(
             (m). Default 0.1.
 
     Returns:
-        tuple[float, np.ndarray, np.ndarray, np.ndarray] | None: `(cos_theta, ni, n,
-        min_layer)`, or None if a quality guard fails. See `pad_metrics_core`.
+        tuple[float, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray] | None: `(cos_theta, ni, n,
+        min_layer, nrd, gf)`, or None if a quality guard fails. See `pad_metrics_core`.
     """
     # Validate pointclouds after preprocessing
     check_lidar_file(input_filename)
