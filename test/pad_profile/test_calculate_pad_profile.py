@@ -47,7 +47,7 @@ def test_pad_metrics_core_returns_cos_theta_between_0_and_1():
 
 def test_pad_metrics_core_output_format():
     """Verify the output format: `None` when there are too few points, otherwise a
-    `(cos_theta, ni, n, min_layer, nrd)` tuple shaped for the default 60 strata."""
+    `(cos_theta, ni, n, min_layer, nrd, gf)` tuple shaped for the default 60 strata."""
     n = 5
     gpstime = np.zeros(n, dtype=np.float64)
     points = _points(n, gpstime)
@@ -62,7 +62,7 @@ def test_pad_metrics_core_output_format():
     )
     assert result_none is None
 
-    # Enough points -> (cos_theta, ni, n, min_layer, nrd)
+    # Enough points -> (cos_theta, ni, n, min_layer, nrd, gf)
     result = pad_metrics_core(
         **points,
         **_DEFAULT_PARAMS,
@@ -70,9 +70,9 @@ def test_pad_metrics_core_output_format():
         limit_N_points=1,
         deviation_days=np.inf,
     )
-    cos_theta, ni, n_per_stratum, min_layer, nrd = result
+    cos_theta, ni, n_per_stratum, min_layer, nrd, gf = result
     assert isinstance(cos_theta, float)
-    assert len(ni) == len(n_per_stratum) == len(min_layer) == len(nrd) == 60
+    assert len(ni) == len(n_per_stratum) == len(min_layer) == len(nrd) == len(gf) == 60
     assert np.issubdtype(ni.dtype, np.integer)
     assert np.issubdtype(n_per_stratum.dtype, np.integer)
     assert min_layer.dtype == np.float64
@@ -83,6 +83,8 @@ def test_pad_metrics_core_output_format():
     np.testing.assert_array_equal(n_per_stratum, np.full(60, n, dtype=n_per_stratum.dtype))
     # ni=0, n=5 for every stratum -> NRD=0 -> Laplace correction: (0+1)/(5+2) = 1/7
     np.testing.assert_allclose(nrd, np.full(60, 1 / 7))
+    # gf = 1 - nrd = 1 - 1/7 = 6/7
+    np.testing.assert_allclose(gf, np.full(60, 6 / 7))
 
 
 def test_pad_metrics_core_scanning_angle_false_returns_one():
@@ -98,5 +100,5 @@ def test_pad_metrics_core_scanning_angle_false_returns_one():
         deviation_days=np.inf,
     )
 
-    cos_theta, _, _, _, _ = result
+    cos_theta, _, _, _, _, _ = result
     assert cos_theta == 1.0

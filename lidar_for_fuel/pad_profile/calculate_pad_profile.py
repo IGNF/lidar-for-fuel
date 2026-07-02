@@ -9,6 +9,7 @@ import numpy as np
 
 from lidar_for_fuel.commons.filter_points_by_date import filter_by_date
 from lidar_for_fuel.pad_profile.compute_cos_theta import compute_cos_theta
+from lidar_for_fuel.pad_profile.compute_gf import compute_gf
 from lidar_for_fuel.pad_profile.compute_ni_n import compute_ni_n
 from lidar_for_fuel.pad_profile.compute_nrd import compute_nrd
 
@@ -36,7 +37,7 @@ def pad_metrics_core(
     dz: float,
     nlayers: int | None,
     ground_margin: float,
-) -> tuple[float, np.ndarray, np.ndarray, np.ndarray] | None:
+) -> tuple[float, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray] | None:
     """Compute PAD metrics for one pixel/plot of LiDAR points.
 
     Args:
@@ -70,8 +71,8 @@ def pad_metrics_core(
             (m). Default 0.1.
 
     Returns:
-        tuple[float, np.ndarray, np.ndarray, np.ndarray, np.ndarray] | None: `(cos_theta, ni, n,
-        min_layer, nrd)`, or None if a quality guard fails.
+        tuple[float, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray] | None: `(cos_theta, ni, n,
+        min_layer, nrd, gf)`, or None if a quality guard fails.
             cos_theta: scan angle factor (1.0 if `scanning_angle=False`).
             ni: vegetation/ground hit count per stratum.
             n: cumulative entering-ray count per stratum (non-decreasing). A
@@ -79,7 +80,9 @@ def pad_metrics_core(
                 stratum's `n` via the cumulative sum, since a ray ending there
                 had to pass through every stratum above it on the way down.
             min_layer: lower height bound of each stratum (m), pre-ground-margin-shift.
-            ndr: fractions of incoming rays intercepted for each "NRD" stratum..
+            nrd: fractions of incoming rays intercepted for each "NRD" stratum.
+            gf: probability that a ray crosses the stratum without being intercepted
+                (Gap Fraction), `gf = 1 - nrd`.
     """
     # # Step 1:
     # Filter points by ±deviation_days around the most densely sampled calendar day.
@@ -136,4 +139,8 @@ def pad_metrics_core(
     # Compute the fractions of incoming rays intercepted for each "NRD" stratum.
     NRD = compute_nrd(Ni, N)
 
-    return cos_theta, Ni, N, min_layer, NRD
+    # # Step 7:
+    # the probability that a ray crosses the stratum without being intercepted: Gap fraction
+    Gf = compute_gf(NRD)
+
+    return cos_theta, Ni, N, min_layer, NRD, Gf
