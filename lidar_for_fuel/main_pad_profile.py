@@ -31,7 +31,10 @@ def pad_profile_one_tile(
     dz: float,
     nlayers: int | None,
     ground_margin: float,
-) -> tuple[float, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray] | None:
+    cover_type: str,
+    height_cover: float,
+    use_cover: bool,
+) -> tuple[float, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, float, float, float, float] | None:
     """Compute PAD metrics for one tile.
 
     Args:
@@ -55,10 +58,16 @@ def pad_profile_one_tile(
             `max(h_abg)`. Default 60.
         ground_margin (float): Margin above `z0` excluded from the first stratum
             (m). Default 0.1.
+        cover_type (str): Either "first" (cover estimated from first returns
+            only) or "all" (cover estimated from all returns).
+        height_cover (float): Height threshold (m) used for `cover_h_pad`.
+        use_cover (bool): If False, `cover_h_pad` is `NaN`; the 2/4/6 m
+            cover fractions are always computed.
 
     Returns:
-        tuple[float, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray] | None: `(cos_theta, ni, n,
-        min_layer, nrd, gf)`, or None if a quality guard fails. See `pad_metrics_core`.
+        tuple[float, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, float, float, float, float]
+        | None: `(cos_theta, ni, n, min_layer, nrd, gf, cover_h_pad, cover_2, cover_4, cover_6)`, or None if
+        a quality guard fails. See `pad_metrics_core`.
     """
     # Validate pointclouds after preprocessing
     check_lidar_file(input_filename)
@@ -99,6 +108,9 @@ def pad_profile_one_tile(
         dz=dz,
         nlayers=nlayers,
         ground_margin=ground_margin,
+        cover_type=cover_type,
+        height_cover=height_cover,
+        use_cover=use_cover,
     )
 
     logger.info("Computed PAD metrics by tiles in %s", input_filename)
@@ -138,6 +150,9 @@ def main(config: DictConfig):
             dz=config.pad_profile.compute_ni_n.dz,
             nlayers=config.pad_profile.compute_ni_n.nlayers,
             ground_margin=config.pad_profile.compute_ni_n.ground_margin,
+            cover_type=config.pad_profile.compute_cover.cover_type,
+            height_cover=config.pad_profile.compute_cover.height_cover,
+            use_cover=config.pad_profile.compute_cover.use_cover,
         )
 
     if initial_las_filename:
