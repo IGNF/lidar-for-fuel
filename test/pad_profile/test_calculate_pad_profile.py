@@ -108,3 +108,33 @@ def test_pad_metrics_core_scanning_angle_false_returns_one():
 
     cos_theta, _, _, _, _, _, _, _, _, _ = result
     assert cos_theta == 1.0
+
+
+def test_pad_metrics_core_scanning_angle_does_not_affect_other_outputs():
+    """`scanning_angle` only feeds `cos_theta`/the `limit_flight_agl` guard; it must
+    have zero effect on ni/n/min_layer/nrd/gf/cover_* (see compute_ni_n/compute_nrd/
+    compute_gf/compute_cover, none of which take cos_theta as input)."""
+    n = 5
+    gpstime = np.zeros(n, dtype=np.float64)
+    points = _points(n, gpstime)
+
+    result_true = pad_metrics_core(
+        **points,
+        **_DEFAULT_PARAMS,
+        scanning_angle=True,
+        limit_N_points=1,
+        deviation_days=np.inf,
+    )
+    result_false = pad_metrics_core(
+        **points,
+        **_DEFAULT_PARAMS,
+        scanning_angle=False,
+        limit_N_points=1,
+        deviation_days=np.inf,
+    )
+
+    assert result_true is not None and result_false is not None
+    # index 0 is cos_theta, expected to differ (1.0 vs computed) -- everything
+    # else must be identical regardless of scanning_angle.
+    for value_true, value_false in zip(result_true[1:], result_false[1:]):
+        np.testing.assert_array_equal(value_true, value_false)
