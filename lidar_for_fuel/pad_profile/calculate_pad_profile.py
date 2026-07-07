@@ -9,6 +9,7 @@ import numpy as np
 
 from lidar_for_fuel.commons.filter_points_by_date import filter_by_date
 from lidar_for_fuel.pad_profile.compute_cos_theta import compute_cos_theta
+from lidar_for_fuel.pad_profile.compute_cover import compute_cover
 from lidar_for_fuel.pad_profile.compute_gf import compute_gf
 from lidar_for_fuel.pad_profile.compute_ni_n import compute_ni_n
 from lidar_for_fuel.pad_profile.compute_nrd import compute_nrd
@@ -37,7 +38,10 @@ def pad_metrics_core(
     dz: float,
     nlayers: int | None,
     ground_margin: float,
-) -> tuple[float, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray] | None:
+    cover_type: str,
+    height_cover: float,
+    use_cover: bool,
+) -> tuple[float, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, float, float, float, float] | None:
     """Compute PAD metrics for one pixel/plot of LiDAR points.
 
     Args:
@@ -69,10 +73,16 @@ def pad_metrics_core(
             `max(h_abg)`. Default 60.
         ground_margin (float): Margin above `z0` excluded from the first stratum
             (m). Default 0.1.
+        cover_type (str): Either "first" (cover estimated from first returns
+            only) or "all" (cover estimated from all returns).
+        height_cover (float): Height threshold (m) used for `cover_h_pad`.
+        use_cover (bool): If False, `cover_h_pad` is `NaN`; the 2/4/6 m
+            cover fractions are always computed.
 
     Returns:
-        tuple[float, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray] | None: `(cos_theta, ni, n,
-        min_layer, nrd, gf)`, or None if a quality guard fails.
+        tuple[float, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, float, float, float, float]
+        | None: `(cos_theta, ni, n, min_layer, nrd, gf, cover_h_pad, cover_2, cover_4, cover_6)`, or None if
+        a quality guard fails.
             cos_theta: scan angle factor (1.0 if `scanning_angle=False`).
             ni: vegetation/ground hit count per stratum.
             n: cumulative entering-ray count per stratum (non-decreasing). A
@@ -83,6 +93,10 @@ def pad_metrics_core(
             nrd: fractions of incoming rays intercepted for each "NRD" stratum.
             gf: probability that a ray crosses the stratum without being intercepted
                 (Gap Fraction), `gf = 1 - nrd`.
+            cover_h_pad: canopy cover fraction above `height_cover`, or `NaN` if `use_cover=False`.
+            cover_2: canopy cover fraction above 2m.
+            cover_4: canopy cover fraction above 4m.
+            cover_6: canopy cover fraction above 6m.
     """
     # # Step 1:
     # Filter points by ±deviation_days around the most densely sampled calendar day.
@@ -143,4 +157,15 @@ def pad_metrics_core(
     # the probability that a ray crosses the stratum without being intercepted: Gap fraction
     Gf = compute_gf(NRD)
 
-    return cos_theta, Ni, N, min_layer, NRD, Gf
+    # # Step 8:
+    # Compute the canopy cover fraction above height_cover, 2m, 4m and 6m.
+    cover_h_pad, cover_2, cover_4, cover_6 = compute_cover(
+        h_abg=h_abg,
+        veg_gnd=veg_ground_points,
+        return_number=return_number,
+        cover_type=cover_type,
+        height_cover=height_cover,
+        use_cover=use_cover,
+    )
+
+    return cos_theta, Ni, N, min_layer, NRD, Gf, cover_h_pad, cover_2, cover_4, cover_6

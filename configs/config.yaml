@@ -45,6 +45,10 @@ pad_profile:
     dz: 1.0
     nlayers: 60
     ground_margin: 0.1
+  compute_cover:
+    cover_type: "all"
+    height_cover: 2.0
+    use_cover: True
 
 dtm:
   download:
