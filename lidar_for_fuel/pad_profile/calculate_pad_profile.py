@@ -13,10 +13,19 @@ from lidar_for_fuel.pad_profile.compute_cover import compute_cover
 from lidar_for_fuel.pad_profile.compute_gf import compute_gf
 from lidar_for_fuel.pad_profile.compute_ni_n import compute_ni_n
 from lidar_for_fuel.pad_profile.compute_nrd import compute_nrd
+from lidar_for_fuel.pad_profile.compute_pad import compute_pad
 
 logger = logging.getLogger(__name__)
 
 _KEEP_VALUES = [1, 2, 3, 4, 5, 9]  # Classes to keep
+
+
+def _format_num(value: float) -> str:
+    """Format a number the way R's `paste()` does: drop a trailing `.0`."""
+    rounded = round(float(value), 6)
+    if rounded == int(rounded):
+        return str(int(rounded))
+    return str(rounded)
 
 
 def pad_metrics_core(
@@ -41,7 +50,10 @@ def pad_metrics_core(
     cover_type: str,
     height_cover: float,
     use_cover: bool,
-) -> tuple[float, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, float, float, float, float] | None:
+    G: float,
+    omega: float,
+    keep_N: bool,
+) -> dict[str, float] | None:
     """Compute PAD metrics for one pixel/plot of LiDAR points.
 
     Args:
@@ -77,26 +89,28 @@ def pad_metrics_core(
             only) or "all" (cover estimated from all returns).
         height_cover (float): Height threshold (m) used for `cover_h_pad`.
         use_cover (bool): If False, `cover_h_pad` is `NaN`; the 2/4/6 m
-            cover fractions are always computed.
+            cover fractions are always computed, and the PAD formula falls
+            back to the plain Beer-Lambert form for every stratum (no cover
+            correction).
+        G (float): Leaf projection ratio. Default 0.5.
+        omega (float): Clumping factor. Default 1.
+        keep_N (bool): If True, include `Ni_{dz}_{min_layer}`/`N_{dz}_{min_layer}`
+            per stratum in the output. Default False.
 
     Returns:
-        tuple[float, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, float, float, float, float]
-        | None: `(cos_theta, ni, n, min_layer, nrd, gf, cover_h_pad, cover_2, cover_4, cover_6)`, or None if
-        a quality guard fails.
+        dict[str, float] | None: `None` if a quality guard fails, otherwise a dict
+        containing named-list output exactly:
+            date: mean GPS time of the points used (post temporal filter).
+            Cover_h_pad: canopy cover fraction above `height_cover`, or `NaN` if `use_cover=False`.
+            Cover_2: canopy cover fraction above 2m.
+            Cover_4: canopy cover fraction above 4m.
+            Cover_6: canopy cover fraction above 6m.
             cos_theta: scan angle factor (1.0 if `scanning_angle=False`).
-            ni: vegetation/ground hit count per stratum.
-            n: cumulative entering-ray count per stratum (non-decreasing). A
-                point below the ground margin still counts toward every
-                stratum's `n` via the cumulative sum, since a ray ending there
-                had to pass through every stratum above it on the way down.
-            min_layer: lower height bound of each stratum (m), pre-ground-margin-shift.
-            nrd: fractions of incoming rays intercepted for each "NRD" stratum.
-            gf: probability that a ray crosses the stratum without being intercepted
-                (Gap Fraction), `gf = 1 - nrd`.
-            cover_h_pad: canopy cover fraction above `height_cover`, or `NaN` if `use_cover=False`.
-            cover_2: canopy cover fraction above 2m.
-            cover_4: canopy cover fraction above 4m.
-            cover_6: canopy cover fraction above 6m.
+            PAD_{dz}_{min_layer}: Plant Area Density for that stratum, cover-corrected
+                when possible. One key per stratum.
+            Ni_{dz}_{min_layer}, N_{dz}_{min_layer}: vegetation/ground hit count and
+                cumulative entering-ray count for that stratum. Only present when
+                `keep_N=True`.
     """
     # # Step 1:
     # Filter points by ±deviation_days around the most densely sampled calendar day.
@@ -168,4 +182,38 @@ def pad_metrics_core(
         use_cover=use_cover,
     )
 
-    return cos_theta, Ni, N, min_layer, NRD, Gf, cover_h_pad, cover_2, cover_4, cover_6
+    # # Step 9:
+    # Compute PAD per stratum from the Gap Fraction, with an optional cover correction.
+    PAD = compute_pad(
+        NRD=NRD,
+        Gf=Gf,
+        min_layer=min_layer,
+        cos_theta=cos_theta,
+        h_abg=h_abg,
+        veg_gnd=veg_ground_points,
+        height_cover=height_cover,
+        cover_h_pad=cover_h_pad,
+        use_cover=use_cover,
+        ground_margin=ground_margin,
+        dz=dz,
+        G=G,
+        omega=omega,
+    )
+
+    # # Step 10:
+    # Assemble the final output dict.
+    z_names = [f"{_format_num(dz)}_{_format_num(layer)}" for layer in min_layer]
+    output: dict[str, float] = {
+        "date": float(np.mean(gpstime)),
+        "Cover_h_pad": cover_h_pad,
+        "Cover_2": cover_2,
+        "Cover_4": cover_4,
+        "Cover_6": cover_6,
+        "cos_theta": cos_theta,
+    }
+    output.update({f"PAD_{name}": float(value) for name, value in zip(z_names, PAD)})
+    if keep_N:
+        output.update({f"Ni_{name}": int(value) for name, value in zip(z_names, Ni)})
+        output.update({f"N_{name}": int(value) for name, value in zip(z_names, N)})
+
+    return output
