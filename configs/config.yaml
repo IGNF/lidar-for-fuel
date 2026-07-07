@@ -49,6 +49,10 @@ pad_profile:
     cover_type: "all"
     height_cover: 2.0
     use_cover: True
+  compute_pad:
+    G: 0.5
+    omega: 1
+  keep_N: False
 
 dtm:
   download:
