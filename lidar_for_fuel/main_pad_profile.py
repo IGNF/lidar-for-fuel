@@ -66,10 +66,10 @@ def pad_profile_one_tile(
         height_cover (float): Height threshold (m) used for `cover_h_pad`.
         use_cover (bool): If False, `cover_h_pad` is `NaN`; the 2/4/6 m
             cover fractions are always computed.
-        G (float): Leaf projection ratio. R default 0.5.
-        omega (float): Clumping factor. R default 0.77.
+        G (float): Leaf projection ratio. Default 0.5.
+        omega (float): Clumping factor. Default 1.
         keep_N (bool): If True, include `Ni_{dz}_{min_layer}`/`N_{dz}_{min_layer}`
-            per stratum in the output. R default False.
+            per stratum in the output. Default False.
 
     Returns:
         dict[str, float] | None: `None` if a quality guard fails, otherwise a dict
