@@ -34,7 +34,10 @@ def pad_profile_one_tile(
     cover_type: str,
     height_cover: float,
     use_cover: bool,
-) -> tuple[float, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, float, float, float, float] | None:
+    G: float,
+    omega: float,
+    keep_N: bool,
+) -> dict[str, float] | None:
     """Compute PAD metrics for one tile.
 
     Args:
@@ -63,11 +66,14 @@ def pad_profile_one_tile(
         height_cover (float): Height threshold (m) used for `cover_h_pad`.
         use_cover (bool): If False, `cover_h_pad` is `NaN`; the 2/4/6 m
             cover fractions are always computed.
+        G (float): Leaf projection ratio. R default 0.5.
+        omega (float): Clumping factor. R default 0.77.
+        keep_N (bool): If True, include `Ni_{dz}_{min_layer}`/`N_{dz}_{min_layer}`
+            per stratum in the output. R default False.
 
     Returns:
-        tuple[float, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, float, float, float, float]
-        | None: `(cos_theta, ni, n, min_layer, nrd, gf, cover_h_pad, cover_2, cover_4, cover_6)`, or None if
-        a quality guard fails. See `pad_metrics_core`.
+        dict[str, float] | None: `None` if a quality guard fails, otherwise a dict
+        matching R's named-list output. See `pad_metrics_core`.
     """
     # Validate pointclouds after preprocessing
     check_lidar_file(input_filename)
@@ -111,6 +117,9 @@ def pad_profile_one_tile(
         cover_type=cover_type,
         height_cover=height_cover,
         use_cover=use_cover,
+        G=G,
+        omega=omega,
+        keep_N=keep_N,
     )
 
     logger.info("Computed PAD metrics by tiles in %s", input_filename)
@@ -153,6 +162,9 @@ def main(config: DictConfig):
             cover_type=config.pad_profile.compute_cover.cover_type,
             height_cover=config.pad_profile.compute_cover.height_cover,
             use_cover=config.pad_profile.compute_cover.use_cover,
+            G=config.pad_profile.compute_pad.G,
+            omega=config.pad_profile.compute_pad.omega,
+            keep_N=config.pad_profile.keep_N,
         )
 
     if initial_las_filename:

@@ -35,12 +35,16 @@ def test_pad_profile_one_tile_real_las_returns_coherent_output_values():
         cover_type="all",
         height_cover=2.0,
         use_cover=True,
+        G=0.5,
+        omega=0.77,
+        keep_N=False,
     )
 
-    cos_theta, ni, n, min_layer, nrd, gf, cover_h_pad, cover_2, cover_4, cover_6 = result
+    assert isinstance(result, dict)
+    cos_theta = result["cos_theta"]
     assert isinstance(cos_theta, (float, int)), "Expected a numeric cos_theta value"
     assert 0.0 <= float(cos_theta) <= 1.0
-    assert len(ni) == len(n) == len(min_layer) == len(nrd) == len(gf)
-    np.testing.assert_allclose(gf, 1.0 - nrd)
-    for cover in (cover_h_pad, cover_2, cover_4, cover_6):
-        assert 0.0 <= cover <= 1.0
+    pad_keys = [key for key in result if key.startswith("PAD_")]
+    assert len(pad_keys) == 60
+    for cover_key in ("Cover_2", "Cover_4", "Cover_6"):
+        assert 0.0 <= result[cover_key] <= 1.0
