@@ -24,9 +24,12 @@ from lidar_for_fuel.preprocessing.normalize_height_by_dtm import (
 )
 from lidar_for_fuel.preprocessing.validate_lidar_file import check_lidar_file
 
+from pdaltools.check_las import check_pdal_can_open_file_with_retry_decorator
+
 logger = logging.getLogger(__name__)
 
 
+@check_pdal_can_open_file_with_retry_decorator(delay=10, filepath="output_path")
 def preprocess_one_tile(
     input_filename: str,
     trajectory_dir: str,
