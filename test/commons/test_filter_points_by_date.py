@@ -28,7 +28,7 @@ def test_multiday_filters_correct_number_of_points_and_warns(rng):
     gpstime = np.concatenate([gpstime_regular, gpstime_extra])
 
     with pytest.warns(UserWarning, match=r"%\) of the returns were removed"):
-        mask = filter_by_date(gpstime, deviation_days=_DEVIATION_DAYS)
+        mask, _ = filter_by_date(gpstime, deviation_days=_DEVIATION_DAYS)
 
     n_result = int(np.sum(mask))
     expected = _DEVIATION_DAYS * 2 + _N + 1  # = 14
@@ -40,7 +40,7 @@ def test_single_day_no_filtering(rng):
     gpstime = rng.random(n_total) * _SECONDS_PER_DAY
     with warnings.catch_warnings():
         warnings.simplefilter("error")
-        mask = filter_by_date(gpstime, deviation_days=_DEVIATION_DAYS)
+        mask, _ = filter_by_date(gpstime, deviation_days=_DEVIATION_DAYS)
 
     n_result = int(np.sum(mask))
     assert n_result == n_total, f"Expected all {n_total} points to be retained, got {n_result}"
@@ -50,9 +50,10 @@ def test_infinite_deviation_returns_original_pipeline(rng):
     gpstime = np.arange(1, 101, dtype=np.float64) * _SECONDS_PER_DAY
     n_total = len(gpstime)
 
-    mask = filter_by_date(gpstime, deviation_days=math.inf)
+    mask, modal_gpstime = filter_by_date(gpstime, deviation_days=math.inf)
     assert isinstance(mask, np.ndarray) and mask.dtype == bool
     assert int(np.sum(mask)) == n_total
+    assert isinstance(modal_gpstime, float)
 
 
 def test_missing_gpstime_dimension_raises():
@@ -86,9 +87,12 @@ def test_gpstime_window_correctness(rng):
     modal_date = utcdate[5]
     EXPECTED_DATE_MIN = modal_date - np.timedelta64(DEVIATION_DAY, "D")
     EXPECTED_DATE_MAX = modal_date + np.timedelta64(DEVIATION_DAY, "D")
+    EXPECTED_MODAL_GPSTIME = float(
+        (modal_date - _GPS_EPOCH) / np.timedelta64(1, "s") - _ADJUSTED_GPS_TIME_TO_STANDARD_GPS_TIME
+    )
 
     with pytest.warns(UserWarning, match=r"%\) of the returns were removed"):
-        mask = filter_by_date(gpstime_input, deviation_days=DEVIATION_DAY)
+        mask, modal_gpstime = filter_by_date(gpstime_input, deviation_days=DEVIATION_DAY)
 
     retained = gpstime_input[mask]
     retained_dates = utcdate[mask]
@@ -96,6 +100,9 @@ def test_gpstime_window_correctness(rng):
     # Check retained calendar-date limits
     assert np.all(retained_dates >= EXPECTED_DATE_MIN)
     assert np.all(retained_dates <= EXPECTED_DATE_MAX)
+
+    # Check the returned modal GPS time matches the modal calendar day
+    assert modal_gpstime == pytest.approx(EXPECTED_MODAL_GPSTIME)
 
     # Check retained GpsTime values
     assert len(retained) == len(EXPECTED_RETAINED_MIDPOINTS) + n_extra

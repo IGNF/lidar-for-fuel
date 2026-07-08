@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 def _max_or_neg_inf(values: np.ndarray) -> float:
-    """`max()`, or `-inf` for an empty array (mirrors R's `max(numeric(0)) == -Inf`)."""
+    """`max()`, or `-inf` for an empty array"""
     return float(np.max(values)) if len(values) else -np.inf
 
 
@@ -57,13 +57,8 @@ def compute_pad(
 
     if use_cover:
         if height_cover >= _max_or_neg_inf(h_abg):
-            logger.warning("height_cover > maximum vegetation height")
-
-        if cover_h_pad == 0:
-            logger.warning("Cover method not used in PAD computation as Cover_h_pad = 0")
-            PAD = -np.log(Gf) * cos_theta / (G * omega * dz)
-        elif np.any(NRD[min_layer >= height_cover] == cover_h_pad):
-            logger.warning("Found NRD values equal to Cover_h_pad: not using Cover method.")
+            pass
+        if cover_h_pad == 0 or np.any(NRD[min_layer >= height_cover] == cover_h_pad):
             PAD = -np.log(Gf) * cos_theta / (G * omega * dz)
         else:
             cover_h_pad_v = np.full(len(min_layer), cover_h_pad)

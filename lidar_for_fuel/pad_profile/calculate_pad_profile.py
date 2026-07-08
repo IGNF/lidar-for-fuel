@@ -100,7 +100,8 @@ def pad_metrics_core(
     Returns:
         dict[str, float] | None: `None` if a quality guard fails, otherwise a dict
         containing named-list output exactly:
-            date: mean GPS time of the points used (post temporal filter).
+            date: GPS time of the modal acquisition day for the points in the
+                pixel/plot -- the center of the ±deviation_days temporal window.
             Cover_h_pad: canopy cover fraction above `height_cover`, or `NaN` if `use_cover=False`.
             Cover_2: canopy cover fraction above 2m.
             Cover_4: canopy cover fraction above 4m.
@@ -114,7 +115,7 @@ def pad_metrics_core(
     """
     # # Step 1:
     # Filter points by ±deviation_days around the most densely sampled calendar day.
-    valid = filter_by_date(gpstime, deviation_days=deviation_days)
+    valid, modal_gpstime = filter_by_date(gpstime, deviation_days=deviation_days)
 
     gpstime = gpstime[valid]
     x = x[valid]
@@ -204,7 +205,9 @@ def pad_metrics_core(
     # Assemble the final output dict.
     z_names = [f"{_format_num(dz)}_{_format_num(layer)}" for layer in min_layer]
     output: dict[str, float] = {
-        "date": float(np.mean(gpstime)),
+        "date": modal_gpstime, 
+        # Predominant acquisition date for the points contained within a pixel; 
+        # this date corresponds to the center of the time window.
         "Cover_h_pad": cover_h_pad,
         "Cover_2": cover_2,
         "Cover_4": cover_4,

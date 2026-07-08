@@ -17,7 +17,7 @@ _GPS_EPOCH = np.datetime64("1980-01-06T00:00")
 def filter_by_date(
     gpstime: np.ndarray,
     deviation_days: float = np.inf,
-) -> np.ndarray:
+) -> tuple[np.ndarray, float]:
     """Filter a LiDAR point cloud keeping only points acquired within ±deviation_days
     around the most densely sampled calendar day.
 
@@ -29,16 +29,16 @@ def filter_by_date(
         Note: the GPS epoch is fixed to 1980-01-06 00:00:00 UTC.
 
     Returns:
-        np.ndarray: Boolean mask, same shape as ``gpstime``, True for retained points.
+        tuple[np.ndarray, float]: (mask, modal_gpstime).
+            mask: Boolean mask, same shape as ``gpstime``, True for retained points.
+            modal_gpstime: GPS time (same units as ``gpstime``, at 00:00 UTC) of the
+                most densely sampled calendar day -- the center of the
+                ±deviation_days temporal window.
 
     Raises:
         ValueError: If the pipeline has no arrays, lacks a ``GpsTime`` dimension,
             or if ``deviation_days`` is negative.
     """
-    if math.isinf(deviation_days):
-        logger.debug("deviation_days is Inf — no filtering applied.")
-        return np.ones_like(gpstime, dtype=bool)
-
     # Convert GPStime -> calendar day using fixed GPS epoch
     # Approximation: GPS time is a continuous SI-second count with no leap-second
     # adjustments, while unix/UTC time absorbs them. As of today the accumulated
@@ -49,6 +49,13 @@ def filter_by_date(
 
     unique_days, counts = np.unique(utcdate, return_counts=True)
     modal_day = unique_days[counts.argmax()]
+    modal_gpstime = float(
+        (modal_day - _GPS_EPOCH) / np.timedelta64(1, "s") - _ADJUSTED_GPS_TIME_TO_STANDARD_GPS_TIME
+    )
+
+    if math.isinf(deviation_days):
+        logger.debug("deviation_days is Inf — no filtering applied.")
+        return np.ones_like(gpstime, dtype=bool), modal_gpstime
 
     # Resulting mask: True for points within the window, False for points outside
     window = np.timedelta64(int(deviation_days), "D")
@@ -76,4 +83,4 @@ def filter_by_date(
         pct_removed,
     )
 
-    return retained_mask
+    return retained_mask, modal_gpstime

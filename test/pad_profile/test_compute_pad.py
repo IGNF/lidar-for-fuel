@@ -1,5 +1,3 @@
-import logging
-
 import numpy as np
 import pytest
 
@@ -24,46 +22,41 @@ def _no_veg_gnd_filter(n: int) -> np.ndarray:
     return np.ones(n, dtype=bool)
 
 
-# ── cases that fall back to the plain Beer-Lambert formula, with an optional warning ─
+# ── cases that fall back to the plain Beer-Lambert formula ──────────────────────────
 
 
 @pytest.mark.parametrize(
-    "cover_h_pad,use_cover,h_abg,height_cover,expected_warning",
+    "cover_h_pad,use_cover,h_abg,height_cover",
     [
-        # use_cover=False -> no cover logic at all, no warning.
-        (np.nan, False, np.array([5.0]), 2.0, None),
-        # cover_h_pad == 0 -> cover method unusable, falls back with a warning.
-        (0.0, True, np.array([5.0]), 2.0, "Cover_h_pad = 0"),
-        # An upper-stratum NRD (0.6) exactly equals cover_h_pad -> falls back with a warning.
-        (0.6, True, np.array([5.0]), 2.0, "not using Cover method"),
-        # height_cover >= max(h_abg) -> warns, but every stratum is below height_cover
-        # so cover_h_pad_v is all 1 and the cover formula reduces to the basic one anyway.
-        (0.5, True, np.array([3.5]), 5.0, "height_cover > maximum vegetation height"),
+        # use_cover=False -> no cover logic at all.
+        (np.nan, False, np.array([5.0]), 2.0),
+        # cover_h_pad == 0 -> cover method unusable, falls back.
+        (0.0, True, np.array([5.0]), 2.0),
+        # An upper-stratum NRD (0.6) exactly equals cover_h_pad -> falls back.
+        (0.6, True, np.array([5.0]), 2.0),
+        # height_cover >= max(h_abg) -> every stratum is below height_cover so
+        # cover_h_pad_v is all 1 and the cover formula reduces to the basic one anyway.
+        (0.5, True, np.array([3.5]), 5.0),
     ],
     ids=[
         "use_cover_false",
         "cover_zero_fallback",
         "nrd_equals_cover_fallback",
-        "height_cover_above_max_warns",
+        "height_cover_above_max",
     ],
 )
-def test_compute_pad_basic_formula_cases(cover_h_pad, use_cover, h_abg, height_cover, expected_warning, caplog):
-    with caplog.at_level(logging.WARNING):
-        result = compute_pad(
-            NRD=_NRD,
-            Gf=_GF,
-            h_abg=h_abg,
-            veg_gnd=_no_veg_gnd_filter(1),
-            height_cover=height_cover,
-            cover_h_pad=cover_h_pad,
-            use_cover=use_cover,
-            **_COMMON,
-        )
+def test_compute_pad_basic_formula_cases(cover_h_pad, use_cover, h_abg, height_cover):
+    result = compute_pad(
+        NRD=_NRD,
+        Gf=_GF,
+        h_abg=h_abg,
+        veg_gnd=_no_veg_gnd_filter(1),
+        height_cover=height_cover,
+        cover_h_pad=cover_h_pad,
+        use_cover=use_cover,
+        **_COMMON,
+    )
     np.testing.assert_allclose(result, _BASIC_FORMULA, rtol=1e-7)
-    if expected_warning is None:
-        assert caplog.text == ""
-    else:
-        assert expected_warning in caplog.text
 
 
 # ── cases with distinct expected PAD values ──────────────────────────────────────────
