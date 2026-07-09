@@ -24,6 +24,7 @@ def test_pad_profile_one_tile_real_las_returns_coherent_output_values():
     result = pad_profile_one_tile(
         input_filename=str(real_las),
         srid="EPSG:2154",
+        keep_classes=[1, 2, 3, 4, 5, 6, 9, 17, 18, 64, 66, 67],
         limit_N_points=1,
         limit_flight_agl=0.0,
         deviation_days=np.inf,
@@ -39,6 +40,7 @@ def test_pad_profile_one_tile_real_las_returns_coherent_output_values():
         use_cover=True,
         G=0.5,
         omega=0.77,
+        keep_values=[2, 3, 4, 5, 9],
     )
 
     assert isinstance(result, dict)

@@ -5,7 +5,9 @@ import pdal
 import pytest
 
 from lidar_for_fuel.pad_profile.calculate_pad_profile import pad_metrics_core
-from lidar_for_fuel.commons.compute_class_counts import _TRACKED_CLASSES
+
+
+_TRACKED_CLASSES = [1, 2, 3, 4, 5, 6, 9, 17, 18, 64, 66, 67]
 
 _REAL_PRETRAITED_LAS = Path(
     "data/pointcloud/test_semis_2024_0751_6690_LA93_IGN69_filter_trajectory_1311_pretraited.laz"
@@ -27,6 +29,8 @@ _DEFAULT_PARAMS = dict(
     use_cover=True,
     G=0.5,
     omega=0.77,
+    keep_values=[2, 3, 4, 5, 9],
+    keep_classes=[1, 2, 3, 4, 5, 6, 9, 17, 18, 64, 66, 67],
 )
 
 _MAIN_PAD_KEYS = [f"PAD_1_{i}" for i in range(60)]
@@ -357,6 +361,8 @@ def test_pad_metrics_core_real_las_returns_coherent_output_values():
         use_cover=True,
         G=0.5,
         omega=0.77,
+        keep_values=[2, 3, 4, 5, 9],
+        keep_classes=[1, 2, 3, 4, 5, 6, 9, 17, 18, 64, 66, 67],
     )
 
     assert isinstance(result, dict)

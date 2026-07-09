@@ -115,6 +115,8 @@ def pad_metrics_core(
     use_cover: bool,
     G: float,
     omega: float,
+    keep_values: list,
+    keep_classes: list,
 ) -> dict[str, float] | None:
     """Compute PAD metrics for one pixel/plot of LiDAR points.
 
@@ -160,6 +162,9 @@ def pad_metrics_core(
             correction).
         G (float): Leaf projection ratio. Default 0.5.
         omega (float): Clumping factor. Default 1.
+        keep_values (list): Classes to keep for counting Ni. Default: [2, 3, 4, 5, 9].
+        keep_classes(list): Classes to keep for counting points. Default: [1, 2, 3, 4, 5, 6, 9, 17, 18, 64, 66, 67].
+
 
     Returns:
         dict[str, float] | None: `None` if a quality guard fails, otherwise a dict
@@ -206,7 +211,7 @@ def pad_metrics_core(
 
     # # Step 3:
     # Keep only points with classes unclassified, ground, vegetations and water
-    veg_ground_points = np.isin(classification, _KEEP_VALUES)
+    veg_ground_points = np.isin(classification, keep_values)
 
     # # Step 4:
     # Calculate "cos_theta"
@@ -243,7 +248,7 @@ def pad_metrics_core(
     # # Step 6:
     # Count points per LAS classification code (post temporal filter, pre
     # vegetation/ground subsetting), plus the pixel total.
-    class_counts = compute_class_counts(classification)
+    class_counts = compute_class_counts(classification, keep_classes)
 
     # # Step 7:
     # Compute PAD per stratum from the Gap Fraction, with an optional cover

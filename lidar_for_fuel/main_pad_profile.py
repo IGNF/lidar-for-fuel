@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 def pad_profile_one_tile(
     input_filename: str,
     srid: str,
+    keep_classes: list,
     scanning_angle: bool,
     limit_N_points: int,
     limit_flight_agl: float,
@@ -38,12 +39,14 @@ def pad_profile_one_tile(
     use_cover: bool,
     G: float,
     omega: float,
+    keep_values: list,
 ) -> dict[str, float] | None:
     """Compute PAD metrics for one tile.
 
     Args:
         input_filename (str): Path to the input LAS/LAZ file.
         srid (str): Spatial reference of the input file. Default: EPSG:2154.
+        keep_classes(list): Classes to keep for counting points. Default: [1, 2, 3, 4, 5, 6, 9, 17, 18, 64, 66, 67].
         scanning_angle (bool): If True, estimate cos(theta) from the trajectory.
                                If False, returns 1.0 (vertical pulses assumed, no correction).
                                Default True.
@@ -73,6 +76,7 @@ def pad_profile_one_tile(
             cover fractions are always computed.
         G (float): Leaf projection ratio. Default 0.5.
         omega (float): Clumping factor. Default 1.
+        keep_values (list): Classes to keep for counting Ni. Default: [2, 3, 4, 5, 9].
 
     Returns:
         dict[str, float] | None: `None` if a quality guard fails, otherwise a dict
@@ -124,6 +128,8 @@ def pad_profile_one_tile(
         use_cover=use_cover,
         G=G,
         omega=omega,
+        keep_values=keep_values,
+        keep_classes=keep_classes,
     )
 
     logger.info("Computed PAD metrics by tiles in %s", input_filename)
@@ -155,6 +161,7 @@ def main(config: DictConfig):
         pad_profile_one_tile(
             input_filename=os.path.join(input_dir, filename),
             srid=config.io.spatial_reference,
+            keep_classes=config.commons.class_count.keep_classes,
             deviation_days=config.commons.filter_date.deviation_days,
             scanning_angle=config.pad_profile.cos_theta.scanning_angle,
             limit_N_points=config.pad_profile.cos_theta.limit_N_points,
@@ -170,6 +177,7 @@ def main(config: DictConfig):
             use_cover=config.pad_profile.compute_cover.use_cover,
             G=config.pad_profile.compute_pad.G,
             omega=config.pad_profile.compute_pad.omega,
+            keep_values=config.pad_profile.compute_pad.keep_values,
         )
 
     if initial_las_filename:
