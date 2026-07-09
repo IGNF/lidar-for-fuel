@@ -31,13 +31,14 @@ def test_pad_profile_one_tile_real_las_returns_coherent_output_values():
         z0=0.0,
         dz=1.0,
         nlayers=60,
+        dz_low=0.5,
+        nlayers_low=4,
         ground_margin=0.1,
         cover_type="all",
         height_cover=2.0,
         use_cover=True,
         G=0.5,
         omega=0.77,
-        keep_N=False,
     )
 
     assert isinstance(result, dict)
@@ -45,6 +46,6 @@ def test_pad_profile_one_tile_real_las_returns_coherent_output_values():
     assert isinstance(cos_theta, (float, int)), "Expected a numeric cos_theta value"
     assert 0.0 <= float(cos_theta) <= 1.0
     pad_keys = [key for key in result if key.startswith("PAD_")]
-    assert len(pad_keys) == 60
+    assert len(pad_keys) == 60 + 4
     for cover_key in ("Cover_2", "Cover_4", "Cover_6"):
         assert 0.0 <= result[cover_key] <= 1.0

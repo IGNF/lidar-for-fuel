@@ -1,6 +1,16 @@
+from pathlib import Path
+
 import numpy as np
+import pdal
+import pytest
 
 from lidar_for_fuel.pad_profile.calculate_pad_profile import pad_metrics_core
+from lidar_for_fuel.pad_profile.compute_class_counts import _TRACKED_CLASSES
+
+_REAL_PRETRAITED_LAS = Path(
+    "data/pointcloud/test_semis_2024_0751_6690_LA93_IGN69_filter_trajectory_1311_pretraited.laz"
+)
+_SECONDS_PER_DAY = 86_400.0
 
 # pad_metrics_core has no defaults of its own for these scalar params (the
 # defaults documented in compute_ni_n/main_pad_profile live one level up).
@@ -9,14 +19,21 @@ _DEFAULT_PARAMS = dict(
     z0=0.0,
     dz=1.0,
     nlayers=60,
+    dz_low=0.5,
+    nlayers_low=4,
     ground_margin=0.1,
     cover_type="all",
     height_cover=2.0,
     use_cover=True,
     G=0.5,
     omega=0.77,
-    keep_N=False,
 )
+
+_MAIN_PAD_KEYS = [f"PAD_1_{i}" for i in range(60)]
+_MAIN_NI_KEYS = [f"Ni_1_{i}" for i in range(60)]
+_MAIN_N_KEYS = [f"N_1_{i}" for i in range(60)]
+_LOW_PAD_KEYS = ["PAD_0.5_0", "PAD_0.5_0.5", "PAD_0.5_1", "PAD_0.5_1.5"]
+_CLASS_KEYS = [f"Class_{code}" for code in _TRACKED_CLASSES] + ["Total"]
 
 
 def _points(n: int, gpstime: np.ndarray) -> dict:
@@ -53,9 +70,10 @@ def test_pad_metrics_core_returns_cos_theta_between_0_and_1():
 
 def test_pad_metrics_core_output_format():
     """Verify the output format: `None` when there are too few points, otherwise a
-    dict matching R's named-list output -- `date`, `Cover_h_pad`, `Cover_2`, `Cover_4`,
-    `Cover_6`, `cos_theta`, plus one `PAD_{dz}_{min_layer}` key per stratum (60 by
-    default), and no `Ni_*`/`N_*` keys since `keep_N=False`."""
+    dict with `Date_maj`/`Date_min`/`Date_max`, `Cover_h_pad`, `Cover_2`, `Cover_4`,
+    `Cover_6`, `cos_theta`, `Class_*`/`Total`, one `PAD_{dz}_{min_layer}` key per
+    stratum for both the main profile (60 by default) and the low-strata band (4 by
+    default), and `Ni_*`/`N_*` for the main profile."""
     n = 5
     gpstime = np.zeros(n, dtype=np.float64)
     points = _points(n, gpstime)
@@ -79,49 +97,161 @@ def test_pad_metrics_core_output_format():
         deviation_days=np.inf,
     )
     assert isinstance(result, dict)
-    assert len(result) == 6 + 60
     assert isinstance(result["cos_theta"], float)
-    pad_keys = [f"PAD_1_{i}" for i in range(60)]
-    assert set(result) == {"date", "Cover_h_pad", "Cover_2", "Cover_4", "Cover_6", "cos_theta", *pad_keys}
+    expected_keys = {
+        "Date_maj",
+        "Date_min",
+        "Date_max",
+        "Cover_h_pad",
+        "Cover_2",
+        "Cover_4",
+        "Cover_6",
+        "cos_theta",
+        *_CLASS_KEYS,
+        *_MAIN_PAD_KEYS,
+        *_MAIN_NI_KEYS,
+        *_MAIN_N_KEYS,
+        *_LOW_PAD_KEYS,
+    }
+    assert set(result) == expected_keys
+    assert len(result) == len(expected_keys)
+
     # classification=0.0 is never in _KEEP_VALUES -> no veg/ground points -> 0 cover everywhere
     assert result["Cover_h_pad"] == result["Cover_2"] == result["Cover_4"] == result["Cover_6"] == 0.0
-    # No veg/ground points at all -> Z_veg_gnd is empty -> every stratum counts as
-    # "empty" (min_empty = -inf) -> PAD forced to 0 everywhere, regardless of the
-    # nonzero Gf/NRD produced by the Laplace correction on empty strata.
-    assert all(result[key] == 0.0 for key in pad_keys)
+    # classification=0.0 is not a tracked class either -> every Class_* is 0, but
+    # Total still counts all points regardless of classification.
+    assert all(result[f"Class_{code}"] == 0 for code in _TRACKED_CLASSES)
+    assert result["Total"] == n
+    # No veg/ground points at all -> Z_veg_gnd is empty -> every stratum (both
+    # resolutions) counts as "empty" (min_empty = -inf) -> PAD forced to 0
+    # everywhere, regardless of the nonzero Gf/NRD produced by the Laplace
+    # correction on empty strata.
+    assert all(result[key] == 0.0 for key in _MAIN_PAD_KEYS)
+    assert all(result[key] == 0.0 for key in _LOW_PAD_KEYS)
+    # No vegetation/ground hits anywhere, but every stratum still counts the
+    # full point total via the cumulative sum.
+    assert all(result[key] == 0 for key in _MAIN_NI_KEYS)
+    assert all(result[key] == n for key in _MAIN_N_KEYS)
 
 
-def test_pad_metrics_core_keep_n_adds_ni_n_keys():
-    """`keep_N=True` adds `Ni_{dz}_{min_layer}`/`N_{dz}_{min_layer}` per stratum,
-    on top of the keys already covered by `test_pad_metrics_core_output_format`."""
+def test_pad_metrics_core_output_key_order_matches_channel_spec():
+    """Locks in the exact output-list channel order from the PAD output spec:
+    PAD (low-strata band, then main profile), Class_*/Total, N_*, Ni_*, Cover_*,
+    cos_theta, Date_*. Downstream raster-band assembly relies on this order, so
+    it's a contract, not an implementation detail."""
     n = 5
     gpstime = np.zeros(n, dtype=np.float64)
     points = _points(n, gpstime)
-    params = dict(_DEFAULT_PARAMS, keep_N=True)
 
     result = pad_metrics_core(
         **points,
-        **params,
+        **_DEFAULT_PARAMS,
         scanning_angle=False,
         limit_N_points=1,
         deviation_days=np.inf,
     )
 
-    assert len(result) == 6 + 60 * 3
-    # No vegetation/ground hits anywhere (see test_pad_metrics_core_output_format),
-    # but every stratum still counts the full point total via the cumulative sum.
-    assert all(result[f"Ni_1_{i}"] == 0 for i in range(60))
-    assert all(result[f"N_1_{i}"] == n for i in range(60))
+    expected_order = [
+        *_LOW_PAD_KEYS,
+        *_MAIN_PAD_KEYS,
+        *_CLASS_KEYS,
+        *_MAIN_N_KEYS,
+        *_MAIN_NI_KEYS,
+        "Cover_h_pad",
+        "Cover_2",
+        "Cover_4",
+        "Cover_6",
+        "cos_theta",
+        "Date_maj",
+        "Date_min",
+        "Date_max",
+    ]
+    assert list(result) == expected_order
+
+
+def test_pad_metrics_core_class_counts_include_non_veg_ground_classes():
+    """`Class_*`/`Total` are computed on all points after the temporal filter,
+    before the vegetation/ground (`_KEEP_VALUES`) subsetting -- so a class like 6
+    (building), which is excluded from PAD computation, is still counted."""
+    n = 10
+    gpstime = np.zeros(n, dtype=np.float64)
+    points = _points(n, gpstime)
+    points["classification"][:5] = 1.0  # vegetation, in _KEEP_VALUES
+    points["classification"][5:] = 6.0  # building, tracked but not in _KEEP_VALUES
+
+    result = pad_metrics_core(
+        **points,
+        **_DEFAULT_PARAMS,
+        scanning_angle=False,
+        limit_N_points=1,
+        deviation_days=np.inf,
+    )
+
+    assert result["Class_1"] == 5
+    assert result["Class_6"] == 5
+    assert result["Total"] == n
+
+
+def test_pad_metrics_core_date_min_max_match_deviation_days_window():
+    """`Date_min`/`Date_max` are the theoretical bounds of the ±deviation_days
+    window around `Date_maj` (the modal acquisition day), not the actual min/max
+    GPS time of the retained points."""
+    n = 5
+    gpstime = np.zeros(n, dtype=np.float64)
+    points = _points(n, gpstime)
+    deviation_days = 3
+
+    result = pad_metrics_core(
+        **points,
+        **_DEFAULT_PARAMS,
+        scanning_angle=False,
+        limit_N_points=1,
+        deviation_days=deviation_days,
+    )
+
+    assert result["Date_min"] == pytest.approx(result["Date_maj"] - deviation_days * _SECONDS_PER_DAY)
+    assert result["Date_max"] == pytest.approx(result["Date_maj"] + deviation_days * _SECONDS_PER_DAY)
+
+
+def test_pad_metrics_core_pad_nonzero_for_stratum_with_vegetation():
+    """Contrasts with `test_pad_metrics_core_output_format`'s all-veg-free case:
+    once a stratum actually contains vegetation/ground hits, its PAD is nonzero,
+    while strata above the highest vegetation point are still forced to 0."""
+    n = 20
+    gpstime = np.zeros(n, dtype=np.float64)
+    points = _points(n, gpstime)
+    # 5 vegetation returns (class 1, in _KEEP_VALUES) landing in stratum min_layer=5
+    # (h_abg=5.5 falls in (5, 6] with dz=1).
+    points["h_abg"][10:15] = 5.5
+    points["classification"][10:15] = 1.0
+
+    result = pad_metrics_core(
+        **points,
+        **_DEFAULT_PARAMS,
+        scanning_angle=False,
+        limit_N_points=1,
+        deviation_days=np.inf,
+    )
+
+    # The 5 vegetation hits landed in stratum min_layer=5, as expected.
+    assert result["Ni_1_5"] == 5
+    assert result["PAD_1_5"] > 0.0
+    # max(h_abg[veg_gnd]) = 5.5 -> min_empty = ceil(5.5/1)*1 = 6.0 -> the
+    # stratum holding the vegetation itself (min_layer=5) survives, but every
+    # stratum above it is still forced to 0.
+    assert all(result[f"PAD_1_{i}"] == 0.0 for i in range(6, 60))
 
 
 def test_pad_metrics_core_format_num_matches_r_paste_for_non_integer_dz():
     """Regression test for the deferred-work gap: `_format_num` (R's `paste()`
     number-stringification) was previously only exercised for `dz` in {1, 0.5, 10}
-    in a sibling reference port. Lock in the exact key names for `dz=0.5`."""
+    in a sibling reference port. Lock in the exact key names for a non-integer
+    main-profile `dz` distinct from the default low-strata `dz_low=0.5`, so the
+    two PAD sets don't collide."""
     n = 5
     gpstime = np.zeros(n, dtype=np.float64)
     points = _points(n, gpstime)
-    params = dict(_DEFAULT_PARAMS, dz=0.5, nlayers=4)
+    params = dict(_DEFAULT_PARAMS, dz=0.25, nlayers=4)
 
     result = pad_metrics_core(
         **points,
@@ -131,7 +261,7 @@ def test_pad_metrics_core_format_num_matches_r_paste_for_non_integer_dz():
         deviation_days=np.inf,
     )
 
-    assert {"PAD_0.5_0", "PAD_0.5_0.5", "PAD_0.5_1", "PAD_0.5_1.5"} <= set(result)
+    assert {"PAD_0.25_0", "PAD_0.25_0.25", "PAD_0.25_0.5", "PAD_0.25_0.75"} <= set(result)
 
 
 def test_pad_metrics_core_scanning_angle_false_returns_one():
@@ -153,8 +283,8 @@ def test_pad_metrics_core_scanning_angle_false_returns_one():
 def test_pad_metrics_core_scanning_angle_does_not_affect_other_outputs():
     """`scanning_angle` only feeds `cos_theta` (and, transitively through it, every
     `PAD_*` key, which is cos_theta-scaled by construction); it must have zero effect
-    on any other key (date/Cover_*), since none of the helpers feeding them take
-    cos_theta as input."""
+    on any other key (Date_*/Cover_*/Class_*), since none of the helpers feeding them
+    take cos_theta as input."""
     n = 5
     gpstime = np.zeros(n, dtype=np.float64)
     points = _points(n, gpstime)
@@ -182,3 +312,61 @@ def test_pad_metrics_core_scanning_angle_does_not_affect_other_outputs():
         if key == "cos_theta" or key.startswith("PAD_"):
             continue
         np.testing.assert_array_equal(result_true[key], result_false[key])
+
+
+def test_pad_metrics_core_real_las_returns_coherent_output_values():
+    """Run `pad_metrics_core` directly (no file-level validation) on the real
+    pre-treated LAS used by `test_main_pad_profile.py`, to exercise the core PAD
+    computation itself against a real point cloud rather than synthetic points.
+    Uses a finite `deviation_days=14` (rather than `inf`) so `Date_min`/`Date_max`
+    come out as real bounded GPS times instead of ±inf.
+
+    Skipped if the LAS file is not present in the workspace.
+    """
+    real_las = _REAL_PRETRAITED_LAS
+    if not real_las.exists():
+        pytest.skip(f"Real LAS {real_las} not found in workspace")
+
+    pipeline = pdal.Pipeline() | pdal.Reader.las(filename=str(real_las), override_srs="EPSG:2154", nosrs=True)
+    pipeline.execute()
+    points = pipeline.arrays[0]
+
+    result = pad_metrics_core(
+        gpstime=points["GpsTime"].astype(np.float64),
+        x=points["X"].astype(np.float64),
+        y=points["Y"].astype(np.float64),
+        h_abg=points["h_abg"].astype(np.float64),
+        z=points["Z"].astype(np.float64),
+        return_number=points["ReturnNumber"].astype(np.float64),
+        classification=points["Classification"].astype(np.float64),
+        x_sensor=points["X_sensor"].astype(np.float64),
+        y_sensor=points["Y_sensor"].astype(np.float64),
+        z_sensor=points["Z_sensor"].astype(np.float64),
+        scanning_angle=True,
+        limit_N_points=1,
+        limit_flight_agl=0.0,
+        deviation_days=14,
+        z0=0.0,
+        dz=1.0,
+        nlayers=60,
+        dz_low=0.5,
+        nlayers_low=4,
+        ground_margin=0.1,
+        cover_type="all",
+        height_cover=2.0,
+        use_cover=True,
+        G=0.5,
+        omega=0.77,
+    )
+
+    assert isinstance(result, dict)
+    assert 0.0 <= result["cos_theta"] <= 1.0
+    pad_keys = [key for key in result if key.startswith("PAD_")]
+    assert len(pad_keys) == 60 + 4
+    for cover_key in ("Cover_2", "Cover_4", "Cover_6"):
+        assert 0.0 <= result[cover_key] <= 1.0
+    assert result["Total"] > 0
+    # deviation_days=14 (finite) -> Date_min/Date_max are real bounded GPS
+    # times around Date_maj, not the ±inf produced by an infinite window.
+    assert result["Date_min"] == pytest.approx(result["Date_maj"] - 14 * _SECONDS_PER_DAY)
+    assert result["Date_max"] == pytest.approx(result["Date_maj"] + 14 * _SECONDS_PER_DAY)

@@ -30,13 +30,14 @@ def pad_profile_one_tile(
     z0: float,
     dz: float,
     nlayers: int | None,
+    dz_low: float,
+    nlayers_low: int | None,
     ground_margin: float,
     cover_type: str,
     height_cover: float,
     use_cover: bool,
     G: float,
     omega: float,
-    keep_N: bool,
 ) -> dict[str, float] | None:
     """Compute PAD metrics for one tile.
 
@@ -56,9 +57,13 @@ def pad_profile_one_tile(
                                 `inf` = no filter.
                                 Default `inf`.
         z0 (float): Bottom height of the first stratum (m). Default 0.
-        dz (float): Stratum thickness (m). Default 1.
-        nlayers (int | None): Number of strata above z0. If None, derived from
-            `max(h_abg)`. Default 60.
+        dz (float): Stratum thickness of the main PAD profile (m). Default 1.
+        nlayers (int | None): Number of strata above z0 for the main PAD
+            profile. If None, derived from `max(h_abg)`. Default 60.
+        dz_low (float): Stratum thickness of the low-strata PAD band (m).
+            Default 0.5.
+        nlayers_low (int | None): Number of strata above z0 for the
+            low-strata PAD band. If None, derived from `max(h_abg)`. Default 4.
         ground_margin (float): Margin above `z0` excluded from the first stratum
             (m). Default 0.1.
         cover_type (str): Either "first" (cover estimated from first returns
@@ -68,8 +73,6 @@ def pad_profile_one_tile(
             cover fractions are always computed.
         G (float): Leaf projection ratio. Default 0.5.
         omega (float): Clumping factor. Default 1.
-        keep_N (bool): If True, include `Ni_{dz}_{min_layer}`/`N_{dz}_{min_layer}`
-            per stratum in the output. Default False.
 
     Returns:
         dict[str, float] | None: `None` if a quality guard fails, otherwise a dict
@@ -113,13 +116,14 @@ def pad_profile_one_tile(
         z0=z0,
         dz=dz,
         nlayers=nlayers,
+        dz_low=dz_low,
+        nlayers_low=nlayers_low,
         ground_margin=ground_margin,
         cover_type=cover_type,
         height_cover=height_cover,
         use_cover=use_cover,
         G=G,
         omega=omega,
-        keep_N=keep_N,
     )
 
     logger.info("Computed PAD metrics by tiles in %s", input_filename)
@@ -158,13 +162,14 @@ def main(config: DictConfig):
             z0=config.pad_profile.compute_ni_n.z0,
             dz=config.pad_profile.compute_ni_n.dz,
             nlayers=config.pad_profile.compute_ni_n.nlayers,
+            dz_low=config.pad_profile.compute_ni_n.dz_low,
+            nlayers_low=config.pad_profile.compute_ni_n.nlayers_low,
             ground_margin=config.pad_profile.compute_ni_n.ground_margin,
             cover_type=config.pad_profile.compute_cover.cover_type,
             height_cover=config.pad_profile.compute_cover.height_cover,
             use_cover=config.pad_profile.compute_cover.use_cover,
             G=config.pad_profile.compute_pad.G,
             omega=config.pad_profile.compute_pad.omega,
-            keep_N=config.pad_profile.keep_N,
         )
 
     if initial_las_filename:

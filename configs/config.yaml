@@ -44,6 +44,8 @@ pad_profile:
     z0: 0.0
     dz: 1.0
     nlayers: 60
+    dz_low: 0.5
+    nlayers_low: 4
     ground_margin: 0.1
   compute_cover:
     cover_type: "all"
@@ -52,7 +54,6 @@ pad_profile:
   compute_pad:
     G: 0.5
     omega: 1
-  keep_N: False
 
 dtm:
   download:
