@@ -1,3 +1,4 @@
+- Add check las on preprocessing
 - Add function "compute cos theta"
 - Add function "build vertical strata"
 - Add function "compute Ni and N"
