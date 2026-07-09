@@ -120,7 +120,7 @@ def test_pad_metrics_core_output_format():
     assert set(result) == expected_keys
     assert len(result) == len(expected_keys)
 
-    # classification=0.0 is never in _KEEP_VALUES -> no veg/ground points -> 0 cover everywhere
+    # classification=0.0 is never in keep_values -> no veg/ground points -> 0 cover everywhere
     assert result["Cover_h_pad"] == result["Cover_2"] == result["Cover_4"] == result["Cover_6"] == 0.0
     # classification=0.0 is not a tracked class either -> every Class_* is 0, but
     # Total still counts all points regardless of classification.
@@ -175,13 +175,14 @@ def test_pad_metrics_core_output_key_order_matches_channel_spec():
 
 def test_pad_metrics_core_class_counts_include_non_veg_ground_classes():
     """`Class_*`/`Total` are computed on all points after the temporal filter,
-    before the vegetation/ground (`_KEEP_VALUES`) subsetting -- so a class like 6
-    (building), which is excluded from PAD computation, is still counted."""
+    before the vegetation/ground (`keep_values`) subsetting -- so a class like 1,
+    which is tracked but excluded from PAD computation by `keep_values`, is still
+    counted."""
     n = 10
     gpstime = np.zeros(n, dtype=np.float64)
     points = _points(n, gpstime)
-    points["classification"][:5] = 1.0  # vegetation, in _KEEP_VALUES
-    points["classification"][5:] = 6.0  # building, tracked but not in _KEEP_VALUES
+    points["classification"][:5] = 1.0  # tracked (keep_classes), not in keep_values
+    points["classification"][5:] = 6.0  # tracked (keep_classes), not in keep_values
 
     result = pad_metrics_core(
         **points,
@@ -224,10 +225,10 @@ def test_pad_metrics_core_pad_nonzero_for_stratum_with_vegetation():
     n = 20
     gpstime = np.zeros(n, dtype=np.float64)
     points = _points(n, gpstime)
-    # 5 vegetation returns (class 1, in _KEEP_VALUES) landing in stratum min_layer=5
+    # 5 vegetation returns (class 2, in keep_values) landing in stratum min_layer=5
     # (h_abg=5.5 falls in (5, 6] with dz=1).
     points["h_abg"][10:15] = 5.5
-    points["classification"][10:15] = 1.0
+    points["classification"][10:15] = 2.0
 
     result = pad_metrics_core(
         **points,

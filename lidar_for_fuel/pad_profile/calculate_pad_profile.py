@@ -18,7 +18,6 @@ from lidar_for_fuel.pad_profile.compute_pad import compute_pad
 
 logger = logging.getLogger(__name__)
 
-_KEEP_VALUES = [1, 2, 3, 4, 5, 9]  # Classes to keep
 _SECONDS_PER_DAY = 86_400.0
 
 
