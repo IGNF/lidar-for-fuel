@@ -5,7 +5,7 @@ import pdal
 import pytest
 
 from lidar_for_fuel.pad_profile.calculate_pad_profile import pad_metrics_core
-from lidar_for_fuel.pad_profile.compute_class_counts import _TRACKED_CLASSES
+from lidar_for_fuel.commons.compute_class_counts import _TRACKED_CLASSES
 
 _REAL_PRETRAITED_LAS = Path(
     "data/pointcloud/test_semis_2024_0751_6690_LA93_IGN69_filter_trajectory_1311_pretraited.laz"

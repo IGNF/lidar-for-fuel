@@ -1,6 +1,6 @@
 import numpy as np
 
-from lidar_for_fuel.pad_profile.compute_class_counts import compute_class_counts
+from lidar_for_fuel.commons.compute_class_counts import compute_class_counts
 
 _TRACKED_CLASSES = [1, 2, 3, 4, 5, 6, 9, 17, 18, 64, 66, 67]
 
