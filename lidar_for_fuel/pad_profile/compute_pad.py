@@ -56,8 +56,6 @@ def compute_pad(
     h_abg_veg_gnd = h_abg[veg_gnd]
 
     if use_cover:
-        if height_cover >= _max_or_neg_inf(h_abg):
-            pass
         if cover_h_pad == 0 or np.any(NRD[min_layer >= height_cover] == cover_h_pad):
             PAD = -np.log(Gf) * cos_theta / (G * omega * dz)
         else:
