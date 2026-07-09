@@ -12,7 +12,7 @@ _TRACKED_CLASSES = [1, 2, 3, 4, 5, 6, 9, 17, 18, 64, 66, 67]
 _REAL_PRETRAITED_LAS = Path(
     "data/pointcloud/test_semis_2024_0751_6690_LA93_IGN69_filter_trajectory_1311_pretraited.laz"
 )
-_SECONDS_PER_DAY = 86_400.0
+_SECONDS_PER_DAY = 86_400
 
 # pad_metrics_core has no defaults of its own for these scalar params (the
 # defaults documented in compute_ni_n/main_pad_profile live one level up).
@@ -66,7 +66,7 @@ def test_pad_metrics_core_returns_cos_theta_between_0_and_1():
         **_DEFAULT_PARAMS,
         scanning_angle=False,
         limit_N_points=1,
-        deviation_days=np.inf,
+        deviation_days=0,
     )
 
     assert result is None or (isinstance(result, dict) and 0.0 <= float(result["cos_theta"]) <= 1.0)
@@ -88,7 +88,7 @@ def test_pad_metrics_core_output_format():
         **_DEFAULT_PARAMS,
         scanning_angle=False,
         limit_N_points=n + 1,
-        deviation_days=np.inf,
+        deviation_days=0,
     )
     assert result_none is None
 
@@ -98,7 +98,7 @@ def test_pad_metrics_core_output_format():
         **_DEFAULT_PARAMS,
         scanning_angle=False,
         limit_N_points=1,
-        deviation_days=np.inf,
+        deviation_days=0,
     )
     assert isinstance(result, dict)
     assert isinstance(result["cos_theta"], float)
@@ -152,7 +152,7 @@ def test_pad_metrics_core_output_key_order_matches_channel_spec():
         **_DEFAULT_PARAMS,
         scanning_angle=False,
         limit_N_points=1,
-        deviation_days=np.inf,
+        deviation_days=0,
     )
 
     expected_order = [
@@ -189,7 +189,7 @@ def test_pad_metrics_core_class_counts_include_non_veg_ground_classes():
         **_DEFAULT_PARAMS,
         scanning_angle=False,
         limit_N_points=1,
-        deviation_days=np.inf,
+        deviation_days=0,
     )
 
     assert result["Class_1"] == 5
@@ -235,7 +235,7 @@ def test_pad_metrics_core_pad_nonzero_for_stratum_with_vegetation():
         **_DEFAULT_PARAMS,
         scanning_angle=False,
         limit_N_points=1,
-        deviation_days=np.inf,
+        deviation_days=0,
     )
 
     # The 5 vegetation hits landed in stratum min_layer=5, as expected.
@@ -263,7 +263,7 @@ def test_pad_metrics_core_format_num_matches_r_paste_for_non_integer_dz():
         **params,
         scanning_angle=False,
         limit_N_points=1,
-        deviation_days=np.inf,
+        deviation_days=0,
     )
 
     assert {"PAD_0.25_0", "PAD_0.25_0.25", "PAD_0.25_0.5", "PAD_0.25_0.75"} <= set(result)
@@ -279,7 +279,7 @@ def test_pad_metrics_core_scanning_angle_false_returns_one():
         **_DEFAULT_PARAMS,
         scanning_angle=False,
         limit_N_points=1,
-        deviation_days=np.inf,
+        deviation_days=0,
     )
 
     assert result["cos_theta"] == 1.0
@@ -299,14 +299,14 @@ def test_pad_metrics_core_scanning_angle_does_not_affect_other_outputs():
         **_DEFAULT_PARAMS,
         scanning_angle=True,
         limit_N_points=1,
-        deviation_days=np.inf,
+        deviation_days=0,
     )
     result_false = pad_metrics_core(
         **points,
         **_DEFAULT_PARAMS,
         scanning_angle=False,
         limit_N_points=1,
-        deviation_days=np.inf,
+        deviation_days=0,
     )
 
     assert result_true is not None and result_false is not None
@@ -323,8 +323,6 @@ def test_pad_metrics_core_real_las_returns_coherent_output_values():
     """Run `pad_metrics_core` directly (no file-level validation) on the real
     pre-treated LAS used by `test_main_pad_profile.py`, to exercise the core PAD
     computation itself against a real point cloud rather than synthetic points.
-    Uses a finite `deviation_days=14` (rather than `inf`) so `Date_min`/`Date_max`
-    come out as real bounded GPS times instead of ±inf.
 
     Skipped if the LAS file is not present in the workspace.
     """
@@ -373,7 +371,5 @@ def test_pad_metrics_core_real_las_returns_coherent_output_values():
     for cover_key in ("Cover_2", "Cover_4", "Cover_6"):
         assert 0.0 <= result[cover_key] <= 1.0
     assert result["Total"] > 0
-    # deviation_days=14 (finite) -> Date_min/Date_max are real bounded GPS
-    # times around Date_maj, not the ±inf produced by an infinite window.
     assert result["Date_min"] == pytest.approx(result["Date_maj"] - 14 * _SECONDS_PER_DAY)
     assert result["Date_max"] == pytest.approx(result["Date_maj"] + 14 * _SECONDS_PER_DAY)

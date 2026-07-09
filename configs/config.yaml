@@ -20,7 +20,7 @@ tile_geometry:
 
 commons: 
   filter_date:
-    deviation_days: np.inf
+    deviation_days: 0
   class_count:
     keep_classes: [1, 2, 3, 4, 5, 6, 9, 17, 18, 64, 66, 67]
     

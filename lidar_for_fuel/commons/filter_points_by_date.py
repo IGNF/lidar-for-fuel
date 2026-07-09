@@ -1,6 +1,5 @@
 """Keep points within a ±deviation_days window around the most densely sampled acquisition day."""
 import logging
-import math
 import warnings
 
 import numpy as np
@@ -16,24 +15,23 @@ _GPS_EPOCH = np.datetime64("1980-01-06T00:00")
 
 def filter_by_date(
     gpstime: np.ndarray,
-    deviation_days: float = np.inf,
-) -> tuple[np.ndarray, float]:
+    deviation_days: int = 0,
+) -> tuple[np.ndarray, int]:
     """Filter a LiDAR point cloud keeping only points acquired within ±deviation_days
     around the most densely sampled calendar day.
 
     Args:
         gpstime (np.ndarray): GPS time in seconds.
-        deviation_days (float): Max deviation in days around the local modal acquisition date.
-                                `inf` = no filter.
-                                Default `inf`.
+        deviation_days (int): Max deviation in days around the local modal acquisition date.
+                                Default 0 (only the modal calendar day is retained).
         Note: the GPS epoch is fixed to 1980-01-06 00:00:00 UTC.
 
     Returns:
-        tuple[np.ndarray, float]: (mask, modal_gpstime).
+        tuple[np.ndarray, int]: (mask, modal_time_unix).
             mask: Boolean mask, same shape as ``gpstime``, True for retained points.
-            modal_gpstime: GPS time (same units as ``gpstime``, at 00:00 UTC) of the
-                most densely sampled calendar day -- the center of the
-                ±deviation_days temporal window.
+            modal_time_unix: Unix time in seconds (00:00 UTC) of the most densely
+                sampled calendar day -- the center of the ±deviation_days temporal
+                window.
 
     Raises:
         ValueError: If the pipeline has no arrays, lacks a ``GpsTime`` dimension,
@@ -49,16 +47,10 @@ def filter_by_date(
 
     unique_days, counts = np.unique(utcdate, return_counts=True)
     modal_day = unique_days[counts.argmax()]
-    modal_gpstime = float(
-        (modal_day - _GPS_EPOCH) / np.timedelta64(1, "s") - _ADJUSTED_GPS_TIME_TO_STANDARD_GPS_TIME
-    )
-
-    if math.isinf(deviation_days):
-        logger.debug("deviation_days is Inf — no filtering applied.")
-        return np.ones_like(gpstime, dtype=bool), modal_gpstime
+    modal_time_unix = int((modal_day - np.datetime64(0, "s")) / np.timedelta64(1, "s"))
 
     # Resulting mask: True for points within the window, False for points outside
-    window = np.timedelta64(int(deviation_days), "D")
+    window = np.timedelta64(deviation_days, "D")
     retained_mask = np.logical_and(utcdate >= modal_day - window, utcdate <= modal_day + window)
 
     n_retained = np.sum(retained_mask)
@@ -83,4 +75,4 @@ def filter_by_date(
         pct_removed,
     )
 
-    return retained_mask, modal_gpstime
+    return retained_mask, modal_time_unix

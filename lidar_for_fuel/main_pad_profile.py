@@ -27,7 +27,7 @@ def pad_profile_one_tile(
     scanning_angle: bool,
     limit_N_points: int,
     limit_flight_agl: float,
-    deviation_days: float,
+    deviation_days: int,
     z0: float,
     dz: float,
     nlayers: int | None,
@@ -56,9 +56,8 @@ def pad_profile_one_tile(
                                    If the distance between the flight height and the ground and (Elevation - Zref)
                                    is lower than `limit_flight_agl`, NULL is returned.
                                    Default 800 meters.
-        deviation_days (float): Max deviation in days around the local modal acquisition date.
-                                `inf` = no filter.
-                                Default `inf`.
+        deviation_days (int): Max deviation in days around the local modal acquisition date.
+                                Default 0 (only the modal calendar day is retained).
         z0 (float): Bottom height of the first stratum (m). Default 0.
         dz (float): Stratum thickness of the main PAD profile (m). Default 1.
         nlayers (int | None): Number of strata above z0 for the main PAD

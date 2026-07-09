@@ -18,8 +18,6 @@ from lidar_for_fuel.pad_profile.compute_pad import compute_pad
 
 logger = logging.getLogger(__name__)
 
-_SECONDS_PER_DAY = 86_400.0
-
 
 def _format_num(value: float) -> str:
     """Format a number the way R's `paste()` does: drop a trailing `.0`."""
@@ -29,7 +27,7 @@ def _format_num(value: float) -> str:
     return str(rounded)
 
 
-def _compute_pad_for_resolution(
+def _compute_pad_profile_for_resolution(
     h_abg: np.ndarray,
     veg_gnd: np.ndarray,
     z0: float,
@@ -102,7 +100,7 @@ def pad_metrics_core(
     scanning_angle: bool,
     limit_N_points: int,
     limit_flight_agl: float,
-    deviation_days: float,
+    deviation_days: int,
     z0: float,
     dz: float,
     nlayers: int | None,
@@ -139,9 +137,8 @@ def pad_metrics_core(
                                    If the distance between the flight height and the ground and (Elevation - Zref)
                                    is lower than `limit_flight_agl`, NULL is returned.
                                    Default 800 meters.
-        deviation_days (float): Max deviation in days around the local modal acquisition date.
-                                `inf` = no filter.
-                                Default `inf`.
+        deviation_days (int): Max deviation in days around the local modal acquisition date.
+                                Default 0 (only the modal calendar day is retained).
         z0 (float): Bottom height of the first stratum (m). Default 0.
         dz (float): Stratum thickness of the main PAD profile (m). Default 1.
         nlayers (int | None): Number of strata above z0 for the main PAD
@@ -182,14 +179,15 @@ def pad_metrics_core(
             Cover_4: canopy cover fraction above 4m.
             Cover_6: canopy cover fraction above 6m.
             cos_theta: scan angle factor (1.0 if `scanning_angle=False`).
-            Date_maj: GPS time of the modal acquisition day for the points in
-                the pixel/plot -- the center of the ±deviation_days temporal window.
-            Date_min, Date_max: GPS time of the lower/upper bound of that
-                ±deviation_days temporal window (`Date_maj` -/+ `deviation_days`).
+            Date_maj: Unix time (seconds) of the modal acquisition day for the
+                points in the pixel/plot -- the center of the ±deviation_days
+                temporal window.
+            Date_min, Date_max: Unix time (seconds) of the lower/upper bound of
+                that ±deviation_days temporal window (`Date_maj` -/+ `deviation_days`).
     """
     # # Step 1:
     # Filter points by ±deviation_days around the most densely sampled calendar day.
-    valid, modal_gpstime = filter_by_date(gpstime, deviation_days=deviation_days)
+    valid, modal_time_unix = filter_by_date(gpstime, deviation_days=deviation_days)
 
     gpstime = gpstime[valid]
     x = x[valid]
@@ -257,7 +255,7 @@ def pad_metrics_core(
     # Low-strata band (dz_low/nlayers_low, e.g. 0.5 m x 4 = 0-2 m): only the
     # PAD_0.5_* channels are needed (output-list sections 4/5 only cover the
     # 1 m profile below), so N/Ni are discarded here.
-    pad_low, _, _ = _compute_pad_for_resolution(
+    pad_low, _, _ = _compute_pad_profile_for_resolution(
         h_abg=h_abg,
         veg_gnd=veg_ground_points,
         z0=z0,
@@ -274,7 +272,7 @@ def pad_metrics_core(
     )
     # Main profile (dz/nlayers, e.g. 1 m x 60 = 0-60 m): also returns the
     # N_1_*/Ni_1_* stratum counts alongside PAD_1_*.
-    pad_main, n_main, ni_main = _compute_pad_for_resolution(
+    pad_main, n_main, ni_main = _compute_pad_profile_for_resolution(
         h_abg=h_abg,
         veg_gnd=veg_ground_points,
         z0=z0,
@@ -294,19 +292,19 @@ def pad_metrics_core(
     # Assemble the final output dict, in the exact channel order of the
     # PAD output-list spec: PAD (low-strata, then main profile), Class_*/Total,
     # N_*, Ni_*, Cover_*, cos_theta, Date_*.
-    output: dict[str, float] = {}
-    output.update(pad_low)
-    output.update(pad_main)
-    output.update(class_counts)
-    output.update(n_main)
-    output.update(ni_main)
+    output: dict[str, float] = pad_low | pad_main | class_counts | n_main | ni_main
     output["Cover_h_pad"] = cover_h_pad
     output["Cover_2"] = cover_2
     output["Cover_4"] = cover_4
     output["Cover_6"] = cover_6
     output["cos_theta"] = cos_theta
-    output["Date_maj"] = modal_gpstime
-    output["Date_min"] = modal_gpstime - deviation_days * _SECONDS_PER_DAY
-    output["Date_max"] = modal_gpstime + deviation_days * _SECONDS_PER_DAY
+    modal_date = np.datetime64(modal_time_unix, "s")
+    date_min = modal_date - np.timedelta64(deviation_days, "D")
+    date_max = modal_date + np.timedelta64(deviation_days, "D")
 
+    output["Date_maj"] = modal_time_unix
+    output["Date_min"] = int((date_min - np.datetime64(0, "s")) / np.timedelta64(1, "s"))
+    output["Date_max"] = int((date_max - np.datetime64(0, "s")) / np.timedelta64(1, "s"))
+    
+    print(output)
     return output

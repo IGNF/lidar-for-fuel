@@ -1,6 +1,5 @@
 from pathlib import Path
 
-import numpy as np
 import pytest
 
 from lidar_for_fuel.main_pad_profile import pad_profile_one_tile
@@ -27,7 +26,7 @@ def test_pad_profile_one_tile_real_las_returns_coherent_output_values():
         keep_classes=[1, 2, 3, 4, 5, 6, 9, 17, 18, 64, 66, 67],
         limit_N_points=1,
         limit_flight_agl=0.0,
-        deviation_days=np.inf,
+        deviation_days=36_500,  # ~100 years: wide enough to keep every point in the file
         scanning_angle=True,
         z0=0.0,
         dz=1.0,
