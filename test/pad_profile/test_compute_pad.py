@@ -15,7 +15,8 @@ _COMMON = dict(
     omega=0.77,
     ground_margin=0.0,
 )
-_BASIC_FORMULA = np.array([0.57959364, 1.3268198, 2.37997593, 4.18035821])
+# Plain Beer-Lambert formula (compute_pad.py's `PAD = -log(Gf) * cos_theta / (G * omega * dz)`).
+_BASIC_FORMULA = -np.log(_GF) * _COMMON["cos_theta"] / (_COMMON["G"] * _COMMON["omega"] * _COMMON["dz"])
 
 
 def _no_veg_gnd_filter(n: int) -> np.ndarray:

@@ -11,9 +11,8 @@ from lidar_for_fuel.commons.filter_points_by_date import (
 )
 
 _SECONDS_PER_DAY = 86_400.0
-
 _N = 9
-_DEVIATION_DAYS = 2
+
 
 
 @pytest.fixture()
@@ -27,11 +26,22 @@ def test_multiday_filters_correct_number_of_points_and_warns(rng):
     gpstime = np.concatenate([gpstime_regular, gpstime_extra])
 
     with pytest.warns(UserWarning, match=r"%\) of the returns were removed"):
-        mask, _ = filter_by_date(gpstime, deviation_days=_DEVIATION_DAYS)
+        mask, modal_time_unix = filter_by_date(gpstime, deviation_days=2)
 
     n_result = int(np.sum(mask))
-    expected = _DEVIATION_DAYS * 2 + _N + 1  # = 14
+    expected = 2 * 2 + _N + 1  # = 14
     assert n_result == expected, f"Expected {expected} points after filtering, got {n_result}"
+
+    # Modal day is day 50 by construction: gpstime_regular[49] == 50 * _SECONDS_PER_DAY,
+    # and all 9 gpstime_extra points fall in the same calendar day (see above), giving
+    # it 10 points against 1 for every other day.
+    modal_date = np.array(
+        _GPS_EPOCH
+        + np.array(_ADJUSTED_GPS_TIME_TO_STANDARD_GPS_TIME + gpstime_regular[49], dtype="timedelta64[s]"),
+        dtype="datetime64[D]",
+    )
+    expected_modal_time_unix = int((modal_date - np.datetime64(0, "s")) / np.timedelta64(1, "s"))
+    assert modal_time_unix == expected_modal_time_unix
 
 
 def test_single_day_no_filtering(rng):
@@ -39,13 +49,13 @@ def test_single_day_no_filtering(rng):
     gpstime = rng.random(n_total) * _SECONDS_PER_DAY
     with warnings.catch_warnings():
         warnings.simplefilter("error")
-        mask, _ = filter_by_date(gpstime, deviation_days=_DEVIATION_DAYS)
+        mask, _ = filter_by_date(gpstime, deviation_days=2)
 
     n_result = int(np.sum(mask))
     assert n_result == n_total, f"Expected all {n_total} points to be retained, got {n_result}"
 
 
-def test_large_deviation_days_returns_original_pipeline(rng):
+def test_large2_returns_original_pipeline(rng):
     """A window wide enough to cover the whole span behaves like no filtering."""
     gpstime = np.arange(1, 101, dtype=np.float64) * _SECONDS_PER_DAY
     n_total = len(gpstime)

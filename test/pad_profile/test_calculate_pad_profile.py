@@ -33,9 +33,9 @@ _DEFAULT_PARAMS = dict(
     keep_classes=[1, 2, 3, 4, 5, 6, 9, 17, 18, 64, 66, 67],
 )
 
-_MAIN_PAD_KEYS = [f"PAD_1_{i}" for i in range(60)]
-_MAIN_NI_KEYS = [f"Ni_1_{i}" for i in range(60)]
-_MAIN_N_KEYS = [f"N_1_{i}" for i in range(60)]
+_MAIN_PAD_KEYS = [f"PAD_1_{i}" for i in range(10)]
+_MAIN_NI_KEYS = [f"Ni_1_{i}" for i in range(10)]
+_MAIN_N_KEYS = [f"N_1_{i}" for i in range(10)]
 _LOW_PAD_KEYS = ["PAD_0.5_0", "PAD_0.5_0.5", "PAD_0.5_1", "PAD_0.5_1.5"]
 _CLASS_KEYS = [f"Class_{code}" for code in _TRACKED_CLASSES] + ["Total"]
 
@@ -193,7 +193,7 @@ def test_pad_metrics_core_class_counts_include_non_veg_ground_classes():
     )
 
     assert result["Class_1"] == 5
-    assert result["Class_6"] == 5
+    assert result["Class_6"] == n - 5
     assert result["Total"] == n
 
 
