@@ -20,7 +20,7 @@ _DEFAULT_PARAMS = dict(
     limit_flight_agl=0.0,
     z0=0.0,
     dz=1.0,
-    nlayers=60,
+    nlayers=10,
     dz_low=0.5,
     nlayers_low=4,
     ground_margin=0.1,
@@ -33,9 +33,9 @@ _DEFAULT_PARAMS = dict(
     keep_classes=[1, 2, 3, 4, 5, 6, 9, 17, 18, 64, 66, 67],
 )
 
-_MAIN_PAD_KEYS = [f"PAD_1_{i}" for i in range(10)]
-_MAIN_NI_KEYS = [f"Ni_1_{i}" for i in range(10)]
-_MAIN_N_KEYS = [f"N_1_{i}" for i in range(10)]
+_MAIN_PAD_KEYS = [f"PAD_1_{i}" for i in range(_DEFAULT_PARAMS["nlayers"])]
+_MAIN_NI_KEYS = [f"Ni_1_{i}" for i in range(_DEFAULT_PARAMS["nlayers"])]
+_MAIN_N_KEYS = [f"N_1_{i}" for i in range(_DEFAULT_PARAMS["nlayers"])]
 _LOW_PAD_KEYS = ["PAD_0.5_0", "PAD_0.5_0.5", "PAD_0.5_1", "PAD_0.5_1.5"]
 _CLASS_KEYS = [f"Class_{code}" for code in _TRACKED_CLASSES] + ["Total"]
 
@@ -76,8 +76,8 @@ def test_pad_metrics_core_output_format():
     """Verify the output format: `None` when there are too few points, otherwise a
     dict with `Date_maj`/`Date_min`/`Date_max`, `Cover_h_pad`, `Cover_2`, `Cover_4`,
     `Cover_6`, `cos_theta`, `Class_*`/`Total`, one `PAD_{dz}_{min_layer}` key per
-    stratum for both the main profile (60 by default) and the low-strata band (4 by
-    default), and `Ni_*`/`N_*` for the main profile."""
+    stratum for both the main profile (`nlayers` strata) and the low-strata band
+    (`nlayers_low` strata), and `Ni_*`/`N_*` for the main profile."""
     n = 5
     gpstime = np.zeros(n, dtype=np.float64)
     points = _points(n, gpstime)
@@ -244,7 +244,7 @@ def test_pad_metrics_core_pad_nonzero_for_stratum_with_vegetation():
     # max(h_abg[veg_gnd]) = 5.5 -> min_empty = ceil(5.5/1)*1 = 6.0 -> the
     # stratum holding the vegetation itself (min_layer=5) survives, but every
     # stratum above it is still forced to 0.
-    assert all(result[f"PAD_1_{i}"] == 0.0 for i in range(6, 60))
+    assert all(result[f"PAD_1_{i}"] == 0.0 for i in range(6, _DEFAULT_PARAMS["nlayers"]))
 
 
 def test_pad_metrics_core_format_num_matches_r_paste_for_non_integer_dz():
