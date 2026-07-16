@@ -1,12 +1,113 @@
 from pathlib import Path
 
+import numpy as np
+import pandas as pd
 import pytest
 
-from lidar_for_fuel.main_pad_profile import pad_profile_one_tile
+from lidar_for_fuel.main_pad_profile import (
+    create_raster_from_points,
+    pad_profile_one_tile,
+    transform_points_coordinates,
+)
 
 _REAL_PRETRAITED_LAS = Path(
     "data/pointcloud/test_semis_2024_0751_6690_LA93_IGN69_filter_trajectory_1311_pretraited.laz"
 )
+
+
+def test_transform_points_coordinates_applies_vectorized_transformations():
+    points = np.array(
+        [
+            (98029.75, 6045536.75, 10.0),
+            (98032.75, 6045540.75, 20.0),
+        ],
+        dtype=[("X", "f8"), ("Y", "f8"), ("Z", "f8")],
+    )
+
+    original_x = points["X"].copy()
+    original_y = points["Y"].copy()
+    origin_x = 98029.75
+    origin_y = 6045536.75
+    resolution_factor = 10.0
+
+    points_df = pd.DataFrame(points)
+
+    assert isinstance(points_df, pd.DataFrame)
+
+    df = transform_points_coordinates(
+        points_df,
+        origin_x=origin_x,
+        origin_y=origin_y,
+        resolution_factor=resolution_factor,
+    )
+    assert isinstance(df, pd.DataFrame)
+    np.testing.assert_allclose(df["X"].to_numpy(), (original_x - origin_x) / resolution_factor)
+    np.testing.assert_allclose(df["Y"].to_numpy(), (original_y - origin_y) / resolution_factor)
+    assert not np.allclose(df["X"].to_numpy(), original_x)
+    assert not np.allclose(df["Y"].to_numpy(), original_y)
+
+
+def test_create_raster_from_points_synthetic_data():
+    """Create a GeoTIFF raster from synthetic point
+    cloud with max height per pixel
+    """
+    output_dir = Path("test/output_test")
+    output_dir.mkdir(exist_ok=True)
+    output_raster_path = output_dir / "test_raster.tif"
+    output_raster_path.unlink(missing_ok=True)
+
+    origin_x = 100.0
+    origin_y = 200.0
+    resolution_factor = 10.0
+
+    points = np.array(
+        [
+            (100.0, 200.0, 5.0),
+            (105.0, 200.0, 8.0),
+            (105.0, 205.0, 12.0),
+            (110.0, 210.0, 15.0),
+            (110.0, 210.5, 10.0),
+        ],
+        dtype=[("X", "f8"), ("Y", "f8"), ("h_abg", "f8")],
+    )
+
+    points_df = pd.DataFrame(points)
+    transformed_df = transform_points_coordinates(
+        points_df,
+        origin_x=origin_x,
+        origin_y=origin_y,
+        resolution_factor=resolution_factor,
+    )
+
+    raster = create_raster_from_points(
+        transformed_df,
+        origin_x=origin_x,
+        origin_y=origin_y,
+        resolution_factor=resolution_factor,
+        output_path=str(output_raster_path),
+        value_column="h_abg",
+        aggregation="max",
+    )
+
+    assert output_raster_path.exists(), f"Raster file {output_raster_path} was not created."
+    assert raster.shape[0] > 0 and raster.shape[1] > 0, "Raster has invalid dimensions."
+    assert not np.all(np.isnan(raster)), "Raster contains only NaN values."
+
+    expected_max_per_pixel = (
+        transformed_df.assign(
+            pixel_x=np.floor(transformed_df["X"]).astype(int),
+            pixel_y=np.floor(transformed_df["Y"]).astype(int),
+        )
+        .groupby(["pixel_y", "pixel_x"])["h_abg"]
+        .max()
+    )
+    for (row, col), expected_val in expected_max_per_pixel.items():
+        assert not np.isnan(raster[row, col]), f"Pixel ({row}, {col}) is NaN but should contain {expected_val}"
+        np.testing.assert_allclose(
+            raster[row, col],
+            expected_val,
+            err_msg=f"Pixel ({row}, {col}): expected max h_abg={expected_val}, got {raster[row, col]}",
+        )
 
 
 def test_pad_profile_one_tile_real_las_returns_coherent_output_values():
