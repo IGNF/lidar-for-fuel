@@ -22,4 +22,4 @@ dependencies:
   - pip:
     # Install laspy with laszip laz compression (as laszip is an implementation of the laz 1.4 standard)
     - laspy[lazrs]  # Installed via pip because laszip is not handled by the conda package.
-    - ign-pdal-tools  # IGN tools for LiDAR HD 
+    - ign-pdal-tools>=1.18.0  # IGN tools for LiDAR HD 
