@@ -7,8 +7,6 @@ import pytest
 from lidar_for_fuel.pad_profile.calculate_pad_profile import pad_metrics_core
 
 
-_TRACKED_CLASSES = [1, 2, 3, 4, 5, 6, 9, 17, 18, 64, 66, 67]
-
 _REAL_PRETRAITED_LAS = Path(
     "data/pointcloud/test_semis_2024_0751_6690_LA93_IGN69_filter_trajectory_1311_pretraited.laz"
 )
@@ -37,7 +35,7 @@ _MAIN_PAD_KEYS = [f"PAD_1_{i}" for i in range(_DEFAULT_PARAMS["nlayers"])]
 _MAIN_NI_KEYS = [f"Ni_1_{i}" for i in range(_DEFAULT_PARAMS["nlayers"])]
 _MAIN_N_KEYS = [f"N_1_{i}" for i in range(_DEFAULT_PARAMS["nlayers"])]
 _LOW_PAD_KEYS = ["PAD_0.5_0", "PAD_0.5_0.5", "PAD_0.5_1", "PAD_0.5_1.5"]
-_CLASS_KEYS = [f"Class_{code}" for code in _TRACKED_CLASSES] + ["Total"]
+_CLASS_KEYS = [f"Class_{c}" for c in _DEFAULT_PARAMS["keep_classes"]] + ["Total"]
 
 
 def _points(n: int, gpstime: np.ndarray) -> dict:
@@ -124,7 +122,7 @@ def test_pad_metrics_core_output_format():
     assert result["Cover_h_pad"] == result["Cover_2"] == result["Cover_4"] == result["Cover_6"] == 0.0
     # classification=0.0 is not a tracked class either -> every Class_* is 0, but
     # Total still counts all points regardless of classification.
-    assert all(result[f"Class_{code}"] == 0 for code in _TRACKED_CLASSES)
+    assert all(result[f"Class_{c}"] == 0 for c in _DEFAULT_PARAMS["keep_classes"])
     assert result["Total"] == n
     # No veg/ground points at all -> Z_veg_gnd is empty -> every stratum (both
     # resolutions) counts as "empty" (min_empty = -inf) -> PAD forced to 0
