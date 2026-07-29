@@ -1,6 +1,5 @@
 from pathlib import Path
 
-import numpy as np
 import pytest
 
 from lidar_for_fuel.main_pad_profile import pad_profile_one_tile
@@ -24,23 +23,30 @@ def test_pad_profile_one_tile_real_las_returns_coherent_output_values():
     result = pad_profile_one_tile(
         input_filename=str(real_las),
         srid="EPSG:2154",
+        keep_classes=[1, 2, 3, 4, 5, 6, 9, 17, 18, 64, 66, 67],
         limit_N_points=1,
         limit_flight_agl=0.0,
-        deviation_days=np.inf,
+        deviation_days=36_500,  # ~100 years: wide enough to keep every point in the file
         scanning_angle=True,
         z0=0.0,
         dz=1.0,
         nlayers=60,
+        dz_low=0.5,
+        nlayers_low=4,
         ground_margin=0.1,
         cover_type="all",
         height_cover=2.0,
         use_cover=True,
+        G=0.5,
+        omega=0.77,
+        keep_values=[2, 3, 4, 5, 9],
     )
 
-    cos_theta, ni, n, min_layer, nrd, gf, cover_h_pad, cover_2, cover_4, cover_6 = result
+    assert isinstance(result, dict)
+    cos_theta = result["cos_theta"]
     assert isinstance(cos_theta, (float, int)), "Expected a numeric cos_theta value"
     assert 0.0 <= float(cos_theta) <= 1.0
-    assert len(ni) == len(n) == len(min_layer) == len(nrd) == len(gf)
-    np.testing.assert_allclose(gf, 1.0 - nrd)
-    for cover in (cover_h_pad, cover_2, cover_4, cover_6):
-        assert 0.0 <= cover <= 1.0
+    pad_keys = [key for key in result if key.startswith("PAD_")]
+    assert len(pad_keys) == 60 + 4
+    for cover_key in ("Cover_2", "Cover_4", "Cover_6"):
+        assert 0.0 <= result[cover_key] <= 1.0

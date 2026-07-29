@@ -20,7 +20,9 @@ tile_geometry:
 
 commons: 
   filter_date:
-    deviation_days: np.inf
+    deviation_days: 0
+  class_count:
+    keep_classes: [1, 2, 3, 4, 5, 6, 9, 17, 18, 64, 66, 67]
     
 preprocessing:
   filter:
@@ -44,11 +46,17 @@ pad_profile:
     z0: 0.0
     dz: 1.0
     nlayers: 60
+    dz_low: 0.5
+    nlayers_low: 4
     ground_margin: 0.1
   compute_cover:
     cover_type: "all"
     height_cover: 2.0
     use_cover: True
+  compute_pad:
+    G: 0.5
+    omega: 1
+    keep_values: [2, 3, 4, 5, 9] 
 
 dtm:
   download:
