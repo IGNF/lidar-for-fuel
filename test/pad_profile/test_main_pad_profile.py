@@ -1,3 +1,4 @@
+import shutil
 from pathlib import Path
 
 import pytest
@@ -9,7 +10,7 @@ _REAL_PRETRAITED_LAS = Path(
 )
 
 
-def test_pad_profile_one_tile_real_las_returns_coherent_output_values():
+def test_pad_profile_one_tile_real_las_returns_coherent_output_values(tmp_path):
     """Run pad_profile_one_tile on the real pre-treated LAS and assert cos_theta is in [0,1].
 
     The test is skipped if the LAS file is not present in the workspace.
@@ -19,9 +20,19 @@ def test_pad_profile_one_tile_real_las_returns_coherent_output_values():
     if not real_las.exists():
         pytest.skip(f"Real LAS {real_las} not found in workspace")
 
+    # pdaltools' buffer tile-naming parser expects <prefix1>_<prefix2>_<coordX>_<coordY>_<suffix>
+    # (e.g. Semis_2024_0751_6690_...). Strip the fixture's leading "test_" segment so the tile
+    # coordinates are parsed from the right fields.
+    tile = tmp_path / real_las.name.removeprefix("test_")
+    shutil.copy(real_las, tile)
+
     # Lower quality guards so the function returns a numeric value for testing.
     result = pad_profile_one_tile(
-        input_filename=str(real_las),
+        input_filename=str(tile),
+        input_dir=str(tile.parent),
+        buffer_width=100,
+        tile_width=1000,
+        tile_coord_scale=1000,
         srid="EPSG:2154",
         keep_classes=[1, 2, 3, 4, 5, 6, 9, 17, 18, 64, 66, 67],
         limit_N_points=1,
