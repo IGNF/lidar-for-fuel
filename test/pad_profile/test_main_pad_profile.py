@@ -2,33 +2,39 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import pdal
 import pytest
+from omegaconf import OmegaConf
 
-from lidar_for_fuel.main_pad_profile import (
+from lidar_for_fuel.main_pad_profile import pad_profile_one_tile
+from lidar_for_fuel.pad_profile.create_raster import (
     create_raster_from_points,
-    pad_profile_one_tile,
+    points_to_dataframe,
     transform_points_coordinates,
 )
 
 _REAL_PRETRAITED_LAS = Path(
     "data/pointcloud/test_semis_2024_0751_6690_LA93_IGN69_filter_trajectory_1311_pretraited.laz"
 )
+_BUFFER_LAS = Path("data/pointcloud/Semis_2022_0691_6484_LA93_IGN69_buffer_10m 1.laz")
+
+_CONFIG = OmegaConf.load("configs/config.yaml")
 
 
 def test_transform_points_coordinates_applies_vectorized_transformations():
     points = np.array(
         [
-            (98029.75, 6045536.75, 10.0),
-            (98032.75, 6045540.75, 20.0),
+            (_CONFIG.pad_profile.create_raster.origin_x, _CONFIG.pad_profile.create_raster.origin_y, 10.0),
+            (_CONFIG.pad_profile.create_raster.origin_x + 3.0, _CONFIG.pad_profile.create_raster.origin_y - 4.0, 20.0),
         ],
         dtype=[("X", "f8"), ("Y", "f8"), ("Z", "f8")],
     )
 
     original_x = points["X"].copy()
     original_y = points["Y"].copy()
-    origin_x = 98029.75
-    origin_y = 6045536.75
-    resolution_factor = 10.0
+    origin_x = _CONFIG.pad_profile.create_raster.origin_x
+    origin_y = _CONFIG.pad_profile.create_raster.origin_y
+    resolution_factor = _CONFIG.pad_profile.create_raster.resolution_factor
 
     points_df = pd.DataFrame(points)
 
@@ -42,7 +48,7 @@ def test_transform_points_coordinates_applies_vectorized_transformations():
     )
     assert isinstance(df, pd.DataFrame)
     np.testing.assert_allclose(df["X"].to_numpy(), (original_x - origin_x) / resolution_factor)
-    np.testing.assert_allclose(df["Y"].to_numpy(), (original_y - origin_y) / resolution_factor)
+    np.testing.assert_allclose(df["Y"].to_numpy(), (origin_y - original_y) / resolution_factor)
     assert not np.allclose(df["X"].to_numpy(), original_x)
     assert not np.allclose(df["Y"].to_numpy(), original_y)
 
@@ -57,7 +63,7 @@ def test_create_raster_from_points_synthetic_data():
     output_raster_path.unlink(missing_ok=True)
 
     origin_x = 100.0
-    origin_y = 200.0
+    origin_y = 210.5  # north edge = max Y of the synthetic points
     resolution_factor = 10.0
 
     points = np.array(
@@ -151,3 +157,49 @@ def test_pad_profile_one_tile_real_las_returns_coherent_output_values():
     assert len(pad_keys) == 60 + 4
     for cover_key in ("Cover_2", "Cover_4", "Cover_6"):
         assert 0.0 <= result[cover_key] <= 1.0
+
+
+def test_create_raster_preserves_classification_from_buffer_las():
+    """Classification value of a point must appear in the raster built from the same file."""
+    if not _BUFFER_LAS.exists():
+        pytest.skip(f"LAS file not found: {_BUFFER_LAS}")
+
+    output_path = "test/output_test/test_raster_classification.tif"
+
+    pipeline = pdal.Pipeline() | pdal.Reader.las(filename=str(_BUFFER_LAS))
+    pipeline.execute()
+    points = pipeline.arrays[0]
+
+    # Pick a reference point and assert its classification is a known value
+    ref_point = points[0]
+    ref_classification = int(ref_point["Classification"])
+    assert ref_classification >= 0
+
+    origin_x = float(points["X"].min())
+    origin_y = float(points["Y"].max())
+    resolution_factor = _CONFIG.pad_profile.create_raster.resolution_factor
+
+    points_df = points_to_dataframe(points)
+    transformed_df = transform_points_coordinates(
+        points_df,
+        origin_x=origin_x,
+        origin_y=origin_y,
+        resolution_factor=resolution_factor,
+    )
+
+    raster = create_raster_from_points(
+        transformed_df,
+        origin_x=origin_x,
+        origin_y=origin_y,
+        resolution_factor=resolution_factor,
+        output_path=output_path,
+        value_column="Classification",
+        aggregation="max",
+    )
+
+    assert raster.shape[0] > 0 and raster.shape[1] > 0
+
+    expected_pixel_x = int(np.floor((float(ref_point["X"]) - origin_x) / resolution_factor))
+    expected_pixel_y = int(np.floor((origin_y - float(ref_point["Y"])) / resolution_factor))
+    assert not np.isnan(raster[expected_pixel_y, expected_pixel_x])
+    assert int(raster[expected_pixel_y, expected_pixel_x]) >= ref_classification
