@@ -11,8 +11,10 @@ import hydra
 import numpy as np
 import pdal
 from omegaconf import DictConfig
+from pdaltools.las_info import get_tile_origin_using_header_info
 
 from lidar_for_fuel.pad_profile.calculate_pad_profile import pad_metrics_core
+from lidar_for_fuel.pad_profile.export_raster import export_pad_rasters
 from lidar_for_fuel.pad_profile.validate_lidar_preprocessing_file import (
     check_lidar_file,
 )
@@ -152,13 +154,19 @@ def main(config: DictConfig):
     if not os.path.isdir(input_dir):
         raise FileNotFoundError(f"The input directory ({input_dir}) doesn't exist.")
 
+    output_dir = config.io.output_dir
+    if output_dir is None:
+        raise ValueError("config.io.output_dir is empty, please provide an output directory in the configuration")
+    os.makedirs(output_dir, exist_ok=True)
+
     initial_las_filename = config.io.input_filename
 
     def main_on_one_tile(filename):
         logging.info(f"\nProcessing tile : {os.path.splitext(filename)[0]}")
 
-        pad_profile_one_tile(
-            input_filename=os.path.join(input_dir, filename),
+        input_filename = os.path.join(input_dir, filename)
+        results = pad_profile_one_tile(
+            input_filename=input_filename,
             srid=config.io.spatial_reference,
             keep_classes=config.commons.class_count.keep_classes,
             deviation_days=config.commons.filter_date.deviation_days,
@@ -177,6 +185,30 @@ def main(config: DictConfig):
             G=config.pad_profile.compute_pad.G,
             omega=config.pad_profile.compute_pad.omega,
             keep_values=config.pad_profile.compute_pad.keep_values,
+        )
+
+        if results is None:
+            logger.warning("No raster exported for %s: quality guard rejected the tile.", input_filename)
+            return
+
+        # One tile == one pixel for now (no sub-tile gridding yet): the raster's
+        # pixel size is the tile width itself, anchored on the tile's own native origin.
+        tile_origin = get_tile_origin_using_header_info(input_filename, tile_width=config.tile_geometry.tile_width)
+        pixel_results = np.array([[results]], dtype=object)
+
+        export_pad_rasters(
+            pixel_results=pixel_results,
+            raster_origin=tile_origin,
+            pixel_size=config.tile_geometry.tile_width,
+            crs=config.io.spatial_reference,
+            output_dir=output_dir,
+            tilename=os.path.splitext(filename)[0],
+            z0=config.pad_profile.compute_ni_n.z0,
+            dz=config.pad_profile.compute_ni_n.dz,
+            nlayers=config.pad_profile.compute_ni_n.nlayers,
+            dz_low=config.pad_profile.compute_ni_n.dz_low,
+            nlayers_low=config.pad_profile.compute_ni_n.nlayers_low,
+            keep_classes=config.commons.class_count.keep_classes,
         )
 
     if initial_las_filename:
