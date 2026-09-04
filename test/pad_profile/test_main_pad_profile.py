@@ -5,8 +5,8 @@ import pytest
 
 from lidar_for_fuel.main_pad_profile import pad_profile_one_tile
 
-_REAL_PRETRAITED_LAS = Path(
-    "data/pointcloud/test_semis_2024_0751_6690_LA93_IGN69_filter_trajectory_1311_pretraited.laz"
+_REAL_PREPROCESSED_LAS = Path(
+    "data/pointcloud/test_semis_2024_0751_6690_LA93_IGN69_filter_trajectory_1311_preprocessed.laz"
 )
 
 
@@ -15,7 +15,7 @@ def test_pad_profile_one_tile_real_las_returns_coherent_output_values(tmp_path):
 
     The test is skipped if the LAS file is not present in the workspace.
     """
-    real_las = _REAL_PRETRAITED_LAS
+    real_las = _REAL_PREPROCESSED_LAS
 
     if not real_las.exists():
         pytest.skip(f"Real LAS {real_las} not found in workspace")
