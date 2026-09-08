@@ -12,6 +12,7 @@ import numpy as np
 import pdal
 from omegaconf import DictConfig
 
+from lidar_for_fuel.commons.add_buffer import create_buffered_las_file
 from lidar_for_fuel.pad_profile.calculate_pad_profile import pad_metrics_core
 from lidar_for_fuel.pad_profile.validate_lidar_preprocessing_file import (
     check_lidar_file,
@@ -22,6 +23,10 @@ logger = logging.getLogger(__name__)
 
 def pad_profile_one_tile(
     input_filename: str,
+    input_dir: str,
+    buffer_width: float,
+    tile_width: int,
+    tile_coord_scale: int,
     srid: str,
     keep_classes: list,
     scanning_angle: bool,
@@ -45,6 +50,13 @@ def pad_profile_one_tile(
 
     Args:
         input_filename (str): Path to the input LAS/LAZ file.
+        input_dir (str): Directory containing all tiles, used to look up neighboring
+            tiles when adding the buffer.
+        buffer_width (float): Width (m) of the buffer merged in from neighboring tiles
+            around the queried tile, to avoid edge effects on PAD computation.
+        tile_width (int): Tile width in meters. Default 1000.
+        tile_coord_scale (int): Scale used in tile filenames to describe coordinates
+            in meters. Default 1000.
         srid (str): Spatial reference of the input file. Default: EPSG:2154.
         keep_classes(list): Classes to keep for counting points. Default: [1, 2, 3, 4, 5, 6, 9, 17, 18, 64, 66, 67].
         scanning_angle (bool): If True, estimate cos(theta) from the trajectory.
@@ -84,10 +96,19 @@ def pad_profile_one_tile(
     # Validate pointclouds after preprocessing
     check_lidar_file(input_filename)
 
-    # Extract pointclouds with attributes
-    pipeline = pdal.Pipeline() | pdal.Reader.las(filename=input_filename, override_srs=srid, nosrs=True)
-    pipeline.execute()
-    points = pipeline.arrays[0]
+    # Merge in neighboring tiles and crop to tile bounds + buffer, to avoid edge effects
+    with create_buffered_las_file(
+        input_dir=input_dir,
+        input_filename=input_filename,
+        buffer_width=buffer_width,
+        spatial_ref=srid,
+        tile_width=tile_width,
+        tile_coord_scale=tile_coord_scale,
+    ) as buffered_las_filename:
+        # Extract pointclouds with attributes
+        pipeline = pdal.Pipeline() | pdal.Reader.las(filename=buffered_las_filename, override_srs=srid, nosrs=True)
+        pipeline.execute()
+        points = pipeline.arrays[0]
 
     x = points["X"].astype(np.float64)
     y = points["Y"].astype(np.float64)
@@ -159,6 +180,10 @@ def main(config: DictConfig):
 
         pad_profile_one_tile(
             input_filename=os.path.join(input_dir, filename),
+            input_dir=input_dir,
+            buffer_width=config.pad_profile.buffer.size,
+            tile_width=config.tile_geometry.tile_width,
+            tile_coord_scale=config.tile_geometry.tile_coord_scale,
             srid=config.io.spatial_reference,
             keep_classes=config.commons.class_count.keep_classes,
             deviation_days=config.commons.filter_date.deviation_days,

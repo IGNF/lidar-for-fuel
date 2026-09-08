@@ -38,6 +38,8 @@ preprocessing:
     nodata: 0
 
 pad_profile:
+  buffer:
+    size: 10  # buffer width (m) merged in from neighboring tiles to avoid edge effects
   cos_theta:
     scanning_angle: True
     limit_N_points: 400

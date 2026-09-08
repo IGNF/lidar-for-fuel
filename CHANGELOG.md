@@ -1,3 +1,5 @@
+- Add function "add buffer"
+
 # v0.1.1
 - Preprocessing: Add "check_las" decorator to return an error when the output las cannot be read
 - [Work in progress] Add PAD profile computation:
