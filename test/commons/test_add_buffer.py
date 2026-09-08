@@ -6,11 +6,12 @@ import laspy
 from lidar_for_fuel.commons.add_buffer import create_buffered_las_file
 
 _INPUT_DIR = Path("data/buffer")
+_OUTPUT_DIR = Path("tmp/test_add_buffer")
 _CENTRAL_TILE = _INPUT_DIR / "Semis_2022_0691_6484_LA93_IGN69_pretraited.laz"
 _BUFFER_WIDTH = 10
 
 
-def test_create_buffered_las_file_extends_bounds_and_cleans_up_on_exit(tmp_path):
+def test_create_buffered_las_file_extends_bounds_and_cleans_up_on_exit():
     """The buffered file is a usable, writable copy covering a larger extent than the
     original tile, and it is removed once the context manager exits."""
     original_header = laspy.open(_CENTRAL_TILE).header
@@ -27,7 +28,7 @@ def test_create_buffered_las_file_extends_bounds_and_cleans_up_on_exit(tmp_path)
         assert path.exists()
 
         # The temporary file is a regular, usable file: it can be copied.
-        copy_path = tmp_path / "copy.las"
+        copy_path = _OUTPUT_DIR / "copy.las"
         shutil.copy2(path, copy_path)
         assert copy_path.exists()
 
