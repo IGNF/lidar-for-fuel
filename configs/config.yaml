@@ -56,7 +56,11 @@ pad_profile:
   compute_pad:
     G: 0.5
     omega: 1
-    keep_values: [2, 3, 4, 5, 9] 
+    keep_values: [2, 3, 4, 5, 9]
+  create_raster:
+    origin_x: 98029.75
+    origin_y: 6045536.75
+    resolution_factor: 10.0
 
 dtm:
   download:
