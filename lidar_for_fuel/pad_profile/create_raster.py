@@ -1,11 +1,8 @@
 import logging
-import os
 from typing import Callable
 
 import numpy as np
 import pandas as pd
-import rasterio
-from rasterio.transform import from_origin
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +31,7 @@ def transform_points_coordinates(
     return transformed_df
 
 
-def create_raster_from_points(
+def compute_pixel_aggregates(
     points_df: pd.DataFrame,
     global_origin_x: float,
     global_origin_y: float,
@@ -42,9 +39,8 @@ def create_raster_from_points(
     tile_origin_y: float,
     tile_size: float,
     resolution_factor: float,
-    output_path: str,
     aggregation: Callable,
-) -> tuple[np.ndarray, list, float, tuple, object]:
+) -> tuple[pd.DataFrame, tuple, float]:
     """Assign a point cloud to the CosiaFrance pixel grid and run an aggregation per pixel.
 
     Args:
@@ -56,14 +52,16 @@ def create_raster_from_points(
         tile_origin_y (float): Y of the tile's own (raw, unaligned) top-left corner.
         tile_size (float): Tile side length in map units (e.g. 1000 for a 1 km dalle).
         resolution_factor (float): Pixel size in map units (e.g. 10 for the CosiaFrance grid).
-        output_path (str): Path to save the GeoTIFF file.
         aggregation (callable): Function run on each pixel's points (e.g. the PAD profile calc).
 
     Returns:
-        tuple: (raster, band_names, nb_pixels, origin_pixel, transform) — `raster` is a
-            (n_bands, nb_pixels, nb_pixels) float32 array, NaN where a pixel had no points
-            or `aggregation` returned None; `band_names` gives the metric name of each band,
-            in the order they appear in `raster`.
+        tuple: (aggregated, origin_pixel, nb_pixels). `aggregated` is a DataFrame indexed by
+            (pixel_y, pixel_x), one column per output band, holding only the pixels where
+            `aggregation` returned a result (pixels where it returned None are dropped ->
+            NoData once rasterized). `origin_pixel` is the CosiaFrance grid corner (ix, iy)
+            this window is anchored on and `nb_pixels` is the tile's side length in pixels;
+            together with `global_origin_x`/`global_origin_y` and `resolution_factor`, they
+            hold everything needed to build the output raster's affine transform.
     """
     df = points_df.copy()
 
@@ -97,7 +95,7 @@ def create_raster_from_points(
         raise ValueError(
             f"No point of the tile (tile_origin=({tile_origin_x}, {tile_origin_y})) falls "
             "within the extracted CosiaFrance window: check the buffer loaded around the "
-            "tile and the coordinates passed to create_raster_from_points."
+            "tile and the coordinates passed to compute_pixel_aggregates."
         )
 
     # --- Step 3: run the calculation (aggregation) on each pixel's points ---------
@@ -116,38 +114,4 @@ def create_raster_from_points(
             f"{tile_origin_y})): every pixel failed"
         )
 
-    # --- Step 4: create the output raster for the tile -------------------------------
-    # The raster is anchored on origin_pixel (this window's own corner), not on the grid's
-    # global origin
-    # / ! \ row 0 = pixel_y == origin_pixel[1] (northernmost).
-    n_pixels = int(nb_pixels)
-    band_names = list(aggregated.columns)
-    raster = np.full((len(band_names), n_pixels, n_pixels), np.nan, dtype=np.float32)
-    for (pixel_y, pixel_x), values in aggregated.iterrows():
-        row = int(origin_pixel[1] - pixel_y)
-        col = int(pixel_x - origin_pixel[0])
-        raster[:, row, col] = values.to_numpy(dtype=np.float32)
-
-    window_origin_x = global_origin_x + origin_pixel[0] * resolution_factor
-    window_origin_y = global_origin_y + origin_pixel[1] * resolution_factor
-    transform = from_origin(window_origin_x, window_origin_y, resolution_factor, resolution_factor)
-
-    os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
-    with rasterio.open(
-        output_path,
-        "w",
-        driver="GTiff",
-        height=n_pixels,
-        width=n_pixels,
-        count=len(band_names),
-        dtype=raster.dtype,
-        crs="EPSG:2154",
-        transform=transform,
-        nodata=np.nan,
-    ) as dst:
-        dst.write(raster)
-        for band_index, band_name in enumerate(band_names, start=1):
-            dst.set_band_description(band_index, band_name)
-    logger.info("Raster saved to %s (%d band(s), %dx%d px)", output_path, len(band_names), n_pixels, n_pixels)
-
-    return raster, band_names, nb_pixels, origin_pixel, transform
+    return aggregated, origin_pixel, nb_pixels
