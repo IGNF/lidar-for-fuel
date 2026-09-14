@@ -24,6 +24,7 @@ def test_pad_profile_one_tile_real_las_returns_coherent_output_values():
     # pdaltools' buffer tile-naming parser expects <prefix1>_<prefix2>_<coordX>_<coordY>_<suffix>
     # (e.g. Semis_2024_0751_6690_...). Strip the fixture's leading "test_" segment so the tile
     # coordinates are parsed from the right fields.
+    TMP_PATH.mkdir(parents=True, exist_ok=True)
     tile = TMP_PATH / real_las.name.removeprefix("test_")
     shutil.copy(real_las, tile)
 

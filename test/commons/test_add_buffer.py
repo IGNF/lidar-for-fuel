@@ -28,6 +28,7 @@ def test_create_buffered_las_file_extends_bounds_and_cleans_up_on_exit():
         assert path.exists()
 
         # The temporary file is a regular, usable file: it can be copied.
+        _OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
         copy_path = _OUTPUT_DIR / "copy.las"
         shutil.copy2(path, copy_path)
         assert copy_path.exists()
