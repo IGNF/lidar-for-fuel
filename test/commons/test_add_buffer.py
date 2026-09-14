@@ -7,7 +7,7 @@ from lidar_for_fuel.commons.add_buffer import create_buffered_las_file
 
 _INPUT_DIR = Path("data/buffer")
 _OUTPUT_DIR = Path("tmp/test_add_buffer")
-_CENTRAL_TILE = _INPUT_DIR / "Semis_2022_0691_6484_LA93_IGN69_pretraited.laz"
+_CENTRAL_TILE = _INPUT_DIR / "Semis_2022_0691_6484_LA93_IGN69_preprocessed.laz"
 _BUFFER_WIDTH = 10
 
 
