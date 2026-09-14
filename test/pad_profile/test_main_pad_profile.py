@@ -5,17 +5,18 @@ import pytest
 
 from lidar_for_fuel.main_pad_profile import pad_profile_one_tile
 
-_REAL_PREPROCESSED_LAS = Path(
-    "data/pointcloud/test_semis_2024_0751_6690_LA93_IGN69_filter_trajectory_1311_preprocessed.laz"
-)
+TMP_PATH = Path("./tmp/cmain_pad_profile")
+
+# File produced by the preprocessing pipeline: has all 4 required extra dims.
+PREPROCESSED_LAS = Path("data/pointcloud/test_semis_2024_0751_6690_LA93_IGN69_filter_trajectory_1311_preprocessed.laz")
 
 
-def test_pad_profile_one_tile_real_las_returns_coherent_output_values(tmp_path):
+def test_pad_profile_one_tile_real_las_returns_coherent_output_values():
     """Run pad_profile_one_tile on the real pre-treated LAS and assert cos_theta is in [0,1].
 
     The test is skipped if the LAS file is not present in the workspace.
     """
-    real_las = _REAL_PREPROCESSED_LAS
+    real_las = PREPROCESSED_LAS
 
     if not real_las.exists():
         pytest.skip(f"Real LAS {real_las} not found in workspace")
@@ -23,7 +24,7 @@ def test_pad_profile_one_tile_real_las_returns_coherent_output_values(tmp_path):
     # pdaltools' buffer tile-naming parser expects <prefix1>_<prefix2>_<coordX>_<coordY>_<suffix>
     # (e.g. Semis_2024_0751_6690_...). Strip the fixture's leading "test_" segment so the tile
     # coordinates are parsed from the right fields.
-    tile = tmp_path / real_las.name.removeprefix("test_")
+    tile = TMP_PATH / real_las.name.removeprefix("test_")
     shutil.copy(real_las, tile)
 
     # Lower quality guards so the function returns a numeric value for testing.
