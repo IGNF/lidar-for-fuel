@@ -59,8 +59,4 @@ def create_buffered_las_file(
             buffered_filename,
         )
 
-        try:
-            yield buffered_filename
-        except Exception:
-            logger.error("create_buffered_las_file: failed while using %s", buffered_filename)
-            raise
+        yield buffered_filename
