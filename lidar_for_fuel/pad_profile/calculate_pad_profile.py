@@ -7,8 +7,8 @@ import logging
 
 import numpy as np
 
-from lidar_for_fuel.commons.filter_points_by_date import filter_by_date
 from lidar_for_fuel.commons.compute_class_counts import compute_class_counts
+from lidar_for_fuel.commons.filter_points_by_date import filter_by_date
 from lidar_for_fuel.pad_profile.compute_cos_theta import compute_cos_theta
 from lidar_for_fuel.pad_profile.compute_cover import compute_cover
 from lidar_for_fuel.pad_profile.compute_gf import compute_gf
@@ -305,6 +305,5 @@ def pad_metrics_core(
     output["Date_maj"] = modal_time_unix
     output["Date_min"] = int((date_min - np.datetime64(0, "s")) / np.timedelta64(1, "s"))
     output["Date_max"] = int((date_max - np.datetime64(0, "s")) / np.timedelta64(1, "s"))
-    
-    print(output)
+
     return output
