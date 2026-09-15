@@ -1,3 +1,5 @@
+- Get a buffer around the input pointcloud in order to compensate the difference between las tiling grid and the output raster grid 
+
 # v0.1.1
 - Preprocessing: Add "check_las" decorator to return an error when the output las cannot be read
 - [Work in progress] Add PAD profile computation:

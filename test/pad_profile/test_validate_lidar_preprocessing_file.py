@@ -1,4 +1,6 @@
-"""Tests for pad_profile/validate_lidar_preprocessing_file — validates extra dims h_abg, X_sensor, Y_sensor, Z_sensor."""
+""" Tests for pad_profile/validate_lidar_preprocessing_file
+— validates extra dims h_abg, X_sensor, Y_sensor, Z_sensor. """
+
 import os
 import shutil
 from pathlib import Path
@@ -7,15 +9,14 @@ import laspy
 import numpy as np
 import pytest
 
-from lidar_for_fuel.pad_profile.validate_lidar_preprocessing_file import check_lidar_file
-
+from lidar_for_fuel.pad_profile.validate_lidar_preprocessing_file import (
+    check_lidar_file,
+)
 
 TMP_PATH = Path("./tmp/check_lidar_pad_profile")
 
 # File produced by the preprocessing pipeline: has all 4 required extra dims.
-PRETRAITED_LAS = Path(
-    "data/pointcloud/test_semis_2024_0751_6690_LA93_IGN69_filter_trajectory_1311_pretraited.laz"
-)
+PREPROCESSED_LAS = Path("data/pointcloud/test_semis_2024_0751_6690_LA93_IGN69_filter_trajectory_1311_preprocessed.laz")
 
 # Standard raw file: no extra dims.
 RAW_LAS = Path("data/pointcloud/test_semis_2022_0897_6577_LA93_IGN69_decimation.laz")
@@ -43,6 +44,7 @@ def _write_las_with_extra_dims(path: Path, extra_dim_names: list[str]) -> None:
 
 
 # ── error cases ───────────────────────────────────────────────────────────────
+
 
 def test_check_lidar_file_not_exists():
     with pytest.raises(FileNotFoundError):
@@ -75,4 +77,4 @@ def test_check_lidar_file_missing_some_extra_dims():
 
 def test_check_lidar_file_valid_preprocessed_file_passes():
     # Should not raise
-    check_lidar_file(str(PRETRAITED_LAS))
+    check_lidar_file(str(PREPROCESSED_LAS))

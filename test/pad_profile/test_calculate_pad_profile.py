@@ -6,9 +6,8 @@ import pytest
 
 from lidar_for_fuel.pad_profile.calculate_pad_profile import pad_metrics_core
 
-
-_REAL_PRETRAITED_LAS = Path(
-    "data/pointcloud/test_semis_2024_0751_6690_LA93_IGN69_filter_trajectory_1311_pretraited.laz"
+_REAL_PREPROCESSED_LAS = Path(
+    "data/pointcloud/test_semis_2024_0751_6690_LA93_IGN69_filter_trajectory_1311_preprocessed.laz"
 )
 _SECONDS_PER_DAY = 86_400
 
@@ -324,7 +323,7 @@ def test_pad_metrics_core_real_las_returns_coherent_output_values():
 
     Skipped if the LAS file is not present in the workspace.
     """
-    real_las = _REAL_PRETRAITED_LAS
+    real_las = _REAL_PREPROCESSED_LAS
     if not real_las.exists():
         pytest.skip(f"Real LAS {real_las} not found in workspace")
 
