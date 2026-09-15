@@ -4,6 +4,8 @@ from typing import Callable
 import numpy as np
 import pandas as pd
 
+from lidar_for_fuel.pad_profile.calculate_pad_profile import pad_metrics_core
+
 logger = logging.getLogger(__name__)
 
 
@@ -115,3 +117,69 @@ def compute_pixel_aggregates(
         )
 
     return aggregated, origin_pixel, nb_pixels
+
+
+def build_pad_aggregation(
+    scanning_angle: bool,
+    limit_N_points: int,
+    limit_flight_agl: float,
+    deviation_days: int,
+    z0: float,
+    dz: float,
+    nlayers: int | None,
+    dz_low: float,
+    nlayers_low: int | None,
+    ground_margin: float,
+    cover_type: str,
+    height_cover: float,
+    use_cover: bool,
+    G: float,
+    omega: float,
+    keep_values: list,
+    keep_classes: list,
+) -> Callable[[pd.DataFrame], dict[str, float] | None]:
+    """Bind PAD parameters once into an `aggregation` callable for `compute_pixel_aggregates`.
+
+    The returned function adapts one pixel's points (a DataFrame group, as produced by
+    `compute_pixel_aggregates`'s groupby) to `pad_metrics_core`'s array-based signature.
+
+    Args:
+        See `pad_metrics_core` for every parameter.
+
+    Returns:
+        Callable[[pd.DataFrame], dict[str, float] | None]: pass as `aggregation` to
+        `compute_pixel_aggregates`.
+    """
+
+    def aggregate(group: pd.DataFrame) -> dict[str, float] | None:
+        return pad_metrics_core(
+            gpstime=group["GpsTime"].to_numpy(dtype=np.float64),
+            x=group["X"].to_numpy(dtype=np.float64),
+            y=group["Y"].to_numpy(dtype=np.float64),
+            h_abg=group["h_abg"].to_numpy(dtype=np.float64),
+            z=group["Z"].to_numpy(dtype=np.float64),
+            return_number=group["ReturnNumber"].to_numpy(dtype=np.float64),
+            classification=group["Classification"].to_numpy(dtype=np.float64),
+            x_sensor=group["X_sensor"].to_numpy(dtype=np.float64),
+            y_sensor=group["Y_sensor"].to_numpy(dtype=np.float64),
+            z_sensor=group["Z_sensor"].to_numpy(dtype=np.float64),
+            scanning_angle=scanning_angle,
+            limit_N_points=limit_N_points,
+            limit_flight_agl=limit_flight_agl,
+            deviation_days=deviation_days,
+            z0=z0,
+            dz=dz,
+            nlayers=nlayers,
+            dz_low=dz_low,
+            nlayers_low=nlayers_low,
+            ground_margin=ground_margin,
+            cover_type=cover_type,
+            height_cover=height_cover,
+            use_cover=use_cover,
+            G=G,
+            omega=omega,
+            keep_values=keep_values,
+            keep_classes=keep_classes,
+        )
+
+    return aggregate
