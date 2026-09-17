@@ -54,7 +54,7 @@ def compute_pixel_aggregates(
         tile_origin_y (float): Y of the tile's own (raw, unaligned) top-left corner.
         tile_size (float): Tile side length in map units (e.g. 1000 for a 1 km dalle).
         resolution_factor (float): Pixel size in map units (e.g. 10 for the CosiaFrance grid).
-        aggregation (callable): Function run on each pixel's points (e.g. the PAD profile calc).
+        aggregation (callable): Function run on each pixel (e.g. the PAD profile calc).
 
     Returns:
         tuple: (aggregated, origin_pixel, nb_pixels). `aggregated` is a DataFrame indexed by
