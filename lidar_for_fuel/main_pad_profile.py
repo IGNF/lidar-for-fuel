@@ -17,7 +17,6 @@ from lidar_for_fuel.commons.add_buffer import create_buffered_las_file
 from lidar_for_fuel.pad_profile.create_raster import (
     build_pad_aggregation,
     compute_pixel_aggregates,
-    points_to_dataframe,
 )
 from lidar_for_fuel.pad_profile.validate_lidar_preprocessing_file import (
     check_lidar_file,
@@ -126,7 +125,7 @@ def pad_profile_one_tile(
         # Extract pointclouds with attributes
         pipeline = pdal.Pipeline() | pdal.Reader.las(filename=buffered_las_filename, override_srs=srid, nosrs=True)
         pipeline.execute()
-        points_df = points_to_dataframe(pipeline.arrays[0])
+        points_df = pd.DataFrame(pipeline.arrays[0])
 
     # Calcule PAD PROFILE by PIXEL
     aggregated, origin_pixel, nb_pixels = compute_pixel_aggregates(
