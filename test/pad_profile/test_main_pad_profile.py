@@ -1,14 +1,17 @@
 import shutil
 from pathlib import Path
 
-import numpy as np
-import pdal
+import pandas as pd
 import pytest
 
 from lidar_for_fuel.main_pad_profile import pad_profile_one_tile
-from lidar_for_fuel.pad_profile.calculate_pad_profile import pad_metrics_core
 
 TMP_PATH = Path("./tmp/cmain_pad_profile")
+
+# CosiaFrance grid anchor and pixel size (configs/config.yaml: pad_profile.create_raster).
+_GLOBAL_ORIGIN_X = 98029.75
+_GLOBAL_ORIGIN_Y = 6045536.75
+_RESOLUTION_FACTOR = 10.0
 
 # File produced by the preprocessing pipeline: has all 4 required extra dims.
 PREPROCESSED_LAS = Path("data/pointcloud/test_semis_2024_0751_6690_LA93_IGN69_filter_trajectory_1311_preprocessed.laz")
@@ -18,9 +21,6 @@ PREPROCESSED_LAS = Path("data/pointcloud/test_semis_2024_0751_6690_LA93_IGN69_fi
 BUFFER_DIR = Path("data/buffer")
 CENTRAL_TILE = BUFFER_DIR / "Semis_2022_0691_6484_LA93_IGN69_preprocessed.laz"
 
-# PAD-computation parameters shared between the direct pad_metrics_core call (raw tile,
-# no buffer) and pad_profile_one_tile (buffered tile): keeping them identical isolates
-# the buffer as the only variable between the two outputs.
 _PAD_PARAMS = dict(
     keep_classes=[1, 2, 3, 4, 5, 6, 9, 17, 18, 64, 66, 67],
     limit_N_points=1,
@@ -60,13 +60,16 @@ def test_pad_profile_one_tile_real_las_returns_coherent_output_values():
     shutil.copy(real_las, tile)
 
     # Lower quality guards so the function returns a numeric value for testing.
-    result = pad_profile_one_tile(
+    aggregated, origin_pixel, nb_pixels = pad_profile_one_tile(
         input_filename=str(tile),
         input_dir=str(tile.parent),
         buffer_width=100,
         tile_width=1000,
         tile_coord_scale=1000,
         srid="EPSG:2154",
+        global_origin_x=_GLOBAL_ORIGIN_X,
+        global_origin_y=_GLOBAL_ORIGIN_Y,
+        resolution_factor=_RESOLUTION_FACTOR,
         keep_classes=[1, 2, 3, 4, 5, 6, 9, 17, 18, 64, 66, 67],
         limit_N_points=1,
         limit_flight_agl=0.0,
@@ -86,65 +89,53 @@ def test_pad_profile_one_tile_real_las_returns_coherent_output_values():
         keep_values=[2, 3, 4, 5, 9],
     )
 
-    assert isinstance(result, dict)
-    cos_theta = result["cos_theta"]
-    assert isinstance(cos_theta, (float, int)), "Expected a numeric cos_theta value"
-    assert 0.0 <= float(cos_theta) <= 1.0
-    pad_keys = [key for key in result if key.startswith("PAD_")]
-    assert len(pad_keys) == 60 + 4
-    for cover_key in ("Cover_2", "Cover_4", "Cover_6"):
-        assert 0.0 <= result[cover_key] <= 1.0
+    assert isinstance(aggregated, pd.DataFrame)
+    assert not aggregated.empty
+    assert nb_pixels == 100.0  # 1000m tile / 10m pixels
+    assert isinstance(origin_pixel, tuple) and len(origin_pixel) == 2
+
+    # cos_theta can be NaN for a pixel with no vegetation/ground point at all (too few
+    # points per 10m pixel to guarantee one) -- that's an expected per-pixel data-quality
+    # case, not a wiring bug, so only the non-NaN pixels are checked for range.
+    cos_theta = aggregated["cos_theta"].dropna()
+    assert not cos_theta.empty
+    assert cos_theta.between(0.0, 1.0).all()
+    pad_columns = [c for c in aggregated.columns if c.startswith("PAD_")]
+    assert len(pad_columns) == 60 + 4
+    for cover_column in ("Cover_2", "Cover_4", "Cover_6"):
+        assert aggregated[cover_column].between(0.0, 1.0).all()
 
 
-def _pad_metrics_on_raw_tile(input_filename: str) -> dict[str, float] | None:
-    """Compute PAD metrics directly on a tile's own points, bypassing add_buffer
-    entirely -- the "no buffer" baseline to compare against pad_profile_one_tile's
-    buffered output."""
-    pipeline = pdal.Pipeline() | pdal.Reader.las(filename=input_filename, override_srs="EPSG:2154", nosrs=True)
-    pipeline.execute()
-    points = pipeline.arrays[0]
-
-    return pad_metrics_core(
-        gpstime=points["GpsTime"].astype(np.float64),
-        x=points["X"].astype(np.float64),
-        y=points["Y"].astype(np.float64),
-        h_abg=points["h_abg"].astype(np.float64),
-        z=points["Z"].astype(np.float64),
-        return_number=points["ReturnNumber"].astype(np.float64),
-        classification=points["Classification"].astype(np.float64),
-        x_sensor=points["X_sensor"].astype(np.float64),
-        y_sensor=points["Y_sensor"].astype(np.float64),
-        z_sensor=points["Z_sensor"].astype(np.float64),
-        **_PAD_PARAMS,
-    )
-
-
-def test_pad_profile_one_tile_buffered_output_differs_from_raw_tile():
-    """pad_profile_one_tile (which merges in real neighboring tiles via add_buffer)
-    must give a different result than pad_metrics_core run on the tile's own raw
-    points: the buffered version sees extra points from the 8 real neighbors in
-    data/buffer/, so it covers a strictly larger footprint than the raw 1km x 1km tile.
+def test_pad_profile_one_tile_buffered_output_covers_more_pixels_than_unbuffered():
+    """`compute_pixel_aggregates` windows its output back down to the tile's own
+    CosiaFrance footprint, so the buffer no longer inflates the overall point count the
+    way the old whole-tile call did (see git history) -- it only fills in the pixels
+    that straddle the tile's own boundary (the misalignment between the LiDAR HD tiling
+    and the CosiaFrance grid, see test_create_raster.py). Compare buffered vs unbuffered
+    (buffer_width=0) runs of the same tile: the buffer must strictly add populated pixels,
+    all of them among the pixels the unbuffered run couldn't fill.
 
     Skipped if the buffer tile set is not present in the workspace.
     """
     if not CENTRAL_TILE.exists():
         pytest.skip(f"Buffer tile set not found in workspace: {CENTRAL_TILE}")
 
-    result_raw = _pad_metrics_on_raw_tile(str(CENTRAL_TILE))
-
-    result_buffered = pad_profile_one_tile(
+    common_kwargs = dict(
         input_filename=str(CENTRAL_TILE),
         input_dir=str(BUFFER_DIR),
-        buffer_width=50,
         tile_width=1000,
         tile_coord_scale=1000,
         srid="EPSG:2154",
+        global_origin_x=_GLOBAL_ORIGIN_X,
+        global_origin_y=_GLOBAL_ORIGIN_Y,
+        resolution_factor=_RESOLUTION_FACTOR,
         **_PAD_PARAMS,
     )
 
-    assert isinstance(result_raw, dict)
-    assert isinstance(result_buffered, dict)
-    assert result_raw != result_buffered
-    # The buffer merges in points from the 8 real neighboring tiles -> strictly more
-    # points than the raw 1km x 1km tile alone.
-    assert result_buffered["Total"] > result_raw["Total"]
+    aggregated_unbuffered, _, _ = pad_profile_one_tile(buffer_width=0, **common_kwargs)
+    aggregated_buffered, _, _ = pad_profile_one_tile(buffer_width=50, **common_kwargs)
+
+    assert isinstance(aggregated_buffered, pd.DataFrame)
+    assert not aggregated_buffered.empty
+    assert len(aggregated_buffered) > len(aggregated_unbuffered)
+    assert set(aggregated_unbuffered.index) <= set(aggregated_buffered.index)
