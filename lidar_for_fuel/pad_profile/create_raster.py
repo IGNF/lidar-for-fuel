@@ -9,30 +9,6 @@ from lidar_for_fuel.pad_profile.calculate_pad_profile import pad_metrics_core
 logger = logging.getLogger(__name__)
 
 
-def points_to_dataframe(points: np.ndarray) -> pd.DataFrame:
-    """Convert a PDAL structured numpy array to a DataFrame."""
-    return pd.DataFrame(points)
-
-
-def transform_points_coordinates(
-    points_df: pd.DataFrame,
-    origin_x: float,
-    origin_y: float,
-    resolution_factor: float,
-) -> pd.DataFrame:
-    """Apply vectorized coordinate transforms using external origin and resolution data."""
-    transformed_df = points_df.copy()
-
-    if "X" in transformed_df.columns:
-        # Normalize X coordinates: (X - origin) / pixel_size → pixel space
-        transformed_df["X"] = (transformed_df["X"].astype(np.float64) - origin_x) / resolution_factor
-    if "Y" in transformed_df.columns:
-        # origin_y is the north edge (max Y)
-        transformed_df["Y"] = (origin_y - transformed_df["Y"].astype(np.float64)) / resolution_factor
-
-    return transformed_df
-
-
 def compute_pixel_aggregates(
     points_df: pd.DataFrame,
     global_origin_x: float,
