@@ -6,6 +6,7 @@ Runs on a single pre-processed LAS/LAZ tile or all tiles in a directory.
 
 import logging
 import os
+from pathlib import Path
 
 import hydra
 import pandas as pd
@@ -18,6 +19,7 @@ from lidar_for_fuel.pad_profile.create_raster import (
     build_pad_aggregation,
     compute_pixel_aggregates,
 )
+from lidar_for_fuel.pad_profile.export_raster import export_raster
 from lidar_for_fuel.pad_profile.validate_lidar_preprocessing_file import (
     check_lidar_file,
 )
@@ -52,6 +54,7 @@ def pad_profile_one_tile(
     G: float,
     omega: float,
     keep_values: list,
+    output_dir: str | None = None,
 ) -> tuple[pd.DataFrame, tuple, float]:
     """Compute PAD metrics for one tile, per CosiaFrance pixel.
 
@@ -98,6 +101,8 @@ def pad_profile_one_tile(
         G (float): Leaf projection ratio. Default 0.5.
         omega (float): Clumping factor. Default 1.
         keep_values (list): Classes to keep for counting Ni. Default: [2, 3, 4, 5, 9].
+        output_dir (str | None): If given, the 8 PAD GeoTIFFs are written into this
+            directory (see `export_raster`). If `None`, raster export is skipped.
 
     Returns:
         tuple[pd.DataFrame, tuple, float]: `(aggregated, origin_pixel, nb_pixels)` as
@@ -158,7 +163,21 @@ def pad_profile_one_tile(
     )
 
     logger.info("Computed PAD metrics by pixel in %s", input_filename)
-    return aggregated, origin_pixel, nb_pixels
+
+    if output_dir is not None:
+        export_raster(
+            aggregated,
+            origin_pixel=origin_pixel,
+            nb_pixels=nb_pixels,
+            global_origin_x=global_origin_x,
+            global_origin_y=global_origin_y,
+            resolution_factor=resolution_factor,
+            dz=dz,
+            dz_low=dz_low,
+            srid=srid,
+            output_dir=output_dir,
+            tile_stem=Path(input_filename).stem,
+        )
 
 
 @hydra.main(config_path="../configs/", config_name="config.yaml", version_base="1.2")
@@ -177,6 +196,11 @@ def main(config: DictConfig):
         raise ValueError("config.io.input_dir is empty, please provide an input directory in the configuration")
     if not os.path.isdir(input_dir):
         raise FileNotFoundError(f"The input directory ({input_dir}) doesn't exist.")
+
+    output_dir = config.io.output_dir
+    if output_dir is None:
+        raise ValueError("config.io.output_dir is empty, please provide an output directory in the configuration")
+    os.makedirs(output_dir, exist_ok=True)
 
     initial_las_filename = config.io.input_filename
 
@@ -210,6 +234,7 @@ def main(config: DictConfig):
             G=config.pad_profile.compute_pad.G,
             omega=config.pad_profile.compute_pad.omega,
             keep_values=config.pad_profile.compute_pad.keep_values,
+            output_dir=output_dir,
         )
 
     if initial_las_filename:
