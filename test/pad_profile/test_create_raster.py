@@ -1,8 +1,10 @@
 from pathlib import Path
+import re
 
 import laspy
 import numpy as np
 import pandas as pd
+import pytest
 
 from lidar_for_fuel.pad_profile.calculate_pad_profile import pad_metrics_core
 from lidar_for_fuel.pad_profile.create_raster import (
@@ -109,6 +111,56 @@ def test_compute_pixel_aggregates_with_pad_aggregation_produces_pad_columns():
     assert (0, 0) in aggregated.index
     pad_columns = [c for c in aggregated.columns if c.startswith("PAD_")]
     assert len(pad_columns) == _PAD_PARAMS["nlayers"] + _PAD_PARAMS["nlayers_low"]
+
+
+@pytest.mark.parametrize("n_points", [0, 5], ids=["empty_cloud", "points_outside_window"])
+def test_compute_pixel_aggregates_raises_when_no_point_is_in_window(n_points):
+    points = _pixel_points_df(n_points)
+    points["X"] = _GLOBAL_ORIGIN_X + _TILE_SIZE + 1.0
+
+    def unexpected_aggregation(group):
+        pytest.fail("Aggregation must not run when no point falls within the window")
+
+    expected_message = (
+        f"No point of the tile (tile_origin=({_GLOBAL_ORIGIN_X}, {_GLOBAL_ORIGIN_Y})) falls "
+        "within the extracted CosiaFrance window: check the buffer loaded around the "
+        "tile and the coordinates passed to compute_pixel_aggregates."
+    )
+    with pytest.raises(ValueError, match=f"^{re.escape(expected_message)}$"):
+        compute_pixel_aggregates(
+            points,
+            global_origin_x=_GLOBAL_ORIGIN_X,
+            global_origin_y=_GLOBAL_ORIGIN_Y,
+            tile_origin_x=_GLOBAL_ORIGIN_X,
+            tile_origin_y=_GLOBAL_ORIGIN_Y,
+            tile_size=_TILE_SIZE,
+            resolution_factor=_RESOLUTION_FACTOR,
+            aggregation=unexpected_aggregation,
+        )
+
+
+@pytest.mark.parametrize("n_pixels", [1, 2], ids=["single_pixel", "multiple_pixels"])
+def test_compute_pixel_aggregates_raises_when_all_pixels_fail_quality_guard(n_pixels):
+    points = _pixel_points_df(2)
+    if n_pixels == 2:
+        points.loc[1, "X"] += _RESOLUTION_FACTOR
+    aggregation = build_pad_aggregation(**{**_PAD_PARAMS, "limit_N_points": 5})
+
+    expected_message = (
+        f"`aggregation` returned no result for the tile (tile_origin=({_GLOBAL_ORIGIN_X}, "
+        f"{_GLOBAL_ORIGIN_Y})): every pixel failed"
+    )
+    with pytest.raises(ValueError, match=f"^{re.escape(expected_message)}$"):
+        compute_pixel_aggregates(
+            points,
+            global_origin_x=_GLOBAL_ORIGIN_X,
+            global_origin_y=_GLOBAL_ORIGIN_Y,
+            tile_origin_x=_GLOBAL_ORIGIN_X,
+            tile_origin_y=_GLOBAL_ORIGIN_Y,
+            tile_size=_TILE_SIZE,
+            resolution_factor=_RESOLUTION_FACTOR,
+            aggregation=aggregation,
+        )
 
 
 def test_compute_pixel_aggregates_real_buffered_tile_matches_spatial_histogram():
