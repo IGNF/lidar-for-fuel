@@ -179,6 +179,8 @@ def pad_profile_one_tile(
             tile_stem=Path(input_filename).stem,
         )
 
+    return aggregated, origin_pixel, nb_pixels
+
 
 @hydra.main(config_path="../configs/", config_name="config.yaml", version_base="1.2")
 def main(config: DictConfig):
