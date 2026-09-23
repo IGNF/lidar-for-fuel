@@ -172,25 +172,35 @@ def export_raster(
     pl_factor = 1.0 / aggregated["cos_theta"]
     pl_factor.name = "pl_factor"
 
-    raster_columns: dict[str, dict[str, pd.Series]] = {
-        "pad_sb_0.5m": {
-            c: (aggregated[c], (0.0, 5.0)) for c in _select_stratum_columns(aggregated, f"PAD_{dz_low_str}_")
+    raster_columns = {
+        "pad_sb_0.5m": [ <la liste des noms de colonnes correspondant>]
         },
-        "pad_profile_1m": {
-            c: (aggregated[c], (0.0, 5.0)) for c in _select_stratum_columns(aggregated, f"PAD_{dz_str}_")
+        "pad_profile_1m": [ <la liste des noms de colonnes correspondant>],
+        "class_count":[ <la liste des noms de colonnes correspondant>],
+        "entering_rays": [ <la liste des noms de colonnes correspondant>],
+        "intercept_ray":[ <la liste des noms de colonnes correspondant>],
+        "pl_factor":[ <la liste des noms de colonnes correspondant>],
+        "cover": [ <la liste des noms de colonnes correspondant>],
+        "dates_pad": [ <la liste des noms de colonnes correspondant>],
+    }
+    raster_clip = {
+        "pad_sb_0.5m":(0.0, 5.0)
         },
-        "class_count": {c: (aggregated[c], None) for c in class_columns},
-        "entering_rays": {c: (aggregated[c], None) for c in _select_stratum_columns(aggregated, f"N_{dz_str}_")},
-        "intercept_ray": {c: (aggregated[c], None) for c in _select_stratum_columns(aggregated, f"Ni_{dz_str}_")},
-        "pl_factor": {"pl_factor": (pl_factor, None)},
-        "cover": {c: (aggregated[c], (0.0, 1.0)) for c in ("Cover_2", "Cover_4", "Cover_6")},
-        "dates_pad": {c: (aggregated[c], None) for c in ("Date_maj", "Date_min", "Date_max")},
+        "pad_profile_1m":(0.0, 5.0),
+        "class_count":None,
+        "entering_rays": None,
+        "intercept_ray":None,
+        "pl_factor":None,
+        "cover": (0.0, 1.0),
+        "dates_pad": None,
     }
 
     written: dict[str, Path] = {}
-    for raster_name, columns in raster_columns.items():
+    for raster_name in raster_columns.keys():
+        columns = raster_columns[raster_name]
+        clip = raster_clip[raster_name]
         bands = {
-            name: _band_array(values, origin_pixel, nb_pixels, clip=clip) for name, (values, clip) in columns.items()
+            name: _band_array(aggregated[c], origin_pixel, nb_pixels, clip=clip) for col_name in columns)
         }
         path = output_dir / f"{tile_stem}_{raster_name}.tif"
         _write_geotiff(path, bands, transform, srid)
