@@ -10,29 +10,47 @@ from lidar_for_fuel.pad_profile.calculate_pad_profile import _format_num
 
 logger = logging.getLogger(__name__)
 
-# One row per output raster: (name, list of (band_name, values, clip) builders).
-# `values` is a callable(aggregated, dz_str, dz_low_str) -> dict[str, pd.Series]
-# giving, in band order, the column label to write and the series to rasterize.
-
 
 def _raster_transform(
     global_origin_x: float, global_origin_y: float, origin_pixel: tuple, resolution_factor: float
 ) -> Affine:
     """Affine transform anchored on the CosiaFrance grid corner `origin_pixel`.
 
-    `origin_pixel` (as returned by `compute_pixel_aggregates`) is the tile's own
-    (ix, iy) grid index: ix grows east, iy grows north (see `create_raster.get_pixel_index`).
-    The raster's top-left corner is therefore the *north-west* corner of pixel
-    (ix=origin_pixel[0], iy=origin_pixel[1]).
+    `origin_pixel` is the tile's own (ix, iy) grid index. The raster's top-left
+    corner is therefore the *north-west* corner of pixel (ix=origin_pixel[0], iy=origin_pixel[1]).
+
+    Args:
+        global_origin_x (float): X of the CosiaFrance grid anchor.
+        global_origin_y (float): Y of the CosiaFrance grid anchor (north edge).
+        origin_pixel (tuple): CosiaFrance grid corner (ix, iy) the tile's window is anchored on.
+        resolution_factor (float): Pixel size (m) of the CosiaFrance grid.
+
+    Returns:
+        Affine: Transform mapping (row, col) of the output array to real-world (x, y).
     """
+    # Get the top-left corner in meters
     top_left_x = global_origin_x + origin_pixel[0] * resolution_factor
     top_left_y = global_origin_y + origin_pixel[1] * resolution_factor
+
+    # Affine transform from image space (row, column) to the georeferenced coordinate space
     return Affine(resolution_factor, 0.0, top_left_x, 0.0, -resolution_factor, top_left_y)
 
 
 def _select_stratum_columns(aggregated: pd.DataFrame, prefix: str) -> list[str]:
-    """Columns `{prefix}{layer}` sorted by their numeric stratum suffix, ascending."""
+    """Select and order raster bands: filter by a given prefix (e.g. "PAD_1_"),
+    then sort numerically by the suffix.
+
+    Args:
+        aggregated (pd.DataFrame): Per-pixel metrics, as returned by `compute_pixel_aggregates`.
+        prefix (str): Column prefix to match, e.g. "PAD_1_" or "N_1_".
+
+    Returns:
+        list[str]: Matching column names, sorted ascending by their numeric suffix
+            (e.g. PAD_1_0, PAD_1_1, ..., PAD_1_59 -- not alphabetically, which
+            would put PAD_1_10 before PAD_1_2).
+    """
     columns = [c for c in aggregated.columns if c.startswith(prefix)]
+
     return sorted(columns, key=lambda c: float(c[len(prefix) :]))
 
 
@@ -41,11 +59,24 @@ def _band_array(values: pd.Series, origin_pixel: tuple, nb_pixels: float, clip: 
 
     `values` is indexed like `compute_pixel_aggregates`'s output: a (pixel_y, pixel_x)
     MultiIndex in CosiaFrance grid coordinates. Cells with no data stay `NaN`.
+
+    Args:
+        values (pd.Series): One column of `aggregated` (or a derived series, e.g.
+            `pl_factor`), indexed by (pixel_y, pixel_x).
+        origin_pixel (tuple): CosiaFrance grid corner (ix, iy) the tile's window is anchored on.
+        nb_pixels (float): Tile side length in pixels.
+        clip (tuple | None): Optional (min, max) bounds the values are clipped to
+            before being written (e.g. (0.0, 5.0) to cap PAD). Default None.
+
+    Returns:
+        np.ndarray: (nb_pixels, nb_pixels) float32 grid, `NaN` where no pixel matched.
     """
     size = int(nb_pixels)
     array = np.full((size, size), np.nan, dtype=np.float32)
 
     data = values.to_numpy(dtype=np.float64)
+
+    # Clip = capping of PADs and cover.
     if clip is not None:
         data = np.clip(data, *clip)
 
@@ -54,13 +85,29 @@ def _band_array(values: pd.Series, origin_pixel: tuple, nb_pixels: float, clip: 
     rows = (origin_pixel[1] - pixel_y).astype(int)
     cols = (pixel_x - origin_pixel[0]).astype(int)
 
+    # A single line fills all the pixels at once.
     array[rows, cols] = data.astype(np.float32)
+
     return array
 
 
 def _write_geotiff(path: Path, bands: dict[str, np.ndarray], transform: Affine, srid: str) -> None:
+    """Write one multi-band GeoTIFF.
+
+    Args:
+        path (Path): Output file path. Parent directories are created if missing.
+        bands (dict[str, np.ndarray]): Band name -> (height, width) float32 array,
+            written in dict order (band 1 first).
+        transform (Affine): Georeferencing transform (see `_raster_transform`).
+        srid (str): Spatial reference of the output raster (e.g. "EPSG:2154").
+
+    Returns:
+        None
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
+
     height, width = next(iter(bands.values())).shape
+
     with rasterio.open(
         path,
         "w",
