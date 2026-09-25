@@ -54,8 +54,8 @@ def pad_profile_one_tile(
     G: float,
     omega: float,
     keep_values: list,
-    output_dir: str | None = None,
-) -> tuple[pd.DataFrame, tuple, float]:
+    output_dir: str,
+) -> None:
     """Compute PAD metrics for one tile, per CosiaFrance pixel.
 
     Args:
@@ -101,15 +101,8 @@ def pad_profile_one_tile(
         G (float): Leaf projection ratio. Default 0.5.
         omega (float): Clumping factor. Default 1.
         keep_values (list): Classes to keep for counting Ni. Default: [2, 3, 4, 5, 9].
-        output_dir (str | None): If given, the 8 PAD GeoTIFFs are written into this
-            directory (see `export_raster`). If `None`, raster export is skipped.
-
-    Returns:
-        tuple[pd.DataFrame, tuple, float]: `(aggregated, origin_pixel, nb_pixels)` as
-        returned by `compute_pixel_aggregates`: a DataFrame indexed by (pixel_y, pixel_x)
-        holding one row of PAD metrics per pixel that passed `pad_metrics_core`'s quality
-        guards, the CosiaFrance grid corner the tile's window is anchored on, and the
-        tile's side length in pixels.
+        output_dir (str): Directory the 8 PAD GeoTIFFs are written into
+            (see `export_raster`).
     """
     # Validate pointclouds after preprocessing
     check_lidar_file(input_filename)
@@ -164,22 +157,20 @@ def pad_profile_one_tile(
 
     logger.info("Computed PAD metrics by pixel in %s", input_filename)
 
-    if output_dir is not None:
-        export_raster(
-            aggregated,
-            origin_pixel=origin_pixel,
-            nb_pixels=nb_pixels,
-            global_origin_x=global_origin_x,
-            global_origin_y=global_origin_y,
-            resolution_factor=resolution_factor,
-            dz=dz,
-            dz_low=dz_low,
-            srid=srid,
-            output_dir=output_dir,
-            tile_stem=Path(input_filename).stem,
-        )
-
-    return aggregated, origin_pixel, nb_pixels
+    export_raster(
+        aggregated,
+        origin_pixel=origin_pixel,
+        nb_pixels=nb_pixels,
+        global_origin_x=global_origin_x,
+        global_origin_y=global_origin_y,
+        resolution_factor=resolution_factor,
+        dz=dz,
+        dz_low=dz_low,
+        srid=srid,
+        output_dir=output_dir,
+        tile_stem=Path(input_filename).stem,
+    )
+    logger.info("Export 8 rasters for tile : %s", input_filename)
 
 
 @hydra.main(config_path="../configs/", config_name="config.yaml", version_base="1.2")
