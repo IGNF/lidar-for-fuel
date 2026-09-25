@@ -63,7 +63,7 @@ def _pixel_points_df(x: float, y: float, n: int = 5) -> pd.DataFrame:
     )
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def aggregated_single_pixel():
     """One populated pixel (south-west corner) in a 2x2-pixel tile aligned on the grid origin."""
     points_df = _pixel_points_df(_GLOBAL_ORIGIN_X + 1.0, _GLOBAL_ORIGIN_Y - 1.0)
@@ -80,8 +80,20 @@ def aggregated_single_pixel():
     return aggregated, origin_pixel, nb_pixels
 
 
-def test_export_raster_writes_eight_georeferenced_geotiffs(tmp_path, aggregated_single_pixel):
+@pytest.fixture(scope="module")
+def exported_single_pixel(tmp_path_factory, aggregated_single_pixel):
+    """The 8 GeoTIFFs `aggregated_single_pixel` exports to, written once for the module.
+
+    Every test below that inspects the *unmodified* export reads these same files, so the
+    call is hoisted here rather than repeated per test (the parametrized band-count test
+    alone used to re-write all 8 rasters 8 times over). Tests that need a different input
+    -- value clipping, `pl_factor` passthrough -- call `export_raster` themselves.
+
+    Returns:
+        tuple[dict[str, Path], Path]: raster name -> written path, and their directory.
+    """
     aggregated, origin_pixel, nb_pixels = aggregated_single_pixel
+    output_dir = tmp_path_factory.mktemp("export_raster_single_pixel")
 
     written = export_raster(
         aggregated,
@@ -93,9 +105,17 @@ def test_export_raster_writes_eight_georeferenced_geotiffs(tmp_path, aggregated_
         dz=_PAD_PARAMS["dz"],
         dz_low=_PAD_PARAMS["dz_low"],
         srid=_SRID,
-        output_dir=tmp_path,
+        output_dir=output_dir,
         tile_stem="test_tile",
     )
+
+    return written, output_dir
+
+
+def test_export_raster_writes_eight_georeferenced_geotiffs(exported_single_pixel):
+    """The 8 expected files are written under `tile_stem`, and they are georeferenced:
+    float32 with NaN nodata, on `_SRID`, anchored on the CosiaFrance grid corner."""
+    written, output_dir = exported_single_pixel
 
     assert set(written) == {
         "pad_sb_0.5m",
@@ -108,8 +128,19 @@ def test_export_raster_writes_eight_georeferenced_geotiffs(tmp_path, aggregated_
         "dates_pad",
     }
     for name, path in written.items():
-        assert path == tmp_path / f"test_tile_{name}.tif"
+        assert path == output_dir / f"test_tile_{name}.tif"
         assert path.is_file()
+
+    with rasterio.open(written["pad_profile_1m"]) as src:
+        assert src.dtypes[0] == "float32"
+        assert np.isnan(src.nodata)
+        assert src.crs.to_string() == _SRID
+        assert src.width == 2 and src.height == 2
+        # origin_pixel=(0, 1): top-left corner is (global_origin_x, global_origin_y + 1 * res)
+        assert src.transform.c == pytest.approx(_GLOBAL_ORIGIN_X)
+        assert src.transform.f == pytest.approx(_GLOBAL_ORIGIN_Y + _RESOLUTION_FACTOR)
+        assert src.transform.a == pytest.approx(_RESOLUTION_FACTOR)
+        assert src.transform.e == pytest.approx(-_RESOLUTION_FACTOR)
 
 
 @pytest.mark.parametrize(
@@ -125,76 +156,21 @@ def test_export_raster_writes_eight_georeferenced_geotiffs(tmp_path, aggregated_
         ("dates_pad", 3),
     ],
 )
-def test_export_raster_band_count_matches_spec(tmp_path, aggregated_single_pixel, raster_name, expected_band_count):
-    aggregated, origin_pixel, nb_pixels = aggregated_single_pixel
-
-    written = export_raster(
-        aggregated,
-        origin_pixel=origin_pixel,
-        nb_pixels=nb_pixels,
-        global_origin_x=_GLOBAL_ORIGIN_X,
-        global_origin_y=_GLOBAL_ORIGIN_Y,
-        resolution_factor=_RESOLUTION_FACTOR,
-        dz=_PAD_PARAMS["dz"],
-        dz_low=_PAD_PARAMS["dz_low"],
-        srid=_SRID,
-        output_dir=tmp_path,
-        tile_stem="test_tile",
-    )
+def test_export_raster_band_count_matches_spec(exported_single_pixel, raster_name, expected_band_count):
+    written, _ = exported_single_pixel
 
     with rasterio.open(written[raster_name]) as src:
         assert src.count == expected_band_count
 
 
-def test_export_raster_geotiffs_are_aligned_on_cosiafrance_grid(tmp_path, aggregated_single_pixel):
-    """dtype float32, NaN nodata, and a transform anchored on the CosiaFrance grid corner."""
-    aggregated, origin_pixel, nb_pixels = aggregated_single_pixel
-
-    written = export_raster(
-        aggregated,
-        origin_pixel=origin_pixel,
-        nb_pixels=nb_pixels,
-        global_origin_x=_GLOBAL_ORIGIN_X,
-        global_origin_y=_GLOBAL_ORIGIN_Y,
-        resolution_factor=_RESOLUTION_FACTOR,
-        dz=_PAD_PARAMS["dz"],
-        dz_low=_PAD_PARAMS["dz_low"],
-        srid=_SRID,
-        output_dir=tmp_path,
-        tile_stem="test_tile",
-    )
-
-    with rasterio.open(written["pad_profile_1m"]) as src:
-        assert src.dtypes[0] == "float32"
-        assert np.isnan(src.nodata)
-        assert src.crs.to_string() == _SRID
-        assert src.width == 2 and src.height == 2
-        # origin_pixel=(0, 1): top-left corner is (global_origin_x, global_origin_y + 1 * res)
-        assert src.transform.c == pytest.approx(_GLOBAL_ORIGIN_X)
-        assert src.transform.f == pytest.approx(_GLOBAL_ORIGIN_Y + _RESOLUTION_FACTOR)
-        assert src.transform.a == pytest.approx(_RESOLUTION_FACTOR)
-        assert src.transform.e == pytest.approx(-_RESOLUTION_FACTOR)
-
-
-def test_export_raster_places_pixel_value_at_correct_row_col_and_leaves_rest_nodata(tmp_path, aggregated_single_pixel):
+def test_export_raster_places_pixel_value_at_correct_row_col_and_leaves_rest_nodata(
+    exported_single_pixel, aggregated_single_pixel
+):
     """The single populated pixel (south-west of the tile) lands at row=1, col=0; every
     other cell of the 2x2 grid stays NaN (NoData)."""
-    aggregated, origin_pixel, nb_pixels = aggregated_single_pixel
+    aggregated, _, _ = aggregated_single_pixel
     expected_value = aggregated["PAD_1_0"].iloc[0]
-
-    written = export_raster(
-        aggregated,
-        origin_pixel=origin_pixel,
-        nb_pixels=nb_pixels,
-        global_origin_x=_GLOBAL_ORIGIN_X,
-        global_origin_y=_GLOBAL_ORIGIN_Y,
-        resolution_factor=_RESOLUTION_FACTOR,
-        dz=_PAD_PARAMS["dz"],
-        dz_low=_PAD_PARAMS["dz_low"],
-        srid=_SRID,
-        output_dir=tmp_path,
-        tile_stem="test_tile",
-    )
+    written, _ = exported_single_pixel
 
     with rasterio.open(written["pad_profile_1m"]) as src:
         band = src.read(1)  # PAD_1_0 is the first stratum band
@@ -228,10 +204,13 @@ def test_export_raster_caps_pad_values_at_five(tmp_path, aggregated_single_pixel
         assert np.nanmax(band) == pytest.approx(5.0)
 
 
-def test_export_raster_pl_factor_is_inverse_cos_theta(tmp_path, aggregated_single_pixel):
+def test_export_raster_pl_factor_passes_through_unchanged(tmp_path, aggregated_single_pixel):
+    """export_raster only reorganizes/exports existing columns: `pl_factor` (1 /
+    cos_theta) is already computed upstream by `pad_metrics_core`, not re-derived
+    here from `cos_theta`."""
     aggregated, origin_pixel, nb_pixels = aggregated_single_pixel
     aggregated = aggregated.copy()
-    aggregated["cos_theta"] = 0.5
+    aggregated["pl_factor"] = 2.0
 
     written = export_raster(
         aggregated,
@@ -252,22 +231,8 @@ def test_export_raster_pl_factor_is_inverse_cos_theta(tmp_path, aggregated_singl
         assert band[1, 0] == pytest.approx(2.0)
 
 
-def test_export_raster_band_descriptions_match_column_names(tmp_path, aggregated_single_pixel):
-    aggregated, origin_pixel, nb_pixels = aggregated_single_pixel
-
-    written = export_raster(
-        aggregated,
-        origin_pixel=origin_pixel,
-        nb_pixels=nb_pixels,
-        global_origin_x=_GLOBAL_ORIGIN_X,
-        global_origin_y=_GLOBAL_ORIGIN_Y,
-        resolution_factor=_RESOLUTION_FACTOR,
-        dz=_PAD_PARAMS["dz"],
-        dz_low=_PAD_PARAMS["dz_low"],
-        srid=_SRID,
-        output_dir=tmp_path,
-        tile_stem="test_tile",
-    )
+def test_export_raster_band_descriptions_match_column_names(exported_single_pixel):
+    written, _ = exported_single_pixel
 
     with rasterio.open(written["pad_profile_1m"]) as src:
         assert src.descriptions == ("PAD_1_0", "PAD_1_1")

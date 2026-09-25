@@ -61,8 +61,7 @@ def _band_array(values: pd.Series, origin_pixel: tuple, nb_pixels: float, clip: 
     MultiIndex in CosiaFrance grid coordinates. Cells with no data stay `NaN`.
 
     Args:
-        values (pd.Series): One column of `aggregated` (or a derived series, e.g.
-            `pl_factor`), indexed by (pixel_y, pixel_x).
+        values (pd.Series): One column of `aggregated`, indexed by (pixel_y, pixel_x).
         origin_pixel (tuple): CosiaFrance grid corner (ix, iy) the tile's window is anchored on.
         nb_pixels (float): Tile side length in pixels.
         clip (tuple | None): Optional (min, max) bounds the values are clipped to
@@ -167,41 +166,34 @@ def export_raster(
     dz_str = _format_num(dz)
     dz_low_str = _format_num(dz_low)
 
-    class_columns = _select_stratum_columns(aggregated, "Class_") + ["Total"]
-
-    pl_factor = 1.0 / aggregated["cos_theta"]
-    pl_factor.name = "pl_factor"
-
-    raster_columns = {
-        "pad_sb_0.5m": [ <la liste des noms de colonnes correspondant>]
-        },
-        "pad_profile_1m": [ <la liste des noms de colonnes correspondant>],
-        "class_count":[ <la liste des noms de colonnes correspondant>],
-        "entering_rays": [ <la liste des noms de colonnes correspondant>],
-        "intercept_ray":[ <la liste des noms de colonnes correspondant>],
-        "pl_factor":[ <la liste des noms de colonnes correspondant>],
-        "cover": [ <la liste des noms de colonnes correspondant>],
-        "dates_pad": [ <la liste des noms de colonnes correspondant>],
+    # Which existing `aggregated` columns go into each raster, in band order.
+    # No column is computed here: every value (including `pl_factor`) is already
+    # produced upstream by `pad_metrics_core` -- this only reorganizes and exports.
+    raster_columns: dict[str, list[str]] = {
+        "pad_sb_0.5m": _select_stratum_columns(aggregated, f"PAD_{dz_low_str}_"),
+        "pad_profile_1m": _select_stratum_columns(aggregated, f"PAD_{dz_str}_"),
+        "class_count": _select_stratum_columns(aggregated, "Class_") + ["Total"],
+        "entering_rays": _select_stratum_columns(aggregated, f"N_{dz_str}_"),
+        "intercept_ray": _select_stratum_columns(aggregated, f"Ni_{dz_str}_"),
+        "pl_factor": ["pl_factor"],
+        "cover": ["Cover_2", "Cover_4", "Cover_6"],
+        "dates_pad": ["Date_maj", "Date_min", "Date_max"],
     }
-    raster_clip = {
-        "pad_sb_0.5m":(0.0, 5.0)
-        },
-        "pad_profile_1m":(0.0, 5.0),
-        "class_count":None,
+    raster_clip: dict[str, tuple | None] = {
+        "pad_sb_0.5m": (0.0, 5.0),
+        "pad_profile_1m": (0.0, 5.0),
+        "class_count": None,
         "entering_rays": None,
-        "intercept_ray":None,
-        "pl_factor":None,
+        "intercept_ray": None,
+        "pl_factor": None,
         "cover": (0.0, 1.0),
         "dates_pad": None,
     }
 
     written: dict[str, Path] = {}
-    for raster_name in raster_columns.keys():
-        columns = raster_columns[raster_name]
+    for raster_name, columns in raster_columns.items():
         clip = raster_clip[raster_name]
-        bands = {
-            name: _band_array(aggregated[c], origin_pixel, nb_pixels, clip=clip) for col_name in columns)
-        }
+        bands = {name: _band_array(aggregated[name], origin_pixel, nb_pixels, clip=clip) for name in columns}
         path = output_dir / f"{tile_stem}_{raster_name}.tif"
         _write_geotiff(path, bands, transform, srid)
         written[raster_name] = path
