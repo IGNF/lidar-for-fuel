@@ -1,3 +1,8 @@
+"""
+Assemble `compute_pixel_aggregates`'s per-pixel PAD metrics into 8 georeferenced,
+multi-band GeoTIFFs aligned on the CosiaFrance grid.
+
+"""
 import logging
 from pathlib import Path
 
