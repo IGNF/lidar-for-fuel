@@ -108,6 +108,7 @@ def test_pad_metrics_core_output_format():
         "Cover_4",
         "Cover_6",
         "cos_theta",
+        "pl_factor",
         *_CLASS_KEYS,
         *_MAIN_PAD_KEYS,
         *_MAIN_NI_KEYS,
@@ -138,8 +139,8 @@ def test_pad_metrics_core_output_format():
 def test_pad_metrics_core_output_key_order_matches_channel_spec():
     """Locks in the exact output-list channel order from the PAD output spec:
     PAD (low-strata band, then main profile), Class_*/Total, N_*, Ni_*, Cover_*,
-    cos_theta, Date_*. Downstream raster-band assembly relies on this order, so
-    it's a contract, not an implementation detail."""
+    cos_theta, pl_factor, Date_*. Downstream raster-band assembly relies on this
+    order, so it's a contract, not an implementation detail."""
     n = 5
     gpstime = np.zeros(n, dtype=np.float64)
     points = _points(n, gpstime)
@@ -163,6 +164,7 @@ def test_pad_metrics_core_output_key_order_matches_channel_spec():
         "Cover_4",
         "Cover_6",
         "cos_theta",
+        "pl_factor",
         "Date_maj",
         "Date_min",
         "Date_max",
@@ -284,9 +286,9 @@ def test_pad_metrics_core_scanning_angle_false_returns_one():
 
 def test_pad_metrics_core_scanning_angle_does_not_affect_other_outputs():
     """`scanning_angle` only feeds `cos_theta` (and, transitively through it, every
-    `PAD_*` key, which is cos_theta-scaled by construction); it must have zero effect
-    on any other key (Date_*/Cover_*/Class_*), since none of the helpers feeding them
-    take cos_theta as input."""
+    `PAD_*` key and `pl_factor`, both cos_theta-derived by construction); it must
+    have zero effect on any other key (Date_*/Cover_*/Class_*), since none of the
+    helpers feeding them take cos_theta as input."""
     n = 5
     gpstime = np.zeros(n, dtype=np.float64)
     points = _points(n, gpstime)
@@ -308,10 +310,11 @@ def test_pad_metrics_core_scanning_angle_does_not_affect_other_outputs():
 
     assert result_true is not None and result_false is not None
     assert set(result_true) == set(result_false)
-    # cos_theta and every PAD_* key are expected to differ (PAD is cos_theta-scaled
-    # by construction) -- everything else must be identical regardless of scanning_angle.
+    # cos_theta, pl_factor, and every PAD_* key are expected to differ (all derived
+    # from cos_theta by construction) -- everything else must be identical
+    # regardless of scanning_angle.
     for key in result_true:
-        if key == "cos_theta" or key.startswith("PAD_"):
+        if key in ("cos_theta", "pl_factor") or key.startswith("PAD_"):
             continue
         np.testing.assert_array_equal(result_true[key], result_false[key])
 
@@ -363,6 +366,7 @@ def test_pad_metrics_core_real_las_returns_coherent_output_values():
 
     assert isinstance(result, dict)
     assert 0.0 <= result["cos_theta"] <= 1.0
+    assert result["pl_factor"] == pytest.approx(1.0 / result["cos_theta"])
     pad_keys = [key for key in result if key.startswith("PAD_")]
     assert len(pad_keys) == 60 + 4
     for cover_key in ("Cover_2", "Cover_4", "Cover_6"):

@@ -1,8 +1,9 @@
 import shutil
 from pathlib import Path
 
-import pandas as pd
+import numpy as np
 import pytest
+import rasterio
 
 from lidar_for_fuel.main_pad_profile import pad_profile_one_tile
 
@@ -20,6 +21,18 @@ PREPROCESSED_LAS = Path("data/pointcloud/test_semis_2024_0751_6690_LA93_IGN69_fi
 # a single isolated tile copied into an empty directory, which has no neighbors to merge in).
 BUFFER_DIR = Path("data/buffer")
 CENTRAL_TILE = BUFFER_DIR / "Semis_2022_0691_6484_LA93_IGN69_preprocessed.laz"
+
+# The 8 rasters `export_raster` writes, one GeoTIFF each (see export_raster.raster_columns).
+_RASTER_NAMES = (
+    "pad_sb_0.5m",
+    "pad_profile_1m",
+    "class_count",
+    "entering_rays",
+    "intercept_ray",
+    "pl_factor",
+    "cover",
+    "dates_pad",
+)
 
 _PAD_PARAMS = dict(
     keep_classes=[1, 2, 3, 4, 5, 6, 9, 17, 18, 64, 66, 67],
@@ -42,8 +55,31 @@ _PAD_PARAMS = dict(
 )
 
 
-def test_pad_profile_one_tile_real_las_returns_coherent_output_values():
-    """Run pad_profile_one_tile on the real pre-treated LAS and assert cos_theta is in [0,1].
+def _populated_cells(raster_path: Path, band: int = 1) -> set[tuple[int, int]]:
+    """(row, col) of every cell of `band` that carries a value (i.e. is not NoData).
+
+    Args:
+        raster_path (Path): GeoTIFF written by `export_raster`.
+        band (int): 1-indexed band to read. Default 1.
+
+    Returns:
+        set[tuple[int, int]]: Grid positions holding a non-NaN value.
+    """
+    with rasterio.open(raster_path) as src:
+        array = src.read(band)
+
+    rows, cols = np.nonzero(~np.isnan(array))
+
+    return set(zip(rows.tolist(), cols.tolist()))
+
+
+def test_pad_profile_one_tile_real_las_writes_coherent_rasters(tmp_path):
+    """Run pad_profile_one_tile on the real pre-treated LAS and assert the 8 GeoTIFFs are
+    written, sized on the tile's CosiaFrance window, with coherent values.
+
+    `pad_profile_one_tile` returns nothing: the rasters on disk are its whole output, so
+    every assertion reads them back. Band layout and grid alignment are covered per-raster
+    in test_export_raster.py -- here only the end-to-end wiring is checked.
 
     The test is skipped if the LAS file is not present in the workspace.
     """
@@ -59,8 +95,8 @@ def test_pad_profile_one_tile_real_las_returns_coherent_output_values():
     tile = TMP_PATH / real_las.name.removeprefix("test_")
     shutil.copy(real_las, tile)
 
-    # Lower quality guards so the function returns a numeric value for testing.
-    aggregated, origin_pixel, nb_pixels = pad_profile_one_tile(
+    # Lower quality guards so the pixels pass pad_metrics_core and reach the rasters.
+    pad_profile_one_tile(
         input_filename=str(tile),
         input_dir=str(tile.parent),
         buffer_width=100,
@@ -70,55 +106,55 @@ def test_pad_profile_one_tile_real_las_returns_coherent_output_values():
         global_origin_x=_GLOBAL_ORIGIN_X,
         global_origin_y=_GLOBAL_ORIGIN_Y,
         resolution_factor=_RESOLUTION_FACTOR,
-        keep_classes=[1, 2, 3, 4, 5, 6, 9, 17, 18, 64, 66, 67],
-        limit_N_points=1,
-        limit_flight_agl=0.0,
-        deviation_days=36_500,  # ~100 years: wide enough to keep every point in the file
-        scanning_angle=True,
-        z0=0.0,
-        dz=1.0,
-        nlayers=60,
-        dz_low=0.5,
-        nlayers_low=4,
-        ground_margin=0.1,
-        cover_type="all",
-        height_cover=2.0,
-        use_cover=True,
-        G=0.5,
-        omega=0.77,
-        keep_values=[2, 3, 4, 5, 9],
+        output_dir=str(tmp_path),
+        **_PAD_PARAMS,
     )
 
-    assert isinstance(aggregated, pd.DataFrame)
-    assert not aggregated.empty
-    assert nb_pixels == 100.0  # 1000m tile / 10m pixels
-    assert isinstance(origin_pixel, tuple) and len(origin_pixel) == 2
+    written = {name: tmp_path / f"{tile.stem}_{name}.tif" for name in _RASTER_NAMES}
+    for name, path in written.items():
+        assert path.is_file(), f"missing raster {name}"
 
-    # cos_theta can be NaN for a pixel with no vegetation/ground point at all (too few
-    # points per 10m pixel to guarantee one) -- that's an expected per-pixel data-quality
-    # case, not a wiring bug, so only the non-NaN pixels are checked for range.
-    cos_theta = aggregated["cos_theta"].dropna()
-    assert not cos_theta.empty
-    assert cos_theta.between(0.0, 1.0).all()
-    pad_columns = [c for c in aggregated.columns if c.startswith("PAD_")]
-    assert len(pad_columns) == 60 + 4
-    for cover_column in ("Cover_2", "Cover_4", "Cover_6"):
-        assert aggregated[cover_column].between(0.0, 1.0).all()
+    with rasterio.open(written["pad_profile_1m"]) as src:
+        # nb_pixels = 1000 m tile / 10 m pixels
+        assert src.width == 100 and src.height == 100
+        assert src.crs.to_string() == "EPSG:2154"
+        assert src.count == _PAD_PARAMS["nlayers"]
+        pad_profile = src.read()
+
+    with rasterio.open(written["pad_sb_0.5m"]) as src:
+        assert src.count == _PAD_PARAMS["nlayers_low"]
+
+    # At least one pixel passed the quality guards, otherwise the run wrote 8 empty grids
+    # and every assertion below would hold vacuously.
+    assert not np.isnan(pad_profile).all()
+    # export_raster clips PAD to [0, 5]; NaN cells are pixels that produced no value.
+    assert np.nanmin(pad_profile) >= 0.0
+    assert np.nanmax(pad_profile) <= 5.0
+
+    with rasterio.open(written["cover"]) as src:
+        assert src.count == 3  # Cover_2, Cover_4, Cover_6
+        cover = src.read()
+
+    assert np.nanmin(cover) >= 0.0
+    assert np.nanmax(cover) <= 1.0
 
 
-def test_pad_profile_one_tile_buffered_output_covers_more_pixels_than_unbuffered():
+def test_pad_profile_one_tile_buffered_rasters_cover_more_pixels_than_unbuffered(tmp_path):
     """`compute_pixel_aggregates` windows its output back down to the tile's own
     CosiaFrance footprint, so the buffer no longer inflates the overall point count the
     way the old whole-tile call did (see git history) -- it only fills in the pixels
     that straddle the tile's own boundary (the misalignment between the LiDAR HD tiling
     and the CosiaFrance grid, see test_create_raster.py). Compare buffered vs unbuffered
-    (buffer_width=0) runs of the same tile: the buffer must strictly add populated pixels,
-    all of them among the pixels the unbuffered run couldn't fill.
+    (buffer_width=0) runs of the same tile: the buffer must strictly add populated cells
+    to the output raster, all of them among the cells the unbuffered run left NoData.
 
     Skipped if the buffer tile set is not present in the workspace.
     """
     if not CENTRAL_TILE.exists():
         pytest.skip(f"Buffer tile set not found in workspace: {CENTRAL_TILE}")
+
+    unbuffered_dir = tmp_path / "unbuffered"
+    buffered_dir = tmp_path / "buffered"
 
     common_kwargs = dict(
         input_filename=str(CENTRAL_TILE),
@@ -132,10 +168,22 @@ def test_pad_profile_one_tile_buffered_output_covers_more_pixels_than_unbuffered
         **_PAD_PARAMS,
     )
 
-    aggregated_unbuffered, _, _ = pad_profile_one_tile(buffer_width=0, **common_kwargs)
-    aggregated_buffered, _, _ = pad_profile_one_tile(buffer_width=50, **common_kwargs)
+    pad_profile_one_tile(buffer_width=0, output_dir=str(unbuffered_dir), **common_kwargs)
+    pad_profile_one_tile(buffer_width=50, output_dir=str(buffered_dir), **common_kwargs)
 
-    assert isinstance(aggregated_buffered, pd.DataFrame)
-    assert not aggregated_buffered.empty
-    assert len(aggregated_buffered) > len(aggregated_unbuffered)
-    assert set(aggregated_unbuffered.index) <= set(aggregated_buffered.index)
+    raster_name = f"{CENTRAL_TILE.stem}_pad_profile_1m.tif"
+    unbuffered_raster = unbuffered_dir / raster_name
+    buffered_raster = buffered_dir / raster_name
+
+    # Both runs window on the tile's own footprint, so the two grids must be superposable
+    # -- otherwise comparing (row, col) sets below would be meaningless.
+    with rasterio.open(unbuffered_raster) as unbuffered_src, rasterio.open(buffered_raster) as buffered_src:
+        assert unbuffered_src.transform == buffered_src.transform
+        assert (unbuffered_src.width, unbuffered_src.height) == (buffered_src.width, buffered_src.height)
+
+    unbuffered_cells = _populated_cells(unbuffered_raster)
+    buffered_cells = _populated_cells(buffered_raster)
+
+    assert buffered_cells
+    assert len(buffered_cells) > len(unbuffered_cells)
+    assert unbuffered_cells <= buffered_cells

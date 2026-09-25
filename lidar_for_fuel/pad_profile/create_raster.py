@@ -1,3 +1,7 @@
+"""
+Bind PAD parameters once into an `aggregation` callable for `compute_pixel_aggregates`
+
+"""
 import logging
 from typing import Callable
 
