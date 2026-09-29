@@ -60,8 +60,8 @@ pad_profile:
     omega: 0.87
     keep_values: [2, 3, 4, 5, 9]
   create_raster:
-    origin_x: 98029.75
-    origin_y: 6045536.75
+    origin_x: 98039.75
+    origin_y: 7111486.75
     resolution_factor: 10.0
 
 dtm:
