@@ -59,7 +59,7 @@ def _select_stratum_columns(aggregated: pd.DataFrame, prefix: str) -> list[str]:
     return sorted(columns, key=lambda c: float(c[len(prefix) :]))
 
 
-def _band_array(values: pd.Series, origin_pixel: tuple, nb_pixels: float, clip: tuple | None = None) -> np.ndarray:
+def _band_array(values: pd.Series, origin_pixel: tuple, nb_pixels: int, clip: tuple | None = None) -> np.ndarray:
     """Rasterize one pixel-indexed series into a (nb_pixels, nb_pixels) float32 grid.
 
     `values` is indexed like `compute_pixel_aggregates`'s output: a (pixel_y, pixel_x)
@@ -68,15 +68,14 @@ def _band_array(values: pd.Series, origin_pixel: tuple, nb_pixels: float, clip: 
     Args:
         values (pd.Series): One column of `aggregated`, indexed by (pixel_y, pixel_x).
         origin_pixel (tuple): CosiaFrance grid corner (ix, iy) the tile's window is anchored on.
-        nb_pixels (float): Tile side length in pixels.
+        nb_pixels (int): Tile side length in pixels.
         clip (tuple | None): Optional (min, max) bounds the values are clipped to
             before being written (e.g. (0.0, 5.0) to cap PAD). Default None.
 
     Returns:
         np.ndarray: (nb_pixels, nb_pixels) float32 grid, `NaN` where no pixel matched.
     """
-    size = int(nb_pixels)
-    array = np.full((size, size), np.nan, dtype=np.float32)
+    array = np.full((nb_pixels, nb_pixels), np.nan, dtype=np.float32)
 
     data = values.to_numpy(dtype=np.float64)
 
@@ -132,7 +131,7 @@ def _write_geotiff(path: Path, bands: dict[str, np.ndarray], transform: Affine, 
 def export_raster(
     aggregated: pd.DataFrame,
     origin_pixel: tuple,
-    nb_pixels: float,
+    nb_pixels: int,
     global_origin_x: float,
     global_origin_y: float,
     resolution_factor: float,
@@ -151,7 +150,7 @@ def export_raster(
             Indexed by (pixel_y, pixel_x) in CosiaFrance grid coordinates.
         origin_pixel (tuple): CosiaFrance grid corner (ix, iy) the tile's window is
             anchored on, as returned by `compute_pixel_aggregates`.
-        nb_pixels (float): Tile side length in pixels, as returned by `compute_pixel_aggregates`.
+        nb_pixels (int): Tile side length in pixels, as returned by `compute_pixel_aggregates`.
         global_origin_x (float): X of the CosiaFrance grid anchor.
         global_origin_y (float): Y of the CosiaFrance grid anchor (north edge).
         resolution_factor (float): Pixel size (m) of the CosiaFrance grid.
@@ -172,6 +171,8 @@ def export_raster(
     dz_low_str = _format_num(dz_low)
 
     # Which existing `aggregated` columns go into each raster, in band order.
+    # Numeric suffix sorting and explicit lists define that order independently
+    # of the input DataFrame's column order or `pad_metrics_core`'s key order.
     # No column is computed here: every value (including `pl_factor`) is already
     # produced upstream by `pad_metrics_core` -- this only reorganizes and exports.
     raster_columns: dict[str, list[str]] = {
@@ -180,6 +181,7 @@ def export_raster(
         "class_count": _select_stratum_columns(aggregated, "Class_") + ["Total"],
         "entering_rays": _select_stratum_columns(aggregated, f"N_{dz_str}_"),
         "intercept_ray": _select_stratum_columns(aggregated, f"Ni_{dz_str}_"),
+        "cos_theta": ["cos_theta"],
         "pl_factor": ["pl_factor"],
         "cover": ["Cover_2", "Cover_4", "Cover_6"],
         "dates_pad": ["Date_maj", "Date_min", "Date_max"],
@@ -190,6 +192,7 @@ def export_raster(
         "class_count": None,
         "entering_rays": None,
         "intercept_ray": None,
+        "cos_theta": None,
         "pl_factor": None,
         "cover": (0.0, 1.0),
         "dates_pad": None,

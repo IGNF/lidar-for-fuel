@@ -150,9 +150,6 @@ def test_pad_profile_one_tile_buffered_rasters_cover_more_pixels_than_unbuffered
 
     Skipped if the buffer tile set is not present in the workspace.
     """
-    if not CENTRAL_TILE.exists():
-        pytest.skip(f"Buffer tile set not found in workspace: {CENTRAL_TILE}")
-
     unbuffered_dir = tmp_path / "unbuffered"
     buffered_dir = tmp_path / "buffered"
 

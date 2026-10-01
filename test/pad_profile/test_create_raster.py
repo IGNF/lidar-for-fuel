@@ -97,7 +97,7 @@ def test_compute_pixel_aggregates_with_pad_aggregation_produces_pad_columns():
     tile_origin_y = _GLOBAL_ORIGIN_Y
     points_df = _pixel_points_df(5)
 
-    aggregated, _, _ = compute_pixel_aggregates(
+    aggregated, _, nb_pixels = compute_pixel_aggregates(
         points_df,
         global_origin_x=_GLOBAL_ORIGIN_X,
         global_origin_y=_GLOBAL_ORIGIN_Y,
@@ -108,6 +108,8 @@ def test_compute_pixel_aggregates_with_pad_aggregation_produces_pad_columns():
         aggregation=build_pad_aggregation(**_PAD_PARAMS),
     )
 
+    assert isinstance(nb_pixels, int)
+    assert nb_pixels == 2
     assert (0, 0) in aggregated.index
     pad_columns = [c for c in aggregated.columns if c.startswith("PAD_")]
     assert len(pad_columns) == _PAD_PARAMS["nlayers"] + _PAD_PARAMS["nlayers_low"]

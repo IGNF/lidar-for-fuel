@@ -136,42 +136,6 @@ def test_pad_metrics_core_output_format():
     assert all(result[key] == n for key in _MAIN_N_KEYS)
 
 
-def test_pad_metrics_core_output_key_order_matches_channel_spec():
-    """Locks in the exact output-list channel order from the PAD output spec:
-    PAD (low-strata band, then main profile), Class_*/Total, N_*, Ni_*, Cover_*,
-    cos_theta, pl_factor, Date_*. Downstream raster-band assembly relies on this
-    order, so it's a contract, not an implementation detail."""
-    n = 5
-    gpstime = np.zeros(n, dtype=np.float64)
-    points = _points(n, gpstime)
-
-    result = pad_metrics_core(
-        **points,
-        **_DEFAULT_PARAMS,
-        scanning_angle=False,
-        limit_N_points=1,
-        deviation_days=0,
-    )
-
-    expected_order = [
-        *_LOW_PAD_KEYS,
-        *_MAIN_PAD_KEYS,
-        *_CLASS_KEYS,
-        *_MAIN_N_KEYS,
-        *_MAIN_NI_KEYS,
-        "Cover_h_pad",
-        "Cover_2",
-        "Cover_4",
-        "Cover_6",
-        "cos_theta",
-        "pl_factor",
-        "Date_maj",
-        "Date_min",
-        "Date_max",
-    ]
-    assert list(result) == expected_order
-
-
 def test_pad_metrics_core_class_counts_include_non_veg_ground_classes():
     """`Class_*`/`Total` are computed on all points after the temporal filter,
     before the vegetation/ground (`keep_values`) subsetting -- so a class like 1,

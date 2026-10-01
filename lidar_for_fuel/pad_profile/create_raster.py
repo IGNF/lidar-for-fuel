@@ -22,7 +22,7 @@ def compute_pixel_aggregates(
     tile_size: float,
     resolution_factor: float,
     aggregation: Callable,
-) -> tuple[pd.DataFrame, tuple, float]:
+) -> tuple[pd.DataFrame, tuple, int]:
     """Assign a point cloud to the CosiaFrance pixel grid and run an aggregation per pixel.
 
     Args:
@@ -41,7 +41,7 @@ def compute_pixel_aggregates(
             (pixel_y, pixel_x), one column per output band, holding only the pixels where
             `aggregation` returned a result (pixels where it returned None are dropped ->
             NoData once rasterized). `origin_pixel` is the CosiaFrance grid corner (ix, iy)
-            this window is anchored on and `nb_pixels` is the tile's side length in pixels;
+            this window is anchored on and `nb_pixels` is the tile's integer side length in pixels;
             together with `global_origin_x`/`global_origin_y` and `resolution_factor`, they
             hold everything needed to build the output raster's affine transform.
     """
@@ -59,7 +59,7 @@ def compute_pixel_aggregates(
     origin_pixel = get_pixel_index(tile_origin_x, tile_origin_y, global_origin_x, global_origin_y)
 
     # / ! \ nb_pixels is computed from tile_size alone (never from the buffer)
-    nb_pixels = tile_size // resolution_factor
+    nb_pixels = int(tile_size // resolution_factor)
 
     # --- Step 2: assign each point of the cloud to a pixel (ix, iy) --------------------
     # / ! \ Indices are computed relative to the grid's global origin, not the tile's own origin

@@ -10,7 +10,7 @@ from lidar_for_fuel.pad_profile.create_raster import (
     build_pad_aggregation,
     compute_pixel_aggregates,
 )
-from lidar_for_fuel.pad_profile.export_raster import export_raster
+from lidar_for_fuel.pad_profile.export_raster import _select_stratum_columns, export_raster
 
 _GLOBAL_ORIGIN_X = 98029.75
 _GLOBAL_ORIGIN_Y = 6045536.75
@@ -82,7 +82,7 @@ def aggregated_single_pixel():
 
 @pytest.fixture(scope="module")
 def exported_single_pixel(tmp_path_factory, aggregated_single_pixel):
-    """The 8 GeoTIFFs `aggregated_single_pixel` exports to, written once for the module.
+    """The 9 GeoTIFFs `aggregated_single_pixel` exports to, written once for the module.
 
     Every test below that inspects the *unmodified* export reads these same files, so the
     call is hoisted here rather than repeated per test (the parametrized band-count test
@@ -123,6 +123,7 @@ def test_export_raster_writes_eight_georeferenced_geotiffs(exported_single_pixel
         "class_count",
         "entering_rays",
         "intercept_ray",
+        "cos_theta",
         "pl_factor",
         "cover",
         "dates_pad",
@@ -151,6 +152,7 @@ def test_export_raster_writes_eight_georeferenced_geotiffs(exported_single_pixel
         ("class_count", 6),  # 5 keep_classes + Total
         ("entering_rays", 2),
         ("intercept_ray", 2),
+        ("cos_theta", 1),
         ("pl_factor", 1),
         ("cover", 3),
         ("dates_pad", 3),
@@ -240,6 +242,43 @@ def test_export_raster_band_descriptions_match_column_names(exported_single_pixe
         assert src.descriptions == ("Date_maj", "Date_min", "Date_max")
 
 
+@pytest.mark.parametrize("prefix", ["PAD_0.5_", "PAD_1_", "N_1_", "Ni_1_", "Class_"])
+def test_select_stratum_columns_sorts_suffixes_numerically(prefix):
+    aggregated = pd.DataFrame(columns=[f"{prefix}{suffix}" for suffix in (10, 2, 0.5, 0)] + ["Total"])
+
+    assert _select_stratum_columns(aggregated, prefix) == [f"{prefix}{suffix}" for suffix in (0, 0.5, 2, 10)]
+
+
+def test_export_raster_ignores_input_column_order(tmp_path, aggregated_single_pixel, exported_single_pixel):
+    """Shuffled metric columns must preserve band descriptions, values and georeferencing."""
+    aggregated, origin_pixel, nb_pixels = aggregated_single_pixel
+    reference, _ = exported_single_pixel
+    shuffled = aggregated.sample(frac=1, axis=1, random_state=42)
+    assert list(shuffled.columns) != list(aggregated.columns)
+
+    written = export_raster(
+        shuffled,
+        origin_pixel=origin_pixel,
+        nb_pixels=nb_pixels,
+        global_origin_x=_GLOBAL_ORIGIN_X,
+        global_origin_y=_GLOBAL_ORIGIN_Y,
+        resolution_factor=_RESOLUTION_FACTOR,
+        dz=_PAD_PARAMS["dz"],
+        dz_low=_PAD_PARAMS["dz_low"],
+        srid=_SRID,
+        output_dir=tmp_path,
+        tile_stem="shuffled_tile",
+    )
+
+    assert set(written) == set(reference)
+    for name, path in written.items():
+        with rasterio.open(path) as actual, rasterio.open(reference[name]) as expected:
+            assert actual.descriptions == expected.descriptions
+            assert actual.transform == expected.transform
+            assert actual.crs == expected.crs
+            np.testing.assert_array_equal(actual.read(), expected.read())
+
+
 def test_export_raster_real_las_tile_writes_inspectable_geotiffs():
     """Run the full PAD pipeline + export_raster on the real 0691/6484 tile.
 
@@ -324,6 +363,7 @@ def test_export_raster_real_las_tile_writes_inspectable_geotiffs():
         "class_count",
         "entering_rays",
         "intercept_ray",
+        "cos_theta",
         "pl_factor",
         "cover",
         "dates_pad",
