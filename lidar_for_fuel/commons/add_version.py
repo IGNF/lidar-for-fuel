@@ -9,13 +9,20 @@ tile, describing how the tile was acquired and classified (mission code, sensor,
 dates, classification process, reference systems, download URLs).
 
 The extent is read directly from the LAS/LAZ headers, so no assumption is made on filenames.
+
+``add_version`` runs this on a whole chantier: extent of the LAS/LAZ directory, metadata of
+the overlapping tiles, lidar_for_fuel version, then a GeoPackage export.
 """
 import json
 import logging
 from pathlib import Path
 
+import geopandas as gpd
 import laspy
 import requests
+from shapely.geometry import box
+
+from lidar_for_fuel._version import __version__
 
 logger = logging.getLogger(__name__)
 
@@ -212,3 +219,98 @@ def get_mtd_from_stream(
         len(features),
     )
     return metadata
+
+
+def add_version_to_mtd(metadata: list[dict]) -> list[dict]:
+    """Add the lidar_for_fuel version to the metadata of each tile.
+
+    Args:
+        metadata (list[dict]): One dictionary per LiDAR HD tile, as returned by
+            ``get_mtd_from_stream``.
+
+    Returns:
+        list[dict]: The same list, each tile dictionary now carrying
+            ``lidar_for_fuel_version``.
+    """
+    for tile in metadata:
+        tile["lidar_for_fuel_version"] = __version__
+    return metadata
+
+
+def _attribute_value(value):
+    """Turn a metadata value into a scalar a GeoPackage attribute column can store.
+
+    Lists, tuples and dictionaries (for instance the sensor list) are serialized
+    as JSON strings. Scalars are left unchanged.
+
+    Args:
+        value: Metadata value.
+
+    Returns:
+        A scalar suitable for a GeoPackage attribute, or a JSON string.
+    """
+    if isinstance(value, (list, tuple, dict)):
+        return json.dumps(value, ensure_ascii=False)
+    return value
+
+
+def export_mtd(metadata: list[dict], output_path: Path, epsg: int = 2154) -> None:
+    """Export the LiDAR HD tile metadata to a GeoPackage.
+
+    Each tile is written as one feature in the ``metadata`` layer. The geometry
+    is the rectangle of ``tile_extent``; the other entries become attributes.
+
+    Args:
+        metadata (list[dict]): One dictionary per LiDAR HD tile, as returned by
+            ``get_mtd_from_stream`` (optionally enriched by ``add_version_to_mtd``).
+        output_path (Path): Path of the GeoPackage file to write. Parent
+            directories are created when missing. An existing file is replaced.
+        epsg (int): EPSG code of the tile extents. Default: 2154 (Lambert 93).
+
+    Raises:
+        ValueError: If a tile dictionary has no ``tile_extent``.
+    """
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    geometries = []
+    records = []
+    for tile in metadata:
+        try:
+            minx, maxx, miny, maxy = tile["tile_extent"]
+        except KeyError as error:
+            raise ValueError("Each metadata dictionary must contain a 'tile_extent'") from error
+        geometries.append(box(minx, miny, maxx, maxy))
+        records.append({key: _attribute_value(value) for key, value in tile.items() if key != "tile_extent"})
+
+    geodataframe = gpd.GeoDataFrame(records, geometry=geometries, crs=f"EPSG:{epsg}")
+    if output_path.exists():
+        output_path.unlink()
+    geodataframe.to_file(output_path, driver="GPKG", layer="metadata")
+
+
+def add_version(las_dir: Path, output_path: Path, epsg: int = 2154) -> None:
+    """Export the LiDAR HD metadata of every tile of a chantier, tagged with the package version.
+
+    The extent enclosing the LAS/LAZ files is read from their headers, the metadata of the
+    overlapping LiDAR HD tiles are fetched from the WFS service, each tile is tagged with
+    the lidar_for_fuel version, and the result is written to a GeoPackage.
+
+    Args:
+        las_dir (Path): Directory containing the LiDAR tiles (``.las`` or ``.laz``).
+        output_path (Path): Path of the GeoPackage file to write. Parent directories are
+            created when missing. An existing file is replaced.
+        epsg (int): EPSG code of the tiles and of the written geometries.
+            Default: 2154 (Lambert 93).
+
+    Raises:
+        FileNotFoundError: If the directory contains no LAS/LAZ file.
+        requests.HTTPError: If a WFS request fails.
+        ValueError: If the extent is empty, or if a tile dictionary has no ``tile_extent``.
+    """
+    logger.info("Adding the lidar_for_fuel version to the metadata of %s", las_dir)
+    extent = compute_extent(las_dir)
+    metadata = get_mtd_from_stream(extent, epsg=epsg)
+    export_mtd(add_version_to_mtd(metadata), output_path, epsg=epsg)
+
+
