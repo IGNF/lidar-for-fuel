@@ -230,10 +230,10 @@ def add_version_to_mtd(metadata: list[dict]) -> list[dict]:
 
     Returns:
         list[dict]: The same list, each tile dictionary now carrying
-            ``lidar_for_fuel_version``.
+            ``version_lidarforfuel``.
     """
     for tile in metadata:
-        tile["lidar_for_fuel_version"] = __version__
+        tile["version_lidarforfuel"] = __version__
     return metadata
 
 
