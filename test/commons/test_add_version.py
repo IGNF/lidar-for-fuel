@@ -9,13 +9,18 @@ import json
 import shutil
 from pathlib import Path
 
+import geopandas as gpd
 import pytest
 
+from lidar_for_fuel._version import __version__
 from lidar_for_fuel.commons.add_version import (
     _geometry_bounds,
     _overlaps,
     _parse_feature,
+    add_version,
+    add_version_to_mtd,
     compute_extent,
+    export_mtd,
     get_mtd_from_stream,
 )
 
@@ -192,6 +197,82 @@ def test_get_mtd_from_stream_paginates(monkeypatch):
 def test_get_mtd_from_stream_with_an_invalid_extent():
     with pytest.raises(ValueError, match="Invalid extent"):
         get_mtd_from_stream((752000.0, 751000.0, 6689000.0, 6690000.0))
+
+
+def test_add_version_to_mtd_adds_the_package_version_to_each_tile():
+    metadata = [
+        _parse_feature(_tile_feature(751000.0, 6690000.0)),
+        _parse_feature(_tile_feature(751000.0, 6689000.0)),
+    ]
+
+    result = add_version_to_mtd(metadata)
+
+    assert result is metadata
+    assert [tile["lidar_for_fuel_version"] for tile in metadata] == [__version__, __version__]
+    assert metadata[0]["coordonnees_nw"] == "0751-6690"
+    assert metadata[1]["coordonnees_nw"] == "0751-6689"
+
+
+def test_export_mtd_writes_one_feature_per_tile(tmp_path):
+    metadata = add_version_to_mtd(
+        [
+            _parse_feature(_tile_feature(751000.0, 6690000.0)),
+            _parse_feature(_tile_feature(751000.0, 6689000.0, code_mission="23LHDMH")),
+        ]
+    )
+    output_path = tmp_path / "out" / "metadata.gpkg"
+
+    export_mtd(metadata, output_path)
+
+    geodataframe = gpd.read_file(output_path, layer="metadata")
+    assert geodataframe.crs.to_epsg() == 2154
+    assert list(geodataframe["coordonnees_nw"]) == ["0751-6690", "0751-6689"]
+    assert list(geodataframe["code_mission"]) == ["22LHDMH", "23LHDMH"]
+    assert list(geodataframe["lidar_for_fuel_version"]) == [__version__, __version__]
+    # Lists cannot be stored as GeoPackage attributes, so they are JSON strings.
+    assert json.loads(geodataframe.iloc[0]["capteur"]) == ["Optech ALTM Galaxy T2000:5060485"]
+    assert "tile_extent" not in geodataframe.columns
+    minx, maxx, miny, maxy = TEST_TILE_EXTENT
+    assert geodataframe.geometry.iloc[0].bounds == pytest.approx((minx, miny, maxx, maxy))
+    # The input dictionaries are left unchanged.
+    assert metadata[0]["capteur"] == ["Optech ALTM Galaxy T2000:5060485"]
+    assert metadata[0]["tile_extent"] == TEST_TILE_EXTENT
+
+
+def test_export_mtd_replaces_an_existing_file(tmp_path):
+    output_path = tmp_path / "metadata.gpkg"
+    export_mtd([_parse_feature(_tile_feature(751000.0, 6690000.0))], output_path)
+    export_mtd([_parse_feature(_tile_feature(751000.0, 6689000.0))], output_path)
+
+    geodataframe = gpd.read_file(output_path)
+    assert list(geodataframe["coordonnees_nw"]) == ["0751-6689"]
+
+
+def test_export_mtd_without_a_tile_extent():
+    with pytest.raises(ValueError, match="tile_extent"):
+        export_mtd([{"code_mission": "22LHDMH"}], Path("unused.gpkg"))
+
+
+def test_add_version_exports_the_metadata_of_the_chantier(tmp_path, monkeypatch):
+    shutil.copy(DATA_DIR / TEST_TILE, tmp_path / TEST_TILE)
+    features = [_tile_feature(751000.0, 6690000.0)]
+    monkeypatch.setattr(
+        "lidar_for_fuel.commons.add_version.requests.get",
+        lambda *args, **kwargs: FakeResponse({"features": features, "numberMatched": len(features)}),
+    )
+    output_path = tmp_path / "out" / "metadata.gpkg"
+
+    add_version(tmp_path, output_path)
+
+    geodataframe = gpd.read_file(output_path, layer="metadata")
+    assert list(geodataframe["coordonnees_nw"]) == ["0751-6690"]
+    assert list(geodataframe["lidar_for_fuel_version"]) == [__version__]
+    assert geodataframe.crs.to_epsg() == 2154
+
+
+def test_add_version_without_any_tile(tmp_path):
+    with pytest.raises(FileNotFoundError, match="No LAS/LAZ file"):
+        add_version(tmp_path, tmp_path / "metadata.gpkg")
 
 
 def test_get_mtd_from_stream_on_real_service():
