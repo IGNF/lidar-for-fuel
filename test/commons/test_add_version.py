@@ -208,7 +208,7 @@ def test_add_version_to_mtd_adds_the_package_version_to_each_tile():
     result = add_version_to_mtd(metadata)
 
     assert result is metadata
-    assert [tile["lidar_for_fuel_version"] for tile in metadata] == [__version__, __version__]
+    assert [tile["version_lidarforfuel"] for tile in metadata] == [__version__, __version__]
     assert metadata[0]["coordonnees_nw"] == "0751-6690"
     assert metadata[1]["coordonnees_nw"] == "0751-6689"
 
@@ -228,7 +228,7 @@ def test_export_mtd_writes_one_feature_per_tile(tmp_path):
     assert geodataframe.crs.to_epsg() == 2154
     assert list(geodataframe["coordonnees_nw"]) == ["0751-6690", "0751-6689"]
     assert list(geodataframe["code_mission"]) == ["22LHDMH", "23LHDMH"]
-    assert list(geodataframe["lidar_for_fuel_version"]) == [__version__, __version__]
+    assert list(geodataframe["version_lidarforfuel"]) == [__version__, __version__]
     # Lists cannot be stored as GeoPackage attributes, so they are JSON strings.
     assert json.loads(geodataframe.iloc[0]["capteur"]) == ["Optech ALTM Galaxy T2000:5060485"]
     assert "tile_extent" not in geodataframe.columns
@@ -266,7 +266,7 @@ def test_add_version_exports_the_metadata_of_the_chantier(tmp_path, monkeypatch)
 
     geodataframe = gpd.read_file(output_path, layer="metadata")
     assert list(geodataframe["coordonnees_nw"]) == ["0751-6690"]
-    assert list(geodataframe["lidar_for_fuel_version"]) == [__version__]
+    assert list(geodataframe["version_lidarforfuel"]) == [__version__]
     assert geodataframe.crs.to_epsg() == 2154
 
 
