@@ -41,7 +41,7 @@ def compute_pixel_aggregates(
             (pixel_y, pixel_x), one column per output band, holding only the pixels where
             `aggregation` returned a result (pixels where it returned None are dropped ->
             NoData once rasterized). `origin_pixel` is the CosiaFrance grid corner (ix, iy)
-             this window is anchored on and `nb_pixels` is the tile's integer side length in pixels;
+            This window is anchored on and `nb_pixels` is the tile's integer side length in pixels;
             together with `global_origin_x`/`global_origin_y` and `resolution_factor`, they
             hold everything needed to build the output raster's affine transform.
     """
