@@ -164,28 +164,7 @@ def pad_metrics_core(
 
     Returns:
         dict[str, float] | None: `None` if a quality guard fails, otherwise a dict
-        containing the following named metrics. Key order is not part of this
-        function's contract; raster band order is defined by `export_raster`:
-            PAD_{dz_low}_{min_layer}: Plant Area Density for that stratum of the
-                low-strata band. One key per stratum.
-            PAD_{dz}_{min_layer}: Plant Area Density for that stratum of the main
-                profile, cover-corrected when possible. One key per stratum.
-            Class_{code}: point count for each tracked LAS classification code,
-                after the temporal filter, before the vegetation/ground subsetting.
-            Total: point count of any classification, after the temporal filter.
-            N_{dz}_{min_layer}, Ni_{dz}_{min_layer}: cumulative entering-ray count
-                and vegetation/ground hit count for that stratum of the main profile.
-            Cover_h_pad: canopy cover fraction above `height_cover`, or `NaN` if `use_cover=False`.
-            Cover_2: canopy cover fraction above 2m.
-            Cover_4: canopy cover fraction above 4m.
-            Cover_6: canopy cover fraction above 6m.
-            cos_theta: scan angle factor (1.0 if `scanning_angle=False`).
-            pl_factor: correction factor for beam path length, `1 / cos_theta`.
-            Date_maj: Unix time (seconds) of the modal acquisition day for the
-                points in the pixel/plot -- the center of the ±deviation_days
-                temporal window.
-            Date_min, Date_max: Unix time (seconds) of the lower/upper bound of
-                that ±deviation_days temporal window (`Date_maj` -/+ `deviation_days`).
+        containing the following named metrics.
     """
     # # Step 1:
     # Filter points by ±deviation_days around the most densely sampled calendar day.
