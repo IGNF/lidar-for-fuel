@@ -164,7 +164,8 @@ def pad_metrics_core(
 
     Returns:
         dict[str, float] | None: `None` if a quality guard fails, otherwise a dict
-        containing named-list output, in this exact channel order:
+        containing the following named metrics. Key order is not part of this
+        function's contract; raster band order is defined by `export_raster`:
             PAD_{dz_low}_{min_layer}: Plant Area Density for that stratum of the
                 low-strata band. One key per stratum.
             PAD_{dz}_{min_layer}: Plant Area Density for that stratum of the main
@@ -179,6 +180,7 @@ def pad_metrics_core(
             Cover_4: canopy cover fraction above 4m.
             Cover_6: canopy cover fraction above 6m.
             cos_theta: scan angle factor (1.0 if `scanning_angle=False`).
+            pl_factor: correction factor for beam path length, `1 / cos_theta`.
             Date_maj: Unix time (seconds) of the modal acquisition day for the
                 points in the pixel/plot -- the center of the ±deviation_days
                 temporal window.
@@ -289,21 +291,25 @@ def pad_metrics_core(
     )
 
     # # Step 8:
-    # Assemble the final output dict, in the exact channel order of the
-    # PAD output-list spec: PAD (low-strata, then main profile), Class_*/Total,
-    # N_*, Ni_*, Cover_*, cos_theta, Date_*.
-    output: dict[str, float] = pad_low | pad_main | class_counts | n_main | ni_main
-    output["Cover_h_pad"] = cover_h_pad
-    output["Cover_2"] = cover_2
-    output["Cover_4"] = cover_4
-    output["Cover_6"] = cover_6
-    output["cos_theta"] = cos_theta
     modal_date = np.datetime64(modal_time_unix, "s")
     date_min = modal_date - np.timedelta64(deviation_days, "D")
     date_max = modal_date + np.timedelta64(deviation_days, "D")
 
-    output["Date_maj"] = modal_time_unix
-    output["Date_min"] = int((date_min - np.datetime64(0, "s")) / np.timedelta64(1, "s"))
-    output["Date_max"] = int((date_max - np.datetime64(0, "s")) / np.timedelta64(1, "s"))
-
-    return output
+    # Assemble metrics by name in one dict, without intermediate union copies.
+    # Raster band selection and ordering are handled by `export_raster`.
+    return {
+        **pad_low,
+        **pad_main,
+        **class_counts,
+        **n_main,
+        **ni_main,
+        "Cover_h_pad": cover_h_pad,
+        "Cover_2": cover_2,
+        "Cover_4": cover_4,
+        "Cover_6": cover_6,
+        "cos_theta": cos_theta,
+        "pl_factor": 1.0 / cos_theta,
+        "Date_maj": modal_time_unix,
+        "Date_min": int((date_min - np.datetime64(0, "s")) / np.timedelta64(1, "s")),
+        "Date_max": int((date_max - np.datetime64(0, "s")) / np.timedelta64(1, "s")),
+    }
