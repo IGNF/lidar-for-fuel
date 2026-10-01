@@ -163,8 +163,7 @@ def pad_metrics_core(
 
 
     Returns:
-        dict[str, float] | None: `None` if a quality guard fails, otherwise a dict.
-        Assemble metrics by name in one dict, without intermediate union copies.
+        dict[str, float] | None: `None` if a quality guard fails, otherwise a dict of metrics.
     """
     # # Step 1:
     # Filter points by ±deviation_days around the most densely sampled calendar day.
