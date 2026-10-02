@@ -11,7 +11,9 @@ _REAL_TRAJ_FOLDER = Path("data/trajectory")
 
 # Data for the comparison test against the R reference
 _FILTERED_LAS = Path("data/pointcloud/test_semis_2024_0751_6690_LA93_IGN69_filter_trajectory_1311.laz")
-_PRETRAITED_LAS = Path("data/pointcloud/test_semis_2024_0751_6690_LA93_IGN69_filter_trajectory_1311_pretraited.laz")
+_PREPROCESSED_LAS = Path(
+    "data/pointcloud/test_semis_2024_0751_6690_LA93_IGN69_filter_trajectory_1311_preprocessed.laz"
+)
 
 
 def _make_points(psid_values: list[int], gps_times: list[float]) -> np.ndarray:
@@ -104,7 +106,7 @@ def test_add_trajectory_against_r_reference():
     result = add_trajectory_to_points(points, str(_REAL_TRAJ_FOLDER))
 
     # ── Load the R reference ──────────────────────────────────────────────────
-    las_ref = laspy.read(str(_PRETRAITED_LAS))
+    las_ref = laspy.read(str(_PREPROCESSED_LAS))
 
     # ── 1. Field presence ─────────────────────────────────────────────────────
     assert "X_sensor" in result.dtype.names

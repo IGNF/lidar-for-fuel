@@ -1,3 +1,17 @@
+# v0.2.0
+- Get a buffer around the input pointcloud in order to compensate the difference between las tiling grid and the output raster grid 
+- Finish PAD profil computation
+- Export result PAD profile in 9 rasters: 
+        - Plant Area Density by stratum of the low-strata bands. (0.5m strata)
+        - Plant Area Density by stratum of the main profile, cover-corrected when possible (1m strata)
+        - Point count per class
+        - Cumulative entering-ray count for each stratum of the main profile.
+        - Vegetation/ground hit count for each stratum of the main profile.
+        - cos theta
+        - pl factor
+        - Canopy cover fraction by stratum (2m strata)
+        - Points acquisition dates (min, max, maj)
+
 # v0.1.1
 - Preprocessing: Add "check_las" decorator to return an error when the output las cannot be read
 - [Work in progress] Add PAD profile computation:

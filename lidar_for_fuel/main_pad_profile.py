@@ -6,13 +6,20 @@ Runs on a single pre-processed LAS/LAZ tile or all tiles in a directory.
 
 import logging
 import os
+from pathlib import Path
 
 import hydra
-import numpy as np
+import pandas as pd
 import pdal
 from omegaconf import DictConfig
+from pdaltools.las_info import get_tile_origin_using_header_info
 
-from lidar_for_fuel.pad_profile.calculate_pad_profile import pad_metrics_core
+from lidar_for_fuel.commons.add_buffer import create_buffered_las_file
+from lidar_for_fuel.pad_profile.create_raster import (
+    build_pad_aggregation,
+    compute_pixel_aggregates,
+)
+from lidar_for_fuel.pad_profile.export_raster import export_raster
 from lidar_for_fuel.pad_profile.validate_lidar_preprocessing_file import (
     check_lidar_file,
 )
@@ -22,24 +29,49 @@ logger = logging.getLogger(__name__)
 
 def pad_profile_one_tile(
     input_filename: str,
+    input_dir: str,
+    buffer_width: float,
+    tile_width: int,
+    tile_coord_scale: int,
     srid: str,
+    global_origin_x: float,
+    global_origin_y: float,
+    resolution_factor: float,
+    keep_classes: list,
     scanning_angle: bool,
     limit_N_points: int,
     limit_flight_agl: float,
-    deviation_days: float,
+    deviation_days: int,
     z0: float,
     dz: float,
     nlayers: int | None,
+    dz_low: float,
+    nlayers_low: int | None,
     ground_margin: float,
     cover_type: str,
     height_cover: float,
     use_cover: bool,
-) -> tuple[float, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, float, float, float, float] | None:
-    """Compute PAD metrics for one tile.
+    G: float,
+    omega: float,
+    keep_values: list,
+    output_dir: str,
+) -> None:
+    """Compute PAD metrics for one tile, per CosiaFrance pixel.
 
     Args:
         input_filename (str): Path to the input LAS/LAZ file.
+        input_dir (str): Directory containing all tiles, used to look up neighboring
+            tiles when adding the buffer.
+        buffer_width (float): Width (m) of the buffer merged in from neighboring tiles
+            around the queried tile, to avoid edge effects on PAD computation.
+        tile_width (int): Tile width in meters. Default 1000.
+        tile_coord_scale (int): Scale used in tile filenames to describe coordinates
+            in meters. Default 1000.
         srid (str): Spatial reference of the input file. Default: EPSG:2154.
+        global_origin_x (float): X of the CosiaFrance grid anchor (e.g. 98029.75).
+        global_origin_y (float): Y of the CosiaFrance grid anchor (north edge, e.g. 6045536.75).
+        resolution_factor (float): Pixel size (m) of the CosiaFrance grid (e.g. 10).
+        keep_classes(list): Classes to keep for counting points. Default: [1, 2, 3, 4, 5, 6, 9, 17, 18, 64, 66, 67].
         scanning_angle (bool): If True, estimate cos(theta) from the trajectory.
                                If False, returns 1.0 (vertical pulses assumed, no correction).
                                Default True.
@@ -49,13 +81,16 @@ def pad_profile_one_tile(
                                    If the distance between the flight height and the ground and (Elevation - Zref)
                                    is lower than `limit_flight_agl`, NULL is returned.
                                    Default 800 meters.
-        deviation_days (float): Max deviation in days around the local modal acquisition date.
-                                `inf` = no filter.
-                                Default `inf`.
+        deviation_days (int): Max deviation in days around the local modal acquisition date.
+                                Default 0 (only the modal calendar day is retained).
         z0 (float): Bottom height of the first stratum (m). Default 0.
-        dz (float): Stratum thickness (m). Default 1.
-        nlayers (int | None): Number of strata above z0. If None, derived from
-            `max(h_abg)`. Default 60.
+        dz (float): Stratum thickness of the main PAD profile (m). Default 1.
+        nlayers (int | None): Number of strata above z0 for the main PAD
+            profile. If None, derived from `max(h_abg)`. Default 60.
+        dz_low (float): Stratum thickness of the low-strata PAD band (m).
+            Default 0.5.
+        nlayers_low (int | None): Number of strata above z0 for the
+            low-strata PAD band. If None, derived from `max(h_abg)`. Default 4.
         ground_margin (float): Margin above `z0` excluded from the first stratum
             (m). Default 0.1.
         cover_type (str): Either "first" (cover estimated from first returns
@@ -63,58 +98,79 @@ def pad_profile_one_tile(
         height_cover (float): Height threshold (m) used for `cover_h_pad`.
         use_cover (bool): If False, `cover_h_pad` is `NaN`; the 2/4/6 m
             cover fractions are always computed.
-
-    Returns:
-        tuple[float, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, float, float, float, float]
-        | None: `(cos_theta, ni, n, min_layer, nrd, gf, cover_h_pad, cover_2, cover_4, cover_6)`, or None if
-        a quality guard fails. See `pad_metrics_core`.
+        G (float): Leaf projection ratio. Default 0.5.
+        omega (float): Clumping factor. Default 1.
+        keep_values (list): Classes to keep for counting Ni. Default: [2, 3, 4, 5, 9].
+        output_dir (str): Directory the 8 PAD GeoTIFFs are written into
+            (see `export_raster`).
     """
     # Validate pointclouds after preprocessing
     check_lidar_file(input_filename)
 
-    # Extract pointclouds with attributes
-    pipeline = pdal.Pipeline() | pdal.Reader.las(filename=input_filename, override_srs=srid, nosrs=True)
-    pipeline.execute()
-    points = pipeline.arrays[0]
+    # The tile's own (raw, unbuffered) corner: computed from the un-merged file, since
+    # the buffered file's extent no longer belongs to a single theoretical tile.
+    tile_origin_x, tile_origin_y = get_tile_origin_using_header_info(input_filename, tile_width=tile_width)
 
-    x = points["X"].astype(np.float64)
-    y = points["Y"].astype(np.float64)
-    h_abg = points["h_abg"].astype(np.float64)
-    z = points["Z"].astype(np.float64)
-    gpstime = points["GpsTime"].astype(np.float64)
-    return_number = points["ReturnNumber"].astype(np.float64)
-    classification = points["Classification"].astype(np.float64)
-    x_sensor = points["X_sensor"].astype(np.float64)
-    y_sensor = points["Y_sensor"].astype(np.float64)
-    z_sensor = points["Z_sensor"].astype(np.float64)
+    # Merge in neighboring tiles and crop to tile bounds + buffer, to avoid edge effects
+    with create_buffered_las_file(
+        input_dir=input_dir,
+        input_filename=input_filename,
+        buffer_width=buffer_width,
+        spatial_ref=srid,
+        tile_width=tile_width,
+        tile_coord_scale=tile_coord_scale,
+    ) as buffered_las_filename:
+        # Extract pointclouds with attributes
+        pipeline = pdal.Pipeline() | pdal.Reader.las(filename=buffered_las_filename, override_srs=srid, nosrs=True)
+        pipeline.execute()
+        points_df = pd.DataFrame(pipeline.arrays[0])
 
-    # Calcule PAD PROFILE by TILE
-    results = pad_metrics_core(
-        gpstime=gpstime,
-        x=x,
-        y=y,
-        h_abg=h_abg,
-        z=z,
-        return_number=return_number,
-        classification=classification,
-        x_sensor=x_sensor,
-        y_sensor=y_sensor,
-        z_sensor=z_sensor,
-        scanning_angle=scanning_angle,
-        limit_N_points=limit_N_points,
-        limit_flight_agl=limit_flight_agl,
-        deviation_days=deviation_days,
-        z0=z0,
-        dz=dz,
-        nlayers=nlayers,
-        ground_margin=ground_margin,
-        cover_type=cover_type,
-        height_cover=height_cover,
-        use_cover=use_cover,
+    # Calcule PAD PROFILE by PIXEL
+    aggregated, origin_pixel, nb_pixels = compute_pixel_aggregates(
+        points_df,
+        global_origin_x=global_origin_x,
+        global_origin_y=global_origin_y,
+        tile_origin_x=tile_origin_x,
+        tile_origin_y=tile_origin_y,
+        tile_size=tile_width,
+        resolution_factor=resolution_factor,
+        aggregation=build_pad_aggregation(
+            scanning_angle=scanning_angle,
+            limit_N_points=limit_N_points,
+            limit_flight_agl=limit_flight_agl,
+            deviation_days=deviation_days,
+            z0=z0,
+            dz=dz,
+            nlayers=nlayers,
+            dz_low=dz_low,
+            nlayers_low=nlayers_low,
+            ground_margin=ground_margin,
+            cover_type=cover_type,
+            height_cover=height_cover,
+            use_cover=use_cover,
+            G=G,
+            omega=omega,
+            keep_values=keep_values,
+            keep_classes=keep_classes,
+        ),
     )
 
-    logger.info("Computed PAD metrics by tiles in %s", input_filename)
-    return results
+    logger.info("Computed PAD metrics by pixel in %s", input_filename)
+
+    export_raster(
+        aggregated,
+        origin_pixel=origin_pixel,
+        nb_pixels=nb_pixels,
+        global_origin_x=global_origin_x,
+        global_origin_y=global_origin_y,
+        resolution_factor=resolution_factor,
+        dz=dz,
+        dz_low=dz_low,
+        srid=srid,
+        output_dir=output_dir,
+        tile_stem=Path(input_filename).stem,
+    )
+    logger.info("Export 8 rasters for tile : %s", input_filename)
 
 
 @hydra.main(config_path="../configs/", config_name="config.yaml", version_base="1.2")
@@ -134,6 +190,11 @@ def main(config: DictConfig):
     if not os.path.isdir(input_dir):
         raise FileNotFoundError(f"The input directory ({input_dir}) doesn't exist.")
 
+    output_dir = config.io.output_dir
+    if output_dir is None:
+        raise ValueError("config.io.output_dir is empty, please provide an output directory in the configuration")
+    os.makedirs(output_dir, exist_ok=True)
+
     initial_las_filename = config.io.input_filename
 
     def main_on_one_tile(filename):
@@ -141,7 +202,15 @@ def main(config: DictConfig):
 
         pad_profile_one_tile(
             input_filename=os.path.join(input_dir, filename),
+            input_dir=input_dir,
+            buffer_width=config.pad_profile.buffer.size,
+            tile_width=config.tile_geometry.tile_width,
+            tile_coord_scale=config.tile_geometry.tile_coord_scale,
             srid=config.io.spatial_reference,
+            global_origin_x=config.pad_profile.create_raster.origin_x,
+            global_origin_y=config.pad_profile.create_raster.origin_y,
+            resolution_factor=config.pad_profile.create_raster.resolution_factor,
+            keep_classes=config.commons.class_count.keep_classes,
             deviation_days=config.commons.filter_date.deviation_days,
             scanning_angle=config.pad_profile.cos_theta.scanning_angle,
             limit_N_points=config.pad_profile.cos_theta.limit_N_points,
@@ -149,10 +218,16 @@ def main(config: DictConfig):
             z0=config.pad_profile.compute_ni_n.z0,
             dz=config.pad_profile.compute_ni_n.dz,
             nlayers=config.pad_profile.compute_ni_n.nlayers,
+            dz_low=config.pad_profile.compute_ni_n.dz_low,
+            nlayers_low=config.pad_profile.compute_ni_n.nlayers_low,
             ground_margin=config.pad_profile.compute_ni_n.ground_margin,
             cover_type=config.pad_profile.compute_cover.cover_type,
             height_cover=config.pad_profile.compute_cover.height_cover,
             use_cover=config.pad_profile.compute_cover.use_cover,
+            G=config.pad_profile.compute_pad.G,
+            omega=config.pad_profile.compute_pad.omega,
+            keep_values=config.pad_profile.compute_pad.keep_values,
+            output_dir=output_dir,
         )
 
     if initial_las_filename:
