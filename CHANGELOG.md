@@ -1,5 +1,6 @@
 # v0.2.0
 - Get a buffer around the input pointcloud in order to compensate the difference between las tiling grid and the output raster grid 
+- Finish PAD profil computation
 - Export result PAD profile in 9 rasters: 
         - Plant Area Density by stratum of the low-strata bands. (0.5m strata)
         - Plant Area Density by stratum of the main profile, cover-corrected when possible (1m strata)
