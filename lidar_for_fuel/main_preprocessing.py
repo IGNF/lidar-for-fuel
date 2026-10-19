@@ -11,6 +11,7 @@ import tempfile
 import hydra
 import pdal
 from omegaconf import DictConfig
+from pdaltools.check_las import check_pdal_can_open_file_with_retry_decorator
 
 from lidar_for_fuel.commons.filter_points_by_dimension_values import (
     filter_by_dimension_values,
@@ -23,8 +24,6 @@ from lidar_for_fuel.preprocessing.normalize_height_by_dtm import (
     filter_z_by_height,
 )
 from lidar_for_fuel.preprocessing.validate_lidar_file import check_lidar_file
-
-from pdaltools.check_las import check_pdal_can_open_file_with_retry_decorator
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +44,6 @@ def preprocess_one_tile(
     multiplier: float = 10.0,
     dtm_layer: str = "IGNF_LIDAR-HD_MNT_ELEVATION.ELEVATIONGRIDCOVERAGE.LAMB93",
     dtm_epsg: int = 2154,
-    tile_width: int = 1000,
     dtm_resolution: float = 0.5,
     dtm_timeout: int = 60,
     dtm_path: str = None,
@@ -71,7 +69,6 @@ def preprocess_one_tile(
         multiplier: Standard deviation multiplier for outlier detection. Default: 10.
         dtm_layer: IGN Géoplateforme layer identifier for DTM download.
         dtm_epsg: EPSG code for DTM download. Default: 2154.
-        tile_width: Tile width in metres. Default: 1000.
         dtm_resolution: DTM pixel size in metres. Default: 0.5.
         dtm_timeout: Timeout in seconds for the DTM download. Default: 60.
         dtm_path: Path to an existing DTM GeoTIFF. If provided, skips the download.
@@ -86,9 +83,7 @@ def preprocess_one_tile(
 
     if dtm_path is None:
         with tempfile.TemporaryDirectory() as tmp_dtm_dir:
-            dtm_path = download_dtm(
-                filename, input_dir, dtm_layer, tmp_dtm_dir, dtm_epsg, tile_width, dtm_resolution, dtm_timeout
-            )
+            dtm_path = download_dtm(filename, input_dir, dtm_layer, tmp_dtm_dir, dtm_epsg, dtm_resolution, dtm_timeout)
             points = add_h_abg(points, dtm_path, nodata_value=nodata_value)
             points = filter_z_by_height(points, min_height_filter, height_filter)
     else:
@@ -159,7 +154,6 @@ def main(config: DictConfig):
             multiplier=config.preprocessing.filter_outlier.multiplier,
             dtm_layer=config.dtm.download.dtm_layer,
             dtm_epsg=config.dtm.download.epsg,
-            tile_width=config.tile_geometry.tile_width,
             dtm_resolution=config.dtm.download.resolution,
             dtm_timeout=config.dtm.download.timeout,
         )
