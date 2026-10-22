@@ -14,7 +14,7 @@ def test_get_mtd_from_stream_discards_the_tiles_outside_the_extent(monkeypatch):
         _tile_feature(752000.0, 6690000.0),  # east neighbour, only shares an edge
     ]
     monkeypatch.setattr(
-        "lidar_for_fuel.commons.add_version.requests.get",
+        "lidar_for_fuel.add_version.download_mtd_from_geoplateforme.requests.get",
         lambda *args, **kwargs: FakeResponse({"features": features, "numberMatched": len(features)}),
     )
 
@@ -35,7 +35,7 @@ def test_get_mtd_from_stream_paginates(monkeypatch):
         start_indexes.append(params["STARTINDEX"])
         return FakeResponse(pages[len(start_indexes) - 1])
 
-    monkeypatch.setattr("lidar_for_fuel.commons.add_version.requests.get", fake_get)
+    monkeypatch.setattr("lidar_for_fuel.add_version.download_mtd_from_geoplateforme.requests.get", fake_get)
 
     metadata = get_mtd_from_stream((751000.0, 752000.0, 6688000.0, 6690000.0))
 
