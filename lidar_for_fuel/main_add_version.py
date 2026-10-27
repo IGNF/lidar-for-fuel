@@ -52,9 +52,10 @@ def main(config: DictConfig):
     if not os.path.isdir(input_dir):
         raise FileNotFoundError(f"The input directory ({input_dir}) doesn't exist.")
 
-    initial_las_filename = config.io.input_filename
+    output_dir = config.io.output_dir
+    output_filename = config.io.output_filename
 
-    add_version(input_dir, os.path.join(input_dir, filename.replace(".las", ".gpkg")))
+    add_version(input_dir, os.path.join(output_dir, output_filename))
 
 
 

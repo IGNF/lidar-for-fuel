@@ -1,23 +1,32 @@
 """
 Download metadata LiDAR HD from IGN Géoplateforme for a given LiDAR tile.
 
-Dataset: https://cartes.gouv.fr/rechercher-une-donnee/dataset/IGNF_MNT-LIDAR-HD
-WMS flux: https://data.geopf.fr/wms-r/wms?service=wms&version=1.3.0&request=GetCapabilities
+Dataset: https://cartes.gouv.fr/rechercher-une-donnee/dataset/IGNF_LIDAR-HD
+WFS flux: https://data.geopf.fr/wfs/ows?SERVICE=WFS&VERSION=2.0.0&REQUEST=GetCapabilities
 
-The tile bounding box is read directly from the LAS header using ign-pdaltools
+The ``IGNF_LIDAR-HD_METADONNEE:metadata`` layer holds one feature per 1 km x 1 km LiDAR HD
+tile, describing how the tile was acquired and classified (mission code, sensor, acquisition
+dates, classification process, reference systems, download URLs).
 """
-import logging
-import os
-from pathlib import Path
 import json
+import logging
 
-import numpy as np
 import requests
-from pdaltools.las_info import get_bounds_from_header_info, las_info_metadata
-from rasterio.io import MemoryFile
 
 logger = logging.getLogger(__name__)
 
+WFS_URL = "https://data.geopf.fr/wfs/ows"
+WFS_VERSION = "2.0.0"
+LIDAR_HD_METADATA_TYPENAME = "IGNF_LIDAR-HD_METADONNEE:metadata"
+
+# Requesting features by pages keeps the response size bounded on large extents.
+PAGE_SIZE = 1000
+
+# The server applies the BBOX filter on an approximate envelope and returns tiles that do not
+# actually overlap the requested extent, so features are filtered again client-side. Its
+# geometries are stored in EPSG:4326 and reprojected on the fly, which shifts the tile corners
+# by a few millimetres: adjacent tiles would overlap the extent without this tolerance (in
+# metres), which has to stay well below the size of the smallest queried extent.
 OVERLAP_TOLERANCE = 0.1
 
 
@@ -97,66 +106,75 @@ def _parse_feature(feature: dict) -> dict:
     return metadata
 
 
-
 def get_mtd_from_stream(
     extent: tuple[float, float, float, float],
+    typename: str = LIDAR_HD_METADATA_TYPENAME,
     epsg: int = 2154,
-    resolution: float = 0.5,
-    layer: str = "IGNF_LIDAR-HD_MNT_ELEVATION",
     timeout: int = 60,
-) -> str:
-    """
-    Download the DTM LiDAR HD from IGN Géoplateforme for the given LiDAR tile.
-
-    The bounding box (minx, maxx, miny, maxy) is read directly from the LAS
-    header via pdaltools.las_info, avoiding any dependency on the filename format.
+    wfs_url: str = WFS_URL,
+    overlap_tolerance: float = OVERLAP_TOLERANCE,
+) -> list[dict]:
+    """Get the LiDAR HD metadata of every tile overlapping an extent, from the WFS service.
 
     Args:
-        extent (tuple[float, float, float, float]): Bounding box coordinates (minx, maxx, miny, maxy).
-        epsg (int): EPSG code of the coordinate reference system. Default: 2154
-            (Lambert 93).
-        tile_width (int): Tile size in metres. Default: 1000 (LiDAR HD tiles
-            are 1 km × 1 km).
-        resolution (float): Pixel size in metres. Default: 0.5 m (native
-            resolution of the LiDAR HD DTM).
-        timeout (int): Delay after which the request is canceled (in seconds) Default: 60.
+        extent (tuple[float, float, float, float]): Extent as (minx, maxx, miny, maxy).
+        typename (str): Name of the queried WFS layer. Default: the LiDAR HD metadata layer.
+        epsg (int): EPSG code of the extent, also used for the returned geometries.
+            Default: 2154 (Lambert 93).
+        timeout (int): Delay after which a request is canceled (in seconds). Default: 60.
+        wfs_url (str): Base URL of the WFS service.
+        overlap_tolerance (float): Minimum overlap, in metres, between the extent and a tile
+            for that tile to be kept. Default: 0.1 (see ``OVERLAP_TOLERANCE``).
 
     Returns:
-        str: Absolute path to the downloaded DTM GeoTIFF.
+        list[dict]: One dictionary per LiDAR HD tile overlapping the extent.
 
     Raises:
-        requests.HTTPError: If the WMS request fails.
+        requests.HTTPError: If a WFS request fails.
+        ValueError: If the extent is empty (its min bound is above its max bound).
     """
     minx, maxx, miny, maxy = extent
+    if minx > maxx or miny > maxy:
+        raise ValueError(f"Invalid extent (minx, maxx, miny, maxy): {extent}")
 
-    URL_GPP = "https://data.geopf.fr/wms-r/wms?"
-    URL_FORMAT = "&EXCEPTIONS=text/xml&FORMAT=image/geotiff&SERVICE=WMS&VERSION=1.3.0&REQUEST=GetFeature&STYLES="
-    URL_EPSG = "&CRS=EPSG:" + str(epsg)
-    URL_BBOX = f"&BBOX={minx},{miny},{maxx},{maxy}"
-    URL_SIZE = f"&WIDTH={(maxx - minx)/resolution}&HEIGHT={(maxy - miny)/resolution}"
-    url = URL_GPP + "LAYERS=" + layer + URL_FORMAT + URL_EPSG + URL_BBOX + URL_SIZE
+    parameters = {
+        "SERVICE": "WFS",
+        "VERSION": WFS_VERSION,
+        "REQUEST": "GetFeature",
+        "TYPENAMES": typename,
+        "OUTPUTFORMAT": "application/json",
+        "SRSNAME": f"EPSG:{epsg}",
+        "BBOX": f"{minx},{miny},{maxx},{maxy},EPSG:{epsg}",
+        "COUNT": PAGE_SIZE,
+    }
 
-    logger.info(
-        "Downloading DTM for tile '%s' — bbox=[%s, %s, %s, %s]",
-        minx,
-        miny,
-        maxx,
-        maxy,
-    )
-    logger.debug("WMS URL: %s", url)
+    logger.info("Querying %s on extent [%s, %s, %s, %s]", typename, minx, maxx, miny, maxy)
 
     features = []
-    response = requests.get(url, allow_redirects=True, timeout=timeout)
-    response.raise_for_status()
-    page = response.json()
+    start_index = 0
+    while True:
+        response = requests.get(wfs_url, params={**parameters, "STARTINDEX": start_index}, timeout=timeout)
+        response.raise_for_status()
+        page = response.json()
 
-    page_features = page.get("features", [])
-    features.extend(page_features)
+        page_features = page.get("features", [])
+        features.extend(page_features)
+        start_index += len(page_features)
+        if not page_features or start_index >= page.get("numberMatched", 0):
+            break
 
     metadata = [
         _parse_feature(feature)
         for feature in features
-        if _overlaps(extent, _geometry_bounds(feature["geometry"]), 0.01) # overlap_tolerance
+        if _overlaps(extent, _geometry_bounds(feature["geometry"]), overlap_tolerance)
     ]
 
+    logger.info(
+        "Found %d LiDAR HD tiles overlapping the extent (%d returned by the service)",
+        len(metadata),
+        len(features),
+    )
     return metadata
+
+
+
