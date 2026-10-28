@@ -16,6 +16,7 @@ def remove_outliers(
     """
     Identify and remove outliers: for each point, the average distance to its k nearest neighbors is computed.
     If this distance exceeds a statistical threshold, the point is considered isolated.
+    Theses points are classified in classe "18"
 
     Args:
         input_pipeline (pdal.Pipeline): Executed PDAL Pipeline object.
@@ -32,6 +33,6 @@ def remove_outliers(
         multiplier=multiplier,
     )
 
-    pipeline |= pdal.Filter.range(limits="Classification![7:7]")
+    pipeline |= pdal.Filter.assign(value="Classification=18 WHERE Classification==7")
 
     return pipeline
