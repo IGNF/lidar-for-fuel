@@ -1,4 +1,5 @@
 # not yet released
+- Fix for downloading DTM : The output grid is aligned on the native DTM grid and extends half a pixel beyond the tile bounds
 - use ign-pdal-tools v1.18.1 to get logs when checking output las
 
 # v0.2.0
