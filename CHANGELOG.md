@@ -1,3 +1,6 @@
+
+- Fix for downloading DTM : The output grid is aligned on the native DTM grid and extends half a pixel beyond the tile bounds
+
 # v0.2.0
 - Get a buffer around the input pointcloud in order to compensate the difference between las tiling grid and the output raster grid 
 - Finish PAD profil computation
