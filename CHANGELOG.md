@@ -1,6 +1,7 @@
 # not yet released
 - Fix for downloading DTM : The output grid is aligned on the native DTM grid and extends half a pixel beyond the tile bounds
 - use ign-pdal-tools v1.18.1 to get logs when checking output las
+- Add_ersion: add lidar-for=-fuel version in metadata
 
 # v0.2.0
 - Get a buffer around the input pointcloud in order to compensate the difference between las tiling grid and the output raster grid
