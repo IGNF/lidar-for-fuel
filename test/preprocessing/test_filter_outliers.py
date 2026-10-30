@@ -25,15 +25,15 @@ _OUTLIER_XYZ = [(500.0, 500.0, 500.0), (1000.0, 1000.0, 1000.0)]
 
 
 def _make_point_cloud_with_outliers() -> np.ndarray:
-    """10x10 dense grid (spacing 1 m, Z=0) + 2 isolated outliers."""
-    normal = [(float(x), float(y), 0.0) for x in range(10) for y in range(10)]
+    """10x10 grid at ground altitude 100 m + 2 outliers; h_abg = Z - 100 m."""
+    normal = [(float(x), float(y), 100.0) for x in range(10) for y in range(10)]
     all_pts = normal + _OUTLIER_XYZ
     pts = np.zeros(len(all_pts), dtype=_LAS_DTYPE)
     for i, (x, y, z) in enumerate(all_pts):
         pts[i]["X"] = x
         pts[i]["Y"] = y
         pts[i]["Z"] = z
-        pts[i]["h_abg"] = z
+        pts[i]["h_abg"] = z - 100.0
         pts[i]["Classification"] = 2
     return pts
 
@@ -45,8 +45,9 @@ def _make_pipeline(pts: np.ndarray) -> pdal.Pipeline:
 
 
 def test_outliers_are_classified_as_18_and_preserved(tmp_path):
-    """Keep all points, classify outliers as 18 and preserve normal classifications."""
+    """Keep points and heights, save/restore Z, and classify only outliers as 18."""
     pts = _make_point_cloud_with_outliers()
+    assert np.all(pts["Z"] != pts["h_abg"])
 
     result = remove_outliers(_make_pipeline(pts), mean_k=5, multiplier=3.0)
     result |= pdal.Writer.las(
@@ -64,6 +65,13 @@ def test_outliers_are_classified_as_18_and_preserved(tmp_path):
     # Every input point must be preserved, regardless of output order.
     assert len(las.points) == len(pts)
     assert set(out_xyz) == expected_xyz
+
+    # Check the Z -> Zref -> Z round trip and unchanged normalized heights.
+    expected_by_xyz = {(p["X"], p["Y"], p["Z"]): p for p in pts}
+    for xyz, zref, height in zip(out_xyz, las["Zref"], las["h_abg"]):
+        point = expected_by_xyz[xyz]
+        assert zref == point["Z"]
+        assert height == point["h_abg"]
 
     # Only the isolated points must be reclassified; the dense cluster stays in class 2.
     outlier_xyz = set(_OUTLIER_XYZ)

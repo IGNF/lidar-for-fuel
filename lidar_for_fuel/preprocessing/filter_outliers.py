@@ -28,7 +28,7 @@ def remove_outliers(
         multiplier (float): Standard deviation threshold (statistical method only). (Default = 10.0)
 
     Returns:
-        pdal.Pipeline: Updated PDAL pipeline (not yet executed).
+        pdal.Pipeline: Pipeline containing normalized heights in h_abg.
 
     """
     pipeline = input_pipeline | pdal.Filter.ferry(dimensions="Z=>Zref")
