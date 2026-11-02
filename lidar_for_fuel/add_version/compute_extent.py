@@ -1,3 +1,6 @@
+"""
+Compute the extent enclosing every LAS/LAZ file of a directory.
+"""
 from pathlib import Path
 import logging
 from pdaltools.las_info import get_bounds_from_header_info, las_info_metadata

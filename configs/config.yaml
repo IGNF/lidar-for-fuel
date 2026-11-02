@@ -37,6 +37,10 @@ preprocessing:
   trajectory:
     nodata: 0
 
+add_version!
+  output_filename: null
+  output_dir: null
+
 pad_profile:
   buffer:
     size: 10  # buffer width (m) merged in from neighboring tiles to avoid edge effects

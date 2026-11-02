@@ -1,3 +1,6 @@
+"""
+Add the lidar_for_fuel version to the metadata of each tile.
+"""
 from lidar_for_fuel._version import __version__
 
 

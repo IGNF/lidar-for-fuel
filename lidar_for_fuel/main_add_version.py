@@ -52,15 +52,15 @@ def main(config: DictConfig):
     if not os.path.isdir(input_dir):
         raise FileNotFoundError(f"The input directory ({input_dir}) doesn't exist.")
 
-    output_dir = config.io.output_dir
+    output_dir = config._add_version.output_dir
     if output_dir is None:
-        raise ValueError("config.io.output_dir is empty, please provide an output directory in the configuration")
+        raise ValueError("config._add_version.output_dir is empty, please provide an output directory in the configuration")
     if not os.path.isdir(output_dir):
         raise FileNotFoundError(f"The output directory ({output_dir}) doesn't exist.")
 
-    output_filename = config.io.output_filename
+    output_filename = config._add_version.output_filename
     if output_filename is None:
-        raise ValueError("config.io.output_filename is empty, please provide an output filename in the configuration")
+        raise ValueError("config._add_version.output_filename is empty, please provide an output filename in the configuration")
 
     if not output_filename.endswith(".gpkg"):
         output_filename = output_filename + ".gpkg"

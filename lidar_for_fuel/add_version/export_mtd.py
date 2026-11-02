@@ -1,3 +1,6 @@
+"""
+Export the LiDAR HD tile metadata to a GeoPackage.
+"""
 import json
 from pathlib import Path
 import geopandas as gpd
