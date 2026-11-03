@@ -37,7 +37,7 @@ preprocessing:
   trajectory:
     nodata: 0
 
-add_version!
+add_version:
   output_filename: null
   output_dir: null
 

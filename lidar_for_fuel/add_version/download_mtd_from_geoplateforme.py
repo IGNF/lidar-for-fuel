@@ -174,7 +174,5 @@ def get_mtd_from_stream(
         len(metadata),
         len(features),
     )
+
     return metadata
-
-
-

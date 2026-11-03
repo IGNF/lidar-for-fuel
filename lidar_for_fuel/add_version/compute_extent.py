@@ -1,10 +1,10 @@
 """
 Compute the extent enclosing every LAS/LAZ file of a directory.
 """
-from pathlib import Path
 import logging
-from pdaltools.las_info import get_bounds_from_header_info, las_info_metadata
+from pathlib import Path
 
+from pdaltools.las_info import get_bounds_from_header_info, las_info_metadata
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +24,6 @@ def compute_extent(las_files: Path) -> tuple[float, float, float, float]:
     Raises:
         FileNotFoundError: If the directory contains no LAS/LAZ file.
     """
-
     las_dir = Path(las_files[0]).parent
 
     minx = miny = float("inf")
