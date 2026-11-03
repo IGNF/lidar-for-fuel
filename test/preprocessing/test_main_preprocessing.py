@@ -62,11 +62,12 @@ def test_pipeline_with_trajectory(tmp_path):
     las = laspy.read(str(output))
     extra = {d.name for d in las.point_format.extra_dimensions}
 
-    # ── 1. All four extra fields present ─────────────────────────────────────
+    # ── 1. All four extra fields present, without the temporary Zref ─────────
     assert "X_sensor" in extra
     assert "Y_sensor" in extra
     assert "Z_sensor" in extra
     assert "h_abg" in extra
+    assert "Zref" not in extra
 
     # ── 2. Pipeline produced output points ───────────────────────────────────
     assert las.header.point_count > 0

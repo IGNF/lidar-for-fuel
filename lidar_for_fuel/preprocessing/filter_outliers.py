@@ -4,11 +4,12 @@ Classify statistical outliers using height above ground without removing points.
 import logging
 
 import pdal
+from numpy.lib import recfunctions as rfn
 
 logger = logging.getLogger(__name__)
 
 
-def remove_outliers(
+def detect_outliers(
     input_pipeline: pdal.Pipeline,
     mean_k: int = 5,
     multiplier: float = 10.0,
@@ -20,7 +21,8 @@ def remove_outliers(
     Points exceeding the statistical threshold are classified as 18.
     Save the original altitude in Zref, temporarily replace Z with h_abg for
     detection, then restore Z. The h_abg dimension is required and unchanged.
-    Zref remains available in the returned pipeline (and in extra_dims="all" exports).
+    The pipeline is executed and the temporary Zref dimension is dropped, so it is
+    not exported.
 
     Args:
         input_pipeline (pdal.Pipeline): Pipeline containing normalized heights in h_abg.
@@ -28,7 +30,7 @@ def remove_outliers(
         multiplier (float): Standard deviation threshold (statistical method only). (Default = 10.0)
 
     Returns:
-        pdal.Pipeline: Pipeline containing normalized heights in h_abg.
+        pdal.Pipeline: Pipeline holding the classified points, without Zref.
 
     """
     pipeline = input_pipeline | pdal.Filter.ferry(dimensions="Z=>Zref")
@@ -41,5 +43,9 @@ def remove_outliers(
 
     pipeline |= pdal.Filter.assign(value="Classification=18 WHERE Classification==7")
     pipeline |= pdal.Filter.ferry(dimensions="Zref=>Z")
+    pipeline.execute()
 
-    return pipeline
+    # PDAL has no filter to remove a dimension: drop Zref from the computed points.
+    points = rfn.drop_fields(pipeline.arrays[0], "Zref", usemask=False)
+
+    return pdal.Pipeline(arrays=[points])

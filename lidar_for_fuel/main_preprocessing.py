@@ -18,7 +18,7 @@ from lidar_for_fuel.commons.filter_points_by_dimension_values import (
 )
 from lidar_for_fuel.preprocessing.add_trajectory import add_trajectory_to_points
 from lidar_for_fuel.preprocessing.download_dtm_from_geoplateforme import download_dtm
-from lidar_for_fuel.preprocessing.filter_outliers import remove_outliers
+from lidar_for_fuel.preprocessing.filter_outliers import detect_outliers
 from lidar_for_fuel.preprocessing.normalize_height_by_dtm import (
     add_h_abg,
     filter_z_by_height,
@@ -93,7 +93,7 @@ def preprocess_one_tile(
     points = add_trajectory_to_points(points, trajectory_dir, trajectory_nodata)
 
     pipeline_out = pdal.Pipeline(arrays=[points])
-    pipeline_out = remove_outliers(pipeline_out, mean_k, multiplier)
+    pipeline_out = detect_outliers(pipeline_out, mean_k, multiplier)
     (
         pipeline_out
         | pdal.Writer.las(

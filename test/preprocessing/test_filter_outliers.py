@@ -5,7 +5,7 @@ import numpy as np
 import pdal
 import pytest
 
-from lidar_for_fuel.preprocessing.filter_outliers import remove_outliers
+from lidar_for_fuel.preprocessing.filter_outliers import detect_outliers
 
 _LAS_DTYPE = np.dtype(
     [
@@ -49,7 +49,7 @@ def test_outliers_are_classified_as_18_and_preserved(tmp_path):
     pts = _make_point_cloud_with_outliers()
     assert np.all(pts["Z"] != pts["h_abg"])
 
-    result = remove_outliers(_make_pipeline(pts), mean_k=5, multiplier=3.0)
+    result = detect_outliers(_make_pipeline(pts), mean_k=5, multiplier=3.0)
     result |= pdal.Writer.las(
         filename=str(tmp_path / "filtered.las"),
         extra_dims="all",
@@ -66,12 +66,11 @@ def test_outliers_are_classified_as_18_and_preserved(tmp_path):
     assert len(las.points) == len(pts)
     assert set(out_xyz) == expected_xyz
 
-    # Check the Z -> Zref -> Z round trip and unchanged normalized heights.
+    # The temporary Zref is not exported, and normalized heights are unchanged.
+    assert "Zref" not in {dimension.name for dimension in las.point_format.extra_dimensions}
     expected_by_xyz = {(p["X"], p["Y"], p["Z"]): p for p in pts}
-    for xyz, zref, height in zip(out_xyz, las["Zref"], las["h_abg"]):
-        point = expected_by_xyz[xyz]
-        assert zref == point["Z"]
-        assert height == point["h_abg"]
+    for xyz, height in zip(out_xyz, las["h_abg"]):
+        assert height == expected_by_xyz[xyz]["h_abg"]
 
     # Only the isolated points must be reclassified; the dense cluster stays in class 2.
     outlier_xyz = set(_OUTLIER_XYZ)
@@ -87,7 +86,7 @@ def test_outlier_detection_uses_h_abg_and_restores_z(tmp_path, isolated_dimensio
     pts[isolated_dimension][-2:] = 500.0
     original = pts.copy()
 
-    result = remove_outliers(_make_pipeline(pts), mean_k=5, multiplier=5.0)
+    result = detect_outliers(_make_pipeline(pts), mean_k=5, multiplier=5.0)
     output = tmp_path / "normalized_outliers.las"
     result |= pdal.Writer.las(filename=str(output), extra_dims="all", minor_version="4")
     result.execute()
@@ -111,4 +110,4 @@ def test_outlier_detection_requires_h_abg():
     pts = pts[[name for name in pts.dtype.names if name != "h_abg"]].copy()
 
     with pytest.raises(RuntimeError, match="h_abg"):
-        remove_outliers(_make_pipeline(pts)).execute()
+        detect_outliers(_make_pipeline(pts)).execute()
