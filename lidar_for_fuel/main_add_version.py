@@ -21,7 +21,7 @@ from lidar_for_fuel.add_version.export_mtd import export_mtd
 logger = logging.getLogger(__name__)
 
 
-def add_version(las_dir: Path, output_path: Path, epsg: int = 2154) -> None:
+def add_version(input: Path, output_path: Path, epsg: int = 2154) -> None:
     """Add the lidar_for_fuel version to the metadata of a LAS/LAZ file.
     Args:
         las_dir (Path): Directory containing the LiDAR tiles (``.las`` or ``.laz``).
@@ -31,9 +31,16 @@ def add_version(las_dir: Path, output_path: Path, epsg: int = 2154) -> None:
         Default: 2154 (Lambert 93).
     """
 
-    logger.info("Adding the lidar_for_fuel version to the metadata of %s", las_dir)
+    logger.info("Adding the lidar_for_fuel version to the metadata of %s", input)
 
-    extent = compute_extent(las_dir)
+    if os.path.isdir(input):
+        las_files = sorted(set(Path(input).glob("*.las")) | set(Path(input).glob("*.laz")))
+        if not las_files:
+            raise FileNotFoundError(f"No LAS/LAZ file found in {input}")
+    else:
+        las_files = [input]
+
+    extent = compute_extent(las_files)
     metadata = get_mtd_from_stream(extent, epsg=epsg)
     export_mtd(add_version_to_mtd(metadata), output_path, epsg=epsg)
 
@@ -65,9 +72,21 @@ def main(config: DictConfig):
     if not output_filename.endswith(".gpkg"):
         output_filename = output_filename + ".gpkg"
 
-    add_version(input_dir, os.path.join(output_dir, output_filename))
 
+    initial_las_filename = config.io.input_filename
 
+    def main_on_one_tile(filename):
+        logging.info(f"\nProcessing tile : {os.path.splitext(filename)[0]}")
+        add_version(
+            input=filename,
+            output_path=os.path.join(output_dir, os.path.splitext(filename)[0] + ".gpkg"),
+            epsg=config.io.spatial_reference,
+            )
+
+    if initial_las_filename:
+        main_on_one_tile(initial_las_filename)
+    else:
+        main(input_dir)
 
 if __name__ == "__main__":
     main()

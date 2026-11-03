@@ -14,8 +14,7 @@ def test_add_version_writes_the_version_in_a_geopackage(tmp_path, monkeypatch):
     las_dir.mkdir()
     shutil.copy(DATA_DIR / TEST_TILE, las_dir / TEST_TILE)
     output_path = tmp_path / "out" / "metadata.gpkg"
-
-    print(output_path)
+    
     # No network access: the WFS service returns the tile covered by TEST_TILE
     # plus a neighbour that only shares an edge and must be discarded.
     features = [_tile_feature(751000.0, 6690000.0), _tile_feature(752000.0, 6690000.0)]
@@ -27,6 +26,21 @@ def test_add_version_writes_the_version_in_a_geopackage(tmp_path, monkeypatch):
     add_version(las_dir, output_path)
 
     geodataframe = gpd.read_file(output_path, layer="metadata")
+    assert geodataframe.crs.to_epsg() == 2154
+    assert list(geodataframe["coordonnees_nw"]) == ["0751-6690"]
+    assert list(geodataframe["version_lidarforfuel"]) == [__version__]
+    minx, maxx, miny, maxy = TEST_TILE_EXTENT
+    assert geodataframe.geometry.iloc[0].bounds == pytest.approx((minx, miny, maxx, maxy))
+
+
+def test_add_version_on_one_tile(tmp_path, monkeypatch):
+    las_filename = DATA_DIR / TEST_TILE
+
+    print(tmp_path)
+
+    add_version(las_filename, tmp_path / "metadata.gpkg")
+
+    geodataframe = gpd.read_file(tmp_path / "metadata.gpkg", layer="metadata")
     assert geodataframe.crs.to_epsg() == 2154
     assert list(geodataframe["coordonnees_nw"]) == ["0751-6690"]
     assert list(geodataframe["version_lidarforfuel"]) == [__version__]
