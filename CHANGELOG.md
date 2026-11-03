@@ -1,7 +1,13 @@
+# v0.3.0
+- Fix outliers : Classify statistical outliers using height above ground without removing points, and assign in classe "18"
+- Fix for downloading DTM : The output grid is aligned on the native DTM grid and extends half a pixel beyond the tile bounds
+- use ign-pdal-tools v1.18.1 to get logs when checking output las
+- Add metadata by LIDAR tile : metadata and version for LidarForFuel
+
 # v0.2.0
-- Get a buffer around the input pointcloud in order to compensate the difference between las tiling grid and the output raster grid 
+- Get a buffer around the input pointcloud in order to compensate the difference between las tiling grid and the output raster grid
 - Finish PAD profil computation
-- Export result PAD profile in 9 rasters: 
+- Export result PAD profile in 9 rasters:
         - Plant Area Density by stratum of the low-strata bands. (0.5m strata)
         - Plant Area Density by stratum of the main profile, cover-corrected when possible (1m strata)
         - Point count per class

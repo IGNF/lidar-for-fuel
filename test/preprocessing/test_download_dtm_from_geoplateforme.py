@@ -34,3 +34,24 @@ def test_download_dtm():
 
     assert data.size > 0, "DTM raster should not be empty"
     assert data.max() > data.min(), "DTM should contain varying elevation values"
+
+
+def test_download_dtm_native_grid():
+    """DTM is requested on the native LiDAR HD grid (pixel centres on multiples of 0.5 m),
+    so the WMS returns native values without resampling and covers the whole tile.
+
+    Tile header bounds: (897000, 897999.99, 6576000.01, 6576999.99).
+    """
+    os.makedirs(TMP_PATH, exist_ok=True)
+    output_path = download_dtm(SAMPLE_TILENAME, SAMPLE_INPUT_DIR, _LAYER, TMP_PATH)
+
+    with rasterio.open(output_path) as src:
+        transform = src.transform
+        width, height = src.width, src.height
+
+    assert transform.a == 0.5
+    assert transform.e == -0.5
+    # Origin shifted by half a pixel from the tile corner (897000, 6577000)
+    assert transform.c == 896999.75
+    assert transform.f == 6577000.25
+    assert (width, height) == (2001, 2001)

@@ -44,7 +44,6 @@ def download_dtm(
     layer: str,
     output_dir: str,
     epsg: int = 2154,
-    tile_width: int = 1000,
     resolution: float = 0.5,
     timeout: int = 60,
 ) -> str:
@@ -61,10 +60,10 @@ def download_dtm(
         output_dir (str): Directory where the DTM GeoTIFF is saved.
         epsg (int): EPSG code of the coordinate reference system. Default: 2154
             (Lambert 93).
-        tile_width (int): Tile size in metres. Default: 1000 (LiDAR HD tiles
-            are 1 km × 1 km).
         resolution (float): Pixel size in metres. Default: 0.5 m (native
-            resolution of the LiDAR HD DTM).
+            resolution of the LiDAR HD DTM). The output grid is aligned on the
+            native DTM grid and extends half a pixel beyond the tile bounds
+            (2001 × 2001 px for a 1 km tile at 0.5 m).
         timeout (int): Delay after which the request is canceled (in seconds) Default: 60.
 
     Returns:
@@ -77,8 +76,18 @@ def download_dtm(
     metadata = las_info_metadata(tile_path)
     minx, maxx, miny, maxy = get_bounds_from_header_info(metadata)
 
-    width_px = int(tile_width / resolution)
-    height_px = int(tile_width / resolution)
+    # The LiDAR HD DTM has its pixel centres on multiples of `resolution`: snap the bbox
+    # onto native pixel edges (± resolution / 2) so that the WMS returns native values
+    # without resampling, and pixel centres cover the whole tile (no point left outside
+    # the interpolation grid in add_h_abg).
+    half = resolution / 2
+    minx = np.floor(minx / resolution) * resolution - half
+    miny = np.floor(miny / resolution) * resolution - half
+    maxx = np.ceil(maxx / resolution) * resolution + half
+    maxy = np.ceil(maxy / resolution) * resolution + half
+
+    width_px = round((maxx - minx) / resolution)
+    height_px = round((maxy - miny) / resolution)
 
     URL_GPP = "https://data.geopf.fr/wms-r/wms?"
     URL_FORMAT = "&EXCEPTIONS=text/xml&FORMAT=image/geotiff&SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&STYLES="
