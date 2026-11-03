@@ -22,9 +22,10 @@ logger = logging.getLogger(__name__)
 
 
 def add_version(input_filename: str, output_path: Path, epsg: int = 2154) -> None:
-    """Add the lidar_for_fuel version to the metadata of a LAS/LAZ file.
+    """Add the lidar_for_fuel version to the metadata of a LAS/LAZ file or of a directory of tiles.
     Args:
-        input_filename (str): Path to the input LAS/LAZ file.
+        input_filename (str): Path to the input LAS/LAZ file, or to a directory whose tiles
+            are all written to the same GeoPackage.
         output_path (Path): Path of the GeoPackage file to write. Parent directories are
             created when missing. An existing file is replaced.
         epsg (int): EPSG code of the tiles and of the written geometries.
@@ -75,21 +76,15 @@ def main(config: DictConfig):
     if not output_filename.endswith(".gpkg"):
         output_filename = output_filename + ".gpkg"
 
+    # Without an input filename, every tile of the input directory goes into a single GeoPackage.
     initial_las_filename = config.io.input_filename
+    input_path = os.path.join(input_dir, initial_las_filename) if initial_las_filename else input_dir
 
-    def main_on_one_tile(filename):
-        logging.info(f"\nProcessing tile : {os.path.splitext(filename)[0]}")
-        add_version(
-            input_filename=os.path.join(input_dir, filename),
-            output_path=os.path.join(output_dir, os.path.splitext(filename)[0] + ".gpkg"),
-            epsg=int(str(config.io.spatial_reference).split(":")[-1]),
-        )
-
-    if initial_las_filename:
-        main_on_one_tile(initial_las_filename)
-    else:
-        for file in os.listdir(input_dir):
-            main_on_one_tile(file)
+    add_version(
+        input_filename=input_path,
+        output_path=os.path.join(output_dir, output_filename),
+        epsg=int(str(config.io.spatial_reference).split(":")[-1]),
+    )
 
 
 if __name__ == "__main__":
