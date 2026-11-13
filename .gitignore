@@ -3,7 +3,6 @@
 .venv
 *.log
 tests/
-docs/
 env/
 venv/
 ENV/
