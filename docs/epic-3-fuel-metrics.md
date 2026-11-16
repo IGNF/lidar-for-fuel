@@ -3,7 +3,7 @@ title: 'Épique 3 — Métriques de combustible : portage de ffuelmetrics2 (R) d
 type: 'epic'
 created: '2026-10-22'
 status: 'draft'
-updated: '2026-11-13'
+updated: '2026-11-16'
 author: 'Mary (analyste BMAD) pour Malvina Dupays'
 sources:
   - 'LidarForFuel (R), branche Dev, commit 8fcccd2 (lidarforfuel 1.0.0.9013, 12/11/2026), qui intègre la PR #48 mergée (261b91e). Pour le calcul, R/ffuelmetrics2.R y est identique à 7c7d35e + PR #48 (1e2cc00), la version analysée auparavant — R/ffuelmetrics2.R, tests/testthat/test-ffuelmetrics2.R, Code_examples/Processing_Pipeline_example_V1.0.R'
@@ -12,6 +12,7 @@ sources:
   - 'Prototype de parité : proto-ffuelmetrics2-parite-2026-10-22.py (dossier de recherche local, hors dépôt)'
   - 'Brief étape 3 (04/11/2026) : _bmad-output/planning-artifacts/briefs/brief-lidar-for-fuel-2026-11-04/{brief.md, addendum.md, note-inrae-reunion-mi-novembre.md}'
   - 'Sprint Change Proposal du 05/11/2026 : _bmad-output/planning-artifacts/sprint-change-proposal-2026-11-05.md'
+  - 'Réponses écrites de l''INRAE aux questions Q1 à Q7, reçues le 16/11/2026 (voir §6)'
 ---
 
 # Épique 3 — Métriques de combustible (portage de `ffuelmetrics2`)
@@ -37,11 +38,18 @@ L'étape 3 est un **calcul pur, pixel par pixel**. Elle ne lit aucun nuage de po
 **Référence R.** La branche Dev de LidarForFuel au commit `8fcccd2` (lidarforfuel 1.0.0.9013, 12/11/2026), qui intègre la PR #48 (décision D7).
 
 **Calendrier.**
-- **mi-novembre 2026** : réunion avec l'INRAE. On y présente les décisions D2 à D5 et une tolérance chiffrée par métrique (story 3.8) ;
+- **mi-novembre 2026** : réponses écrites de l'INRAE (16/11/2026) sur les décisions D2 à D5 et les questions Q5 à Q7 ;
 - **mi-décembre 2026** : code de l'étape 3 prêt ;
 - **janvier 2027** : lancement de la production nationale, après validation par l'INRAE.
 
-Les décisions encore ouvertes (D2 à D5 : pixels sans donnée, bandes `CBD_cbh*`, `cbh_threshold_ratio`, seuil de 1 m codé en dur) sont en annexe, au §6. Elles sont reprises dans la note pour l'INRAE.
+**État des décisions au 16/11/2026** (détail au §6) :
+- **D2** (pixels sans donnée → NaN) est **acceptée** ;
+- **D3** (`CBD_cbh*`) : l'INRAE **corrige le bug dans R**, probablement selon la recommandation IGN ;
+- **D5** (seuil de 1 m codé en dur) est **refusée** : le 1 m est voulu et on le garde ;
+- **D4** (`cbh_threshold_ratio`) reste **ouverte et bloquante**, car la réponse reçue entre en conflit avec l'écart nul attendu (Q6) ;
+- **Q6** : l'INRAE attend un **écart nul** entre R et Python à entrées et paramètres identiques, et non une tolérance de l'ordre de 5 %.
+
+Une relance est envoyée à l'INRAE sur D4, Q6 et Q8, avec des précisions sur D2 et D3.
 
 ### Grille de sortie
 
@@ -119,7 +127,7 @@ Une nouvelle section `fuel_metrics` de la config contient les FMA de canopée et
 | CBHlow | Décimal | 0–60 m | Base du houppier recherchée dans la partie basse, entre 1 m et CTH/3 (m) |
 | CanBDmax, CanBDmin, CanBDlowmax, CanBDlowmin | Décimal | 0 – `bd_max` (1) | Extrêmes de densité CBD qui servent à trouver CBH et CBHlow (kg/m³) |
 | CBDcan | Décimal | 0 – `bd_max` (1) | Densité CBD moyenne entre CBH2 et min(CDH, CTH) (kg/m³) |
-| CBD_cbh, CBD_cbh2, CBD_cbhlow | Décimal | 0 – `bd_max` (1) | Densité CBD à la hauteur CBH, CBH2 ou CBHlow. **Toujours NaN en R** (constat A1, décision D3) (kg/m³) |
+| CBD_cbh, CBD_cbh2, CBD_cbhlow | Décimal | 0 – `bd_max` (1) | Densité CBD à la hauteur CBH, CBH2 ou CBHlow. **Toujours NaN en R** jusqu'à la correction annoncée par l'INRAE (constat A1, décision D3). Métrique probablement abandonnée en production finale (kg/m³) |
 | LFL, CFL, ProfType | Décimal, décimal, entier | ≥ 0, ≥ 0, {1, 2, 3, 4} | Copies des valeurs du seuil par défaut (`LadderLoad_0p020`, `CFL_0p020`, `ProfType_0p020`) |
 
 Avec la configuration par défaut, les 3 seuils d'échelle × 8 métriques donnent les canaux 4 à 27. Les noms suivent le format R : `0.01` → `0p010` pour les seuils d'échelle, `0.01` → `0p0100` pour les seuils CTH. Le seuil par défaut est celui de la liste le plus proche de la médiane (PR #48). L'ordre exact et les conventions de hauteur (bas, centre ou haut de strate) sont en annexe, au §3.2.
@@ -159,8 +167,8 @@ Le schéma suit l'ordre des stories. À l'exécution, c'est le point d'entrée (
                     ╚══════╤══════╝  → parité stricte avec R
                            │  Dict de métriques par pixel (45 avec la config par défaut)
                     ╔══════▼══════╗
-                    ║   US-3.5    ║  Corrections assumées D2, D3, D5
-                    ║             ║  (après les réponses de l'INRAE)
+                    ║   US-3.5    ║  Corrections assumées : D2 (+ D3 si
+                    ║             ║  R n'est pas encore corrigé)
                     ╚══════╤══════╝
                            │  Dict de métriques corrigé
                     ╔══════▼══════╗
@@ -184,7 +192,7 @@ Le schéma suit l'ordre des stories. À l'exécution, c'est le point d'entrée (
 
 ┌──────────────────────────────────────────────────────────────────────────┐
 │  VALIDATION (hors chaîne de calcul)                                      │
-│  • US-3.8 : mesure rapide chaîne complète Python vs R (tolérances Q6),   │
+│  • US-3.8 : écarts chaîne complète Python vs R (écart attendu nul, Q6),  │
 │    passe 1 avec le prototype, passe 2 avec main_fuel_metrics             │
 │  • US-3.9 (reportable) : étape 3 dans lff-compare                        │
 └──────────────────────────────────────────────────────────────────────────┘
@@ -198,10 +206,10 @@ Le schéma suit l'ordre des stories. À l'exécution, c'est le point d'entrée (
 | 3.2 | Lecture des strates et préparation du profil CBD | Facile | |
 | 3.3 | Métriques de canopée (CTH, CBH, CBH2, CBHlow, CDH, CBDcan) | Normal | |
 | 3.4 | Charges, combustible en échelle et assemblage (parité stricte avec R) | Normal | |
-| 3.5 | Corrections assumées par rapport à R | Facile | Attend les réponses de l'INRAE (D2, D3, D5) |
+| 3.5 | Corrections assumées par rapport à R | Facile | D2 acceptée ; D3 dépend de la correction R ; D5 retirée |
 | 3.6 | Application au raster PAD et export GeoTIFF | Normal | |
 | 3.7 | Point d'entrée `main_fuel_metrics`, configuration et documentation | Facile | |
-| 3.8 | Mesure rapide des écarts sur la chaîne complète | Facile | **Obligatoire** : passe 1 avant mi-novembre, passe 2 mi-décembre |
+| 3.8 | Mesure et explication des écarts sur la chaîne complète | Normal | **Obligatoire** : passe 1 au plus tôt, passe 2 mi-décembre. L'écart attendu est nul (Q6) : chaque écart doit être localisé et expliqué |
 | 3.9 | Étape 3 dans l'outil de comparaison `lff-compare` | Normal | **Reportable** après janvier 2027 |
 
 Le détail de chaque story (description, effort, critères d'acceptation) est en annexe, au §9. Le périmètre reste ouvert : des stories pourront être ajoutées ou retirées selon les réponses de l'INRAE et les retours de validation.
@@ -212,15 +220,19 @@ Le détail de chaque story (description, effort, critères d'acceptation) est en
 
 **Normal.**
 
-L'algorithme est maîtrisé : un prototype Python reproduit déjà la sortie R avec 0 écart sur 40 401 pixels × 45 métriques de la zone pilote. Le calcul est léger (environ 3 s par dalle) et ne demande aucune optimisation. L'incertitude porte sur les arbitrages de l'INRAE (D2 à D5, tolérances Q6) et sur le calendrier de validation, qui tombe pendant les fêtes.
+L'algorithme est maîtrisé : un prototype Python reproduit déjà la sortie R avec 0 écart sur 40 401 pixels × 45 métriques de la zone pilote. Le calcul est léger (environ 3 s par dalle) et ne demande aucune optimisation. L'incertitude ne porte plus sur l'étape 3 elle‑même, mais sur deux points :
+- **D4**, encore ouverte, qui change jusqu'à 209 valeurs de CBH2 sur la zone pilote ;
+- l'**écart nul attendu par l'INRAE sur la chaîne complète** (Q6). Il reporte l'exigence de parité sur les étapes 1 et 2, dont l'écart avec R n'est pas encore mesuré (story 3.8).
+
+Le calendrier de validation, qui tombe pendant les fêtes, reste aussi un risque (Q8 sans réponse).
 
 ## Critères d'acceptation
 
-- **AC-E.1 — Parité de l'étape 3 seule.** **Étant donné** le PAD produit par R sur la zone pilote HE_IGN_Galaxy (`pad_1m.tif` du 10/10/2026), **quand** on lui applique l'étape 3 Python, **alors** chacun des 45 canaux est identique à `fuel_metrics.tif` de R, à l'arrondi float32 près (tolérance relative 10⁻⁴), sauf les divergences assumées D2, D3 et D5, qui sont listées dans le `CHANGELOG.md`.
-- **AC-E.2 — Écart maîtrisé sur la chaîne complète.** **Étant donné** le PAD produit par lidar-for-fuel sur la zone pilote, **quand** on compare les métriques de l'étape 3 Python à celles de la chaîne R, **alors** chaque métrique respecte la tolérance convenue avec l'INRAE (Q6, ordre de grandeur 5 %).
+- **AC-E.1 — Parité de l'étape 3 seule.** **Étant donné** le PAD produit par R sur la zone pilote HE_IGN_Galaxy (`pad_1m.tif` du 10/10/2026), **quand** on lui applique l'étape 3 Python, **alors** chacun des 45 canaux est identique à `fuel_metrics.tif` de R, à l'arrondi float32 près (tolérance relative 10⁻⁴, à confirmer avec l'INRAE, Q6 bis). Seules font exception les divergences assumées listées dans le `CHANGELOG.md` : D2, plus D3 tant que la correction R n'est pas dans la référence.
+- **AC-E.2 — Écart nul sur la chaîne complète.** **Étant donné** les mêmes entrées (MNT, nuage, trajectoires) et les mêmes paramètres pour R et Python sur la zone pilote, **quand** on compare les métriques de la chaîne Python complète à celles de la chaîne R, **alors** l'écart est nul (attente de l'INRAE, Q6), hors divergences assumées. **Tout écart non nul est localisé** (étape 1, 2 ou 3) et expliqué dans le rapport de la story 3.8.
 - **AC-E.3 — Format de sortie.** **Étant donné** une dalle `{stem}_pad_profile_1m.tif`, **quand** l'étape 3 s'exécute, **alors** elle écrit `{stem}_fuel_metrics.tif` : un GeoTIFF float32, nodata = NaN, sur la même grille que l'entrée (transform, CRS, taille), avec les noms et l'ordre des canaux de R.
 - **AC-E.4 — Canaux pilotés par la configuration.** **Étant donné** une configuration avec n seuils d'échelle et m seuils de sommet de canopée, **quand** l'étape 3 s'exécute, **alors** la sortie a 19 + 8n + m canaux, nommés d'après les seuils configurés. Les canaux `LFL`, `CFL`, `FSG` et `ProfType` prennent les valeurs du seuil le plus proche de la médiane.
-- **AC-E.5 — Pixels sans donnée.** **Étant donné** un pixel dont tout le profil PAD est NaN, **quand** l'étape 3 s'exécute, **alors** le pixel reçoit la valeur décidée avec l'INRAE (recommandation IGN : NaN sur tous les canaux, D2) et n'apparaît pas comme « sans combustible ». Le nombre de ces pixels est journalisé par dalle.
+- **AC-E.5 — Pixels sans donnée.** **Étant donné** un pixel dont tout le profil PAD est NaN, **quand** l'étape 3 s'exécute, **alors** le pixel vaut NaN sur tous les canaux (D2, acceptée par l'INRAE le 16/11/2026) et n'apparaît pas comme « sans combustible ». Le nombre de ces pixels est journalisé par dalle.
 - **AC-E.6 — Robustesse à l'échelle nationale.** **Étant donné** une dalle atypique (eau, bord de chantier, dalle entièrement vide), **quand** l'étape 3 s'exécute, **alors** elle ne s'interrompt pas, écrit sa sortie et journalise les pixels vides et les profils corrigés.
 - **AC-E.7 — Lancement comme les étapes 1 et 2.** **Étant donné** un fichier ou un dossier de rasters PAD et la configuration, **quand** on lance `main_fuel_metrics`, **alors** on obtient une sortie par dalle. Un avertissement est émis si la condition d'équivalence avec R n'est pas remplie : `5 × min(fma_can, fma_shrub) ≥ bd_max` et `smooth_pad = False`.
 - **AC-E.8 — Validation par l'INRAE.** **Étant donné** le code final de la mi-décembre, **quand** l'INRAE examine le test de parité (AC-E.1) et la mesure des écarts refaite sur la version finale (story 3.8, passe 2), **alors** elle donne son accord avant le lancement de la production en janvier 2027.
@@ -251,7 +263,7 @@ Les annexes gardent la numérotation 3 à 11, à laquelle renvoient les stories 
 | `CanopyHeightThreshold` | `canopy_height_threshold` | 1 m | limite entre combustible de surface et canopée/échelle |
 | `CanopyBDTreshFrac` | `canopy_bd_thresh_frac` | 0.3 | fraction entre CBDmin et CBDmax pour définir le seuil CBH |
 | `CanopyTopBDThresholds` | `canopy_top_bd_thresholds` | [0.0012, 0.01] kg/m³ | seuils de densité pour le sommet de canopée |
-| `CBHThresholdRatio` | `cbh_threshold_ratio` | **1/3 exact**, et non 0.333 (voir D4) | fraction de CTH au‑dessus de laquelle on cherche la base du houppier dominant |
+| `CBHThresholdRatio` | `cbh_threshold_ratio` | **à trancher (D4, ouverte)** : 1/3 exact, la valeur que R calcule réellement, ou 0.333, la valeur de la config INRAE | fraction de CTH au‑dessus de laquelle on cherche la base du houppier dominant |
 | `bdmax` | `bd_max` | 1.0 kg/m³ | plafond de la densité CBD |
 | `M` | `m_perrakis` | 2.5 | facteur M de Perrakis (2025) |
 
@@ -278,7 +290,7 @@ Les noms de bandes sont dérivés des seuils **réellement configurés**, comme 
 | 34 | `CBHlow` | m | base du houppier recherchée dans la partie basse, entre 1 m et CTH/3 | **bas** de strate |
 | 35-38 | `CanBDmax`, `CanBDmin`, `CanBDlowmax`, `CanBDlowmin` | kg/m³ | extrêmes de densité CBD utilisés pour trouver CBH et CBHlow | — |
 | 39 | `CBDcan` | kg/m³ | densité CBD **moyenne** entre CBH2 et min(CDH, CTH) | — |
-| 40-42 | `CBD_cbh`, `CBD_cbh2`, `CBD_cbhlow` | kg/m³ | densité CBD à la hauteur CBH, CBH2 ou CBHlow. **Toujours NaN en R** (voir A1) | — |
+| 40-42 | `CBD_cbh`, `CBD_cbh2`, `CBD_cbhlow` | kg/m³ | densité CBD à la hauteur CBH, CBH2 ou CBHlow. **Toujours NaN en R** jusqu'à la correction annoncée par l'INRAE (voir A1, D3) | — |
 | 43-45 | `LFL`, `CFL`, `ProfType` | kg/m², kg/m², classe | copies de `LadderLoad_0p020`, `CFL_0p020` et `ProfType_0p020` | — |
 
 **Les codes `ProfType`.** `ProfType` décrit la forme du profil vertical d'un pixel, c'est‑à‑dire la façon dont le combustible se répartit entre trois zones :
@@ -314,7 +326,7 @@ h (m)  Type 1            Type 2            Type 3            Type 4
 - Le combustible en échelle n'est cherché qu'au‑dessus de CHT. « Continu depuis la surface » (type 3) signifie donc « qui commence à CHT », et non « qui descend jusqu'au sol ».
 - La strate de surface des types 2 et 4 est une zone de référence. Elle est toujours comptée, même si la strate 0–1 m est vide : sa présence n'est pas testée.
 - Il y a un `ProfType` par seuil (`ProfType_0p010`, `ProfType_0p020`, `ProfType_0p050`). Un même pixel peut être de type 3 avec le seuil 0.01 et de type 2 avec le seuil 0.05. La bande `ProfType` est celle du seuil médian (étape 9).
-- En R, le bas de la zone de recherche est `h > 1` codé en dur, et non CHT (constat A2). Avec CHT = 1 m, le résultat est le même.
+- En R, le bas de la zone de recherche est `h > 1` codé en dur, et non CHT (constat A2). Avec CHT = 1 m, le résultat est le même. L'INRAE a confirmé le 16/11/2026 que ce 1 m est **voulu**, pour caractériser la strate basse (D5 refusée) : le Python le garde.
 
 Quelques remarques sur ces sorties :
 - Ces conventions de hauteur mélangent des centres et des bords de strate. Ce n'est pas une erreur du portage : c'est le comportement de R, qu'il faut **reproduire** puis documenter dans les docstrings.
@@ -365,7 +377,7 @@ Quelques remarques sur ces sorties :
    - `FL_k1 = CBD[0] × dz` et `FL_k2 = CBD[1] × dz`. Ces deux valeurs supposent que la première strate commence à 0 m.
 8. **Combustible en échelle**, pour chaque seuil `t` de `sorted(set(ladder_fuel_bd_thresholds))`
    - Initialisation : `LadderBot = LadderTop = CHT`, `Load = SFLeq0 = SFLeq_int = 0`, `ProfType = 1` si `CBH2 == CHT`, sinon 2.
-   - `A = {CBD ≥ t et h > 1 et h ≤ CBH2}`. Le `1` est codé en dur en R (voir A2).
+   - `A = {CBD ≥ t et h > 1 et h ≤ CBH2}`. Le `1` est codé en dur en R (voir A2). C'est un choix scientifique confirmé par l'INRAE : en Python, c'est une constante nommée, indépendante de `canopy_height_threshold`.
    - Si A n'est pas vide :
      - `i0` = premier indice de A, et `LadderBot = h[i0] − dz/2` ;
      - `j` avance tant que la strate est dans A : `LadderTop = h[j_dernier] + dz/2` ;
@@ -384,9 +396,9 @@ Quelques remarques sur ces sorties :
 
 | ID | Constat | Preuve | Impact |
 |---|---|---|---|
-| **A1** | `CBD_cbh`, `CBD_cbh2` et `CBD_cbhlow` valent **toujours NA**. Le code cherche `zval == CBH`, mais `zval` est un centre de strate (x,5) alors que CBH est un bord (entier), depuis la modification du 12/05/2026. | `fuel_metrics.tif` : 0 pixel valide sur 40 401 pour ces 3 bandes. | Trois bandes vides livrées. |
-| **A2** | Dans la recherche du combustible en échelle, la condition `zval > 1` est **codée en dur** au lieu d'utiliser `CanopyHeightThreshold`. | `ffuelmetrics2.R:253` | Aucun impact avec CHT = 1. Faux si CHT vaut 2 ou 3 m, alors que la documentation annonce « typiquement 1 à 3 m ». |
-| **A3** | `ffuelmetrics2Rast` ne transmet **ni `smooth_pad` ni `CBHThresholdRatio`** à la fonction de calcul. En mode raster, R utilise donc toujours `smooth_pad = FALSE` et un ratio de 1/3, quelle que soit la config. | Prototype : 0 écart avec un ratio de 1/3 ; avec 0.333 (la valeur de la config), 209 pixels changent de CBH2 (jusqu'à 14 m) et 5 083 de CanBDlowmax. | La config INRAE 0.333 est **ignorée sans avertissement**. |
+| **A1** | `CBD_cbh`, `CBD_cbh2` et `CBD_cbhlow` valent **toujours NA**. Le code cherche `zval == CBH`, mais `zval` est un centre de strate (x,5) alors que CBH est un bord (entier), depuis la modification du 12/05/2026. | `fuel_metrics.tif` : 0 pixel valide sur 40 401 pour ces 3 bandes. | Trois bandes vides livrées. **Bug reconnu par l'INRAE le 16/11/2026** : la correction est en cours côté R (D3). |
+| **A2** | Dans la recherche du combustible en échelle, la condition `zval > 1` est **codée en dur** au lieu d'utiliser `CanopyHeightThreshold`. | `ffuelmetrics2.R:253` | Aucun impact avec CHT = 1. **Choix voulu selon l'INRAE (16/11/2026)** : on caractérise la strate basse à partir de 1 m (D5 refusée). Point à noter si CHT ≠ 1 : `LadderBot` peut alors se situer entre 1 m et CHT, alors que `LadderLoad` ne compte que les strates au‑dessus de CHT. À évoquer en réunion technique. |
+| **A3** | `ffuelmetrics2Rast` ne transmet **ni `smooth_pad` ni `CBHThresholdRatio`** à la fonction de calcul. En mode raster, R utilise donc toujours `smooth_pad = FALSE` et un ratio de 1/3, quelle que soit la config. | Prototype : 0 écart avec un ratio de 1/3 ; avec 0.333 (la valeur de la config), 209 pixels changent de CBH2 (jusqu'à 14 m) et 5 083 de CanBDlowmax. | La config INRAE 0.333 est **ignorée sans avertissement**. L'INRAE a répondu le 16/11/2026 que la valeur voulue est 0.333, sans préciser si R sera corrigé pour transmettre le paramètre (D4 ouverte). |
 | **A4** | Les valeurs par défaut diffèrent entre la fonction scalaire et la fonction raster : FMA 0.25 contre 1, `CanopyBDTreshFrac` 0.3 contre 0.1, ratio 1/3 contre 1/5 (ce dernier n'est pas transmis). | `ffuelmetrics2.R:70-81` contre `:315-326` | Risque de confusion. En Python, une seule source de valeurs par défaut : la config. |
 | **A5** | Un pixel sans donnée (PAD entièrement NaN) est converti en profil nul. Il reçoit alors `CLFL = 0`, `ProfType = 1`, `CBH2 = 1`… | 223 pixels entièrement NaN dans `pad_1m.tif` ; tous ont `CLFL = 0` dans `fuel_metrics.tif`. | **Faux signal « pas de combustible »** sur les zones sans mesure : bords de chantier, pixels écartés par le contrôle qualité. |
 | **A6** | Un PAD partiellement NaN est mis à 0 sans le signaler. La variable `invalid` est calculée puis jamais utilisée. | `:122` ; 1 pixel concerné sur la zone pilote. | Faible. Compter ces pixels et le journaliser. |
@@ -406,24 +418,33 @@ Quelques remarques sur ces sorties :
 
 ## 6. Décisions à valider
 
-| ID | Question | Recommandation (Mary) | Alternative | Note INRAE |
-|---|---|---|---|---|
-| **D1** | Fidélité du portage | **D'abord la parité stricte avec R** (story 3.4, test de référence), **ensuite** des corrections explicites et testées (story 3.5). Chaque divergence est listée dans la docstring et dans le CHANGELOG. | Corriger directement pendant le portage, mais on perd alors la preuve de parité. | — (choix IGN) |
-| **D2** | Pixels sans donnée (A5) | Mettre **NaN sur toutes les bandes** quand le PAD du pixel est entièrement NaN. | Garder le comportement R (zéros). | **Q1 (prioritaire)** |
-| **D3** | `CBD_cbh*` (A1) | Les **calculer correctement**, c'est‑à‑dire prendre la CBD de la strate dont le bas vaut CBH (`h_bottom == CBH`), et signaler le bug à l'INRAE. | Les garder à NaN (parité), ou retirer les 3 bandes (on aurait alors 42 bandes au lieu de 45). | Q2 (Q7 peut la simplifier) |
-| **D4** | Valeur de `cbh_threshold_ratio` (A3) | Mettre **`0.3333333333333333`** dans la config (= 1/3 en double précision), car c'est la valeur que R utilise réellement, et transmettre **tous** les paramètres. | Mettre 0.333 (la valeur affichée par l'INRAE), mais on diverge alors de la production R. | Q4 |
-| **D5** | `zval > 1` codé en dur (A2) | Utiliser `canopy_height_threshold`. Les résultats ne changent pas avec la config actuelle. | Garder 1 en dur. | Q3 |
-| **D6** | FMA | Scalaire dans la config pour cette épique. Une FMA en raster (par essence ou par pixel) est différée. | — | — (hors périmètre, brief) |
-| **D7** | Version R de référence | **Dev `8fcccd2` (1.0.0.9013)**. Elle contient la PR #48, mergée le 12/11/2026, et équivaut pour le calcul à l'ancienne référence « `7c7d35e` + PR #48 ». Les évolutions ultérieures de R ne sont pas suivies : l'INRAE prévient l'IGN de tout changement. | — (choix confirmé par le merge) | Q5 — **résolue** |
+| ID | Question | Recommandation (Mary) | Alternative | Réponse INRAE (16/11/2026) | Statut |
+|---|---|---|---|---|---|
+| **D1** | Fidélité du portage | **D'abord la parité stricte avec R** (story 3.4, test de référence), **ensuite** des corrections explicites et testées (story 3.5). Chaque divergence est listée dans la docstring et dans le CHANGELOG. | Corriger directement pendant le portage, mais on perd alors la preuve de parité. | — (choix IGN) | ✅ Retenue |
+| **D2** | Pixels sans donnée (A5) | Mettre **NaN sur toutes les bandes** quand le PAD du pixel est entièrement NaN. | Garder le comportement R (zéros). | Q1 : « NaN sur toutes les métriques me paraît mieux » | ✅ **Acceptée**. Reste à savoir si R passe aussi en NaN (Q1 bis) |
+| **D3** | `CBD_cbh*` (A1) | Les **calculer correctement**, c'est‑à‑dire prendre la CBD de la strate dont le bas vaut CBH (`h_bottom == CBH`), et signaler le bug à l'INRAE. | Les garder à NaN (parité), ou retirer les 3 bandes (on aurait alors 42 bandes au lieu de 45). | Q2 : bug reconnu ; correction dans R, probablement selon la recommandation IGN, après concertation. Métrique probablement pas conservée à la fin | 🟡 **Correction R en cours**. Le Python suivra la correction R (commit à obtenir, Q2 bis) |
+| **D4** | Valeur de `cbh_threshold_ratio` (A3) | Mettre **`0.3333333333333333`** dans la config (= 1/3 en double précision), car c'est la valeur que R utilise réellement, et transmettre **tous** les paramètres. | Mettre 0.333 (la valeur affichée par l'INRAE), mais on diverge alors de la production R. | Q4 : « la paramétrisation dans le fichier config est 0.333 ». Rien sur le fait que R ne transmet pas ce paramètre, ni sur `smooth_pad` | ⚠️ **Ouverte, bloquante**. Elle entre en conflit avec Q6 (voir ci‑dessous et Q4 bis) |
+| **D5** | `zval > 1` codé en dur (A2) | Utiliser `canopy_height_threshold`. Les résultats ne changent pas avec la config actuelle. | Garder 1 en dur. | Q3 : non. Le 1 m sert à caractériser la strate basse ; à rediscuter en réunion technique au besoin | ❌ **Refusée** : on garde 1 m (constante nommée) |
+| **D6** | FMA | Scalaire dans la config pour cette épique. Une FMA en raster (par essence ou par pixel) est différée. | — | — (hors périmètre, brief) | ✅ Retenue |
+| **D7** | Version R de référence | **Dev `8fcccd2` (1.0.0.9013)**. Elle contient la PR #48, mergée le 12/11/2026, et équivaut pour le calcul à l'ancienne référence « `7c7d35e` + PR #48 ». Les évolutions ultérieures de R ne sont pas suivies : l'INRAE prévient l'IGN de tout changement. | — | Q5 : PR #48 mergée | ✅ Confirmée. **À rebaser** sur le commit R qui corrigera A1 (D3), après vérification du diff |
 
-> **Mise à jour du 13/11/2026** : la PR #48 a été mergée le 12/11/2026. **D7 est confirmée**, et Q5 n'est plus une question pour la réunion.
+> **Mise à jour du 16/11/2026 : réponses écrites de l'INRAE.**
 >
-> **Statut au 05/11/2026** : D1, D6 et D7 sont retenues côté IGN (D7 est à confirmer par l'INRAE, Q5). D2, D3, D4 et D5 modifient des résultats ou des choix scientifiques. Elles seront **présentées à la réunion de mi‑novembre** (note `note-inrae-reunion-mi-novembre.md`), avec des réponses attendues d'Olivier Martin et François Pimont. La story 3.5 attend ces réponses ; les stories 3.1 à 3.4 n'en dépendent pas.
+> **Le conflit entre D4 et Q6.** L'INRAE demande à la fois la valeur 0.333 (Q4) et un écart nul avec R (Q6). Or R n'utilise jamais 0.333 en mode raster : `ffuelmetrics2Rast` ne transmet pas `CBHThresholdRatio` et applique 1/3 (A3). Sur la zone pilote, passer de 1/3 à 0.333 change CBH2 sur 209 pixels (jusqu'à 14 m) et CanBDlowmax sur 5 083 pixels. Les deux demandes ne sont compatibles que si l'INRAE corrige R pour transmettre le paramètre. C'est l'objet de la question **Q4 bis** de la relance. En attendant la réponse, le développement garde **1/3**, ce qui assure la parité avec la production R actuelle, et le paramètre est exposé dans la config.
 >
-> Trois questions de la note ne sont pas des décisions de portage, mais conditionnent la validation :
-> - **Q6**, la tolérance par métrique sur la chaîne complète : on la chiffre avec la story 3.8 ;
-> - **Q7**, les bandes réellement exploitées par l'INRAE : on oriente la validation selon la réponse ;
-> - **Q8**, qui valide à l'INRAE et à quelle date : la validation tombe entre mi‑décembre et janvier, pendant les fêtes.
+> **Q6, écart attendu nul.** L'INRAE attend un écart de 0 si les entrées (MNT, nuage, trajectoires) et les paramètres sont identiques. Cela remplace l'objectif d'environ 5 % (AC-E.2). Deux conséquences :
+> - l'exigence s'étend aux étapes 1 et 2 : la story 3.8 ne propose plus une tolérance, elle localise et explique chaque écart ;
+> - les divergences assumées (D2, et D3 tant que R n'est pas corrigé) créent forcément un écart. Il faut soit que R les adopte, soit les exclure explicitement de la comparaison (Q1 bis).
+>
+> Reste à préciser ce que « 0 » veut dire : au bit près, ou à l'arrondi float32 près. Le prototype obtient un écart maximal de 5,6·10⁻⁶ en relatif (Q6 bis).
+>
+> **Q7.** Les 45 métriques sont calculées pour l'instant, pour comparer R et Python sur les zones pilotes. Une sélection des variables utiles aux modèles de comportement du feu sera faite plus tard pour la production finale, sans date. Le nombre de bandes reste piloté par la configuration (AC-E.4).
+>
+> **Q8**, qui valide à l'INRAE et à quelle date : **pas de réponse**, à relancer.
+>
+> **Questions de relance** (mail du 16/11/2026) : Q4 bis (transmission de `CBHThresholdRatio` et de `smooth_pad` dans R, valeur de référence), Q1 bis (NaN aussi dans R ?), Q2 bis (commit et définition de la correction `CBD_cbh*`), Q6 bis (sens de « écart 0 » et périmètre), Q8.
+>
+> **Statut au 05/11/2026** (historique) : D1, D6 et D7 étaient retenues côté IGN. D2 à D5 devaient être présentées à la réunion de mi‑novembre, avec des réponses attendues d'Olivier Martin et François Pimont.
 
 ## 7. Pièges du portage R → Python
 
@@ -610,10 +631,10 @@ Normal.
 **En tant qu'** utilisatrice des cartes de combustible, **je veux** que les défauts identifiés dans le code R soient corrigés de façon explicite et tracée, **pour pouvoir** utiliser des cartes sans faux zéros ni bandes vides.
 
 - **Pour qui** : les utilisateurs des métriques (INRAE), et l'équipe de production IGN qui livre les cartes.
-- **Ce qu'on cherche à faire** : corriger trois défauts de R, selon les décisions prises avec l'INRAE (section 6) :
-  - **D2** : un pixel sans donnée ne doit plus apparaître comme « sans combustible » (charges nulles), mais comme « sans valeur » ;
-  - **D3** : les trois bandes `CBD_cbh*`, toujours vides en R à cause d'un bug, doivent être renseignées ;
-  - **D5** : la recherche du combustible en échelle doit respecter `canopy_height_threshold` au lieu d'une valeur de 1 m codée en dur.
+- **Ce qu'on cherche à faire** : corriger les défauts de R retenus avec l'INRAE (section 6, réponses du 16/11/2026) :
+  - **D2 (acceptée)** : un pixel sans donnée ne doit plus apparaître comme « sans combustible » (charges nulles), mais comme « sans valeur » ;
+  - **D3 (correction R en cours)** : les trois bandes `CBD_cbh*`, toujours vides en R à cause d'un bug, doivent être renseignées. Si la correction R est mergée avant le développement, D3 n'est plus une divergence : le Python suit la nouvelle référence R, et la parité est vérifiée dans la story 3.4 ;
+  - ~~**D5**~~ : **retirée**. L'INRAE garde le seuil de 1 m codé en dur, qui est voulu.
 - **Objectif final** : livrer en production des cartes justes, tout en gardant la trace de chaque écart avec R pour que l'INRAE puisse le vérifier.
 
 #### Estimation de l'effort
@@ -622,17 +643,17 @@ Facile.
 
 #### Critères d'acceptation
 
-> **Préalable** : décisions D2, D3 et D5 validées avec l'INRAE (section 6). Ces critères sont à adapter selon la décision retenue.
+> **Préalable** : D2 est acceptée (16/11/2026). Pour D3, on attend le commit de correction R (Q2 bis) : si sa définition diffère de l'AC-3.5.2, c'est la définition R qui fait foi.
 
 - **AC-3.5.1 (D2)** — **Étant donné** un pixel dont le PAD est entièrement NaN, **quand** on calcule ses métriques, **alors** toutes valent NaN.
-- **AC-3.5.2 (D3)** — **Étant donné** un profil où CBH, CBH2 ou CBHlow est défini, **quand** on calcule ses métriques, **alors** `CBD_cbh`, `CBD_cbh2` ou `CBD_cbhlow` vaut la densité CBD, **après l'étape 4**, de la strate dont le bas vaut cette hauteur. **Étant donné** une de ces hauteurs à NaN, **alors** la densité correspondante vaut NaN.
-- **AC-3.5.3 (D5)** — **Étant donné** `canopy_height_threshold = 2`, **quand** on cherche le combustible en échelle, **alors** la recherche utilise `h > canopy_height_threshold` et le résultat diffère de celui de R. **Étant donné** `canopy_height_threshold = 1`, **alors** le résultat est identique à celui de R.
+- **AC-3.5.2 (D3)** — **Étant donné** un profil où CBH, CBH2 ou CBHlow est défini, **quand** on calcule ses métriques, **alors** `CBD_cbh`, `CBD_cbh2` ou `CBD_cbhlow` vaut la densité CBD, **après l'étape 4**, de la strate dont le bas vaut cette hauteur. **Étant donné** une de ces hauteurs à NaN, **alors** la densité correspondante vaut NaN. *(À aligner sur la correction R dès qu'elle est disponible.)*
+- ~~**AC-3.5.3 (D5)**~~ — **Retiré** : D5 est refusée par l'INRAE. Le seuil `h > 1` est conservé sous forme de constante nommée, indépendante de `canopy_height_threshold` (§4, étape 8).
 - **AC-3.5.4** — **Étant donné** les corrections en place, **quand** on lance le test de parité 3.4, **alors** il reste vert sur toutes les autres métriques. Les divergences assumées sont **exclues explicitement par leur nom** dans ce test, avec un commentaire qui renvoie à cette épique, et non par une tolérance.
 - **AC-3.5.5** — **Étant donné** une divergence assumée avec R, **quand** on lit la docstring de `fuel_metrics_core` et le `CHANGELOG.md`, **alors** elle y est listée.
 
 #### Informations complémentaires
 
-**Dépendances** : 3.4, et les réponses de l'INRAE (réunion de mi‑novembre).
+**Dépendances** : 3.4. Pour D3, le commit de correction R (Q2 bis).
 
 ### Story 3.6 — Application au raster PAD et export GeoTIFF
 
@@ -687,7 +708,7 @@ Facile.
 
 #### Critères d'acceptation
 
-- **AC-3.7.1** — **Étant donné** `configs/config.yaml`, **quand** on l'ouvre, **alors** il contient une section `fuel_metrics:` avec les paramètres du tableau 3.1, nommés en snake_case. Les valeurs par défaut sont celles de la config INRAE, avec `cbh_threshold_ratio: 0.3333333333333333` (D4).
+- **AC-3.7.1** — **Étant donné** `configs/config.yaml`, **quand** on l'ouvre, **alors** il contient une section `fuel_metrics:` avec les paramètres du tableau 3.1, nommés en snake_case. Les valeurs par défaut sont celles de la config INRAE. Pour `cbh_threshold_ratio`, on met `0.3333333333333333` (1/3, la valeur que R calcule réellement) tant que D4 est ouverte. On passe à `0.333` seulement si l'INRAE corrige R pour transmettre ce paramètre (Q4 bis).
 - **AC-3.7.2** — **Étant donné** un dossier qui contient des fichiers `*_pad_profile_1m.tif`, **quand** on lance `python -m lidar_for_fuel.main_fuel_metrics io.input_dir=… io.output_dir=…`, **alors** tous les fichiers du dossier sont traités, ou seulement `io.input_filename` s'il est renseigné, et un fichier `{stem}_fuel_metrics.tif` est écrit pour chacun. **Étant donné** un `input_dir` ou un `output_dir` invalide, **alors** les messages d'erreur sont identiques à ceux de `main_pad_profile.py`.
 - **AC-3.7.3** — **Étant donné** une config où `smooth_pad` est vrai ou bien `5 × min(FMA) < bd_max`, **quand** on lance le traitement, **alors** un avertissement est journalisé au démarrage : la condition d'équivalence avec R de la section 3.1 n'est pas remplie.
 - **AC-3.7.4** — **Étant donné** la story livrée, **quand** on consulte le dépôt, **alors** on y trouve :
@@ -700,21 +721,21 @@ Facile.
 
 **Dépendances** : 3.6.
 
-### Story 3.8 (obligatoire) — Mesure rapide des écarts sur la chaîne complète
+### Story 3.8 (obligatoire) — Mesure et explication des écarts sur la chaîne complète
 
 #### Description
 
-**En tant qu'** analyste, **je veux** chiffrer rapidement l'écart entre les métriques de la chaîne Python complète et celles de la chaîne R sur la dalle `Semis_2024_0513_6856`, **pour pouvoir** proposer à l'INRAE une tolérance par métrique (Q6) à la réunion de mi‑novembre, puis fournir un élément de validation en décembre.
+**En tant qu'** analyste, **je veux** mesurer l'écart entre les métriques de la chaîne Python complète et celles de la chaîne R sur la dalle `Semis_2024_0513_6856`, et **localiser chaque écart non nul**, **pour pouvoir** montrer à l'INRAE que la chaîne Python reproduit R. L'INRAE attend un écart nul à entrées et paramètres identiques (Q6, 16/11/2026).
 
-- **Pour qui** : l'analyste IGN (Malvina), et l'INRAE qui doit fixer les tolérances et valider la chaîne.
-- **Ce qu'on cherche à faire** : comparer, pixel par pixel, les cartes de métriques produites par Python et par R sur une même dalle, et résumer les écarts métrique par métrique. La mesure se fait **deux fois** :
-  - **passe 1, avant la mi‑novembre 2026** : l'étape 3 est calculée par le **prototype**, appliqué au PAD de lidar‑for‑fuel **v0.3.0** ;
+- **Pour qui** : l'analyste IGN (Malvina), et l'INRAE qui valide la chaîne.
+- **Ce qu'on cherche à faire** : comparer, pixel par pixel, les cartes de métriques produites par Python et par R sur une même dalle, à **entrées identiques** (MNT, nuage, trajectoires) et **paramètres identiques**. Pour chaque écart non nul, on dit de quelle étape il vient (1, 2 ou 3) et pourquoi. La mesure se fait **deux fois** :
+  - **passe 1, au plus tôt** : l'étape 3 est calculée par le **prototype**, appliqué au PAD de lidar‑for‑fuel **v0.3.0** ;
   - **passe 2, mi‑décembre 2026** : même mesure, avec cette fois `main_fuel_metrics` (story 3.7), dans sa version finale.
-- **Objectif final** : arriver à la réunion avec des chiffres plutôt qu'avec des intuitions, et montrer d'où viennent les écarts. Comme l'étape 3 seule ne crée aucun écart, tout écart mesuré vient de l'étape 2 (le PAD).
+- **Objectif final** : comme l'étape 3 seule ne crée aucun écart, tout écart mesuré vient des étapes 1 ou 2, ou de différences d'entrées et de paramètres. Avec un écart attendu nul, il faut le prouver point par point, et non le résumer par une tolérance.
 
 #### Estimation de l'effort
 
-Facile.
+Normal. Ce n'est plus Facile : il faut remonter chaque écart à sa source, ce qui peut obliger à comparer aussi les sorties des étapes 1 et 2.
 
 #### Critères d'acceptation
 
@@ -722,9 +743,10 @@ Facile.
 - **AC-3.8.2** — **Étant donné** la comparaison faite, **quand** on lit les résultats, **alors** on obtient, pour chaque métrique ou chaque groupe de la note INRAE (Q6) :
   - l'écart absolu moyen ;
   - le 99ᵉ centile de l'écart absolu ;
-  - la part de pixels dans une tolérance candidate ;
+  - la part de pixels à écart nul (à l'arrondi float32 près) ;
   - pour `ProfType*`, le taux d'accord de classe et la matrice de confusion.
-- **AC-3.8.3** — **Étant donné** les résultats de la passe 1, **quand** on prépare la réunion, **alors** le tableau Q6 de `note-inrae-reunion-mi-novembre.md` est rempli : colonne « Écart mesuré », plus une proposition de seuil par métrique.
+- **AC-3.8.3** — **Étant donné** les résultats d'une passe, **quand** une métrique présente un écart non nul (hors arrondi float32 et hors divergences assumées), **alors** le rapport donne sa **source** (différence d'entrées ou de paramètres, étape 1, étape 2, étape 3) et le nombre de pixels concernés. Les pixels des divergences assumées (D2, et D3 tant que R n'est pas corrigé) sont exclus et comptés à part.
+- **AC-3.8.3 bis** — **Étant donné** la comparaison, **quand** on vérifie les paramètres, **alors** le rapport confirme que R et Python utilisent la même valeur effective de `cbh_threshold_ratio` (1/3 en R raster tant que A3 n'est pas corrigé, voir D4) et de `smooth_pad`.
 - **AC-3.8.4** — **Étant donné** le prototype appliqué au PAD R, **quand** on compare sa sortie à celle de R, **alors** l'écart est nul. L'écart mesuré sur la chaîne complète vient donc **entièrement du PAD**. Le rapport le dit, et vérifie l'hypothèse de l'addendum selon laquelle l'écart sur la strate 0–1 m touche surtout `FL_k1`.
 - **AC-3.8.5** — **Étant donné** une passe terminée, **quand** on ouvre `research/mesure-rapide-etape3-<date>.md`, **alors** on y trouve la version de lidar‑for‑fuel, le commit, la configuration et les chiffres de cette passe.
 
@@ -776,8 +798,13 @@ Normal.
 - **Version de lidar‑for‑fuel dans les rasters de sortie** : depuis la PR #43, elle est inscrite dans les GPKG. Il faudrait l'étendre aux rasters de métriques, utile si l'INRAE fait évoluer les formules pendant la production.
 
 **Actions hors stories (Malvina)** :
-- **Note de décision pour l'INRAE** (`note-inrae-reunion-mi-novembre.md`) : la compléter avec les chiffres de la story 3.8, passe 1, et la présenter à la réunion de mi‑novembre. Profiter de la réunion pour caler la date et la personne qui valide (Q8).
-- **Remonter A1 à A11 à l'INRAE** sous forme d'issue sur `oliviermartin7/LidarForFuel`. A9 et A11 sont réglés par le merge de la PR #48 (12/11/2026) : il reste A1 à A8 et A10 à remonter.
+- **Relance INRAE du 16/11/2026** : obtenir les réponses à Q4 bis (bloquante), Q1 bis, Q2 bis, Q6 bis et Q8 (validateur et date).
+- **Remonter les constats restants à l'INRAE** sous forme d'issue sur `oliviermartin7/LidarForFuel`. Ce qui est déjà réglé :
+  - A9 et A11, par le merge de la PR #48 (12/11/2026) ;
+  - A1, corrigé par l'INRAE (correction annoncée le 16/11/2026) ;
+  - A2, choix voulu par l'INRAE.
+
+  Il reste A3 (lié à Q4 bis), A4 à A8 et A10.
 
 ## 11. Ordre de réalisation
 
@@ -791,13 +818,14 @@ Normal.
                                                3.9 (lff-compare) : après 3.7, reportable après janvier
 ```
 
-- **\*** La story 3.5 attend les réponses de l'INRAE sur D2, D3 et D5. On peut faire 3.6 avant 3.5, puis ajouter AC-3.6.4 ensuite.
-- La story **3.8, passe 1**, n'a **aucune dépendance**. Elle passe **en premier**, en parallèle de 3.1, puisqu'elle doit être prête avant la réunion de mi‑novembre.
+- **\*** Depuis les réponses du 16/11/2026, la story 3.5 ne porte plus que sur D2, plus D3 si la correction R n'est pas encore disponible. On peut faire 3.6 avant 3.5, puis ajouter AC-3.6.4 ensuite.
+- La story **3.8, passe 1**, n'a **aucune dépendance**. Elle passe **en premier**, en parallèle de 3.1. Avec l'écart nul attendu (Q6), c'est elle qui révèle au plus tôt les écarts des étapes 1 et 2.
+- **D4 bloque** la valeur par défaut de `cbh_threshold_ratio` (story 3.7), mais aucune autre story : le paramètre est exposé dans la config dans tous les cas.
 
 | Jalon | Date | Contenu |
 |---|---|---|
-| J1 | avant la réunion de mi‑novembre 2026 | 3.8 passe 1 faite, tableau Q6 de la note rempli |
-| J2 | réunion de mi‑novembre 2026 | décisions D2 à D5 et tolérances Q6 ; validateur et date de validation (Q8) |
+| J1 | au plus tôt | 3.8 passe 1 faite, écarts localisés |
+| J2 | 16/11/2026 (réponses écrites) | D2 acceptée, D3 en cours de correction dans R, D5 refusée, Q6 = écart nul, Q7 = 45 métriques. **Restent ouverts : D4 (Q4 bis), Q6 bis, Q8** |
 | J3 | mi‑décembre 2026 | 3.1 à 3.7 mergées, 3.8 passe 2 faite |
 | J4 | entre mi‑décembre 2026 et janvier 2027 | validation par l'INRAE (test de parité 3.4/3.5 et 3.8 passe 2) |
 | J5 | janvier 2027 | lancement de la production nationale |
