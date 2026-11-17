@@ -15,3 +15,9 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-3-2-prepare-cbd-profile.md`
   summary: Story 3.7 (AC-3.7.3, AC-E.7) — revoir la condition d'équivalence avec R `5 × min(fma_can, fma_shrub) ≥ bd_max` quand une FMA est la carte : elle doit porter sur le minimum de la carte, ou être évaluée par pixel.
   evidence: La carte FMA va de 0,05 à 0,5 kg/m². Pour un pixel où FMA < 0,2, on a 5 × FMA < 1 = `bd_max`. Le PAD Python plafonné à 5 donne alors une CBD plus faible que le PAD R non plafonné (maximum observé 7,01). Il y a donc un écart avec R sur ces pixels si PAD > 5, en contradiction avec Q6, qui demande un écart nul. Avec la valeur scalaire 0,254 de la config, la condition reste vraie.
+- source_spec: `_bmad-output/implementation-artifacts/spec-3-3-canopy-metrics.md`
+  summary: Story 3.7 — refuser les seuils `canopy_top_bd_thresholds` en double ou de même nom au format `%0.4f` (ex. 0.01 et 0.01004 → `CTH_0p0100`).
+  evidence: `compute_canopy_metrics` range les CTH dans un dict ; deux seuils de même nom fusionnent (10 métriques au lieu de 11, nombre de bandes faux) et le CTH de référence prend la dernière valeur, alors que R prend la première. Ne survient qu'avec une config anormale : contrôle à faire à la lecture de la config.
+- source_spec: `_bmad-output/implementation-artifacts/spec-3-3-canopy-metrics.md`
+  summary: Story 3.6 — décider du traitement des pixels sans FMA (NaN renvoyé par `read_fma`) avant le calcul des métriques (Q9 posée à l'INRAE).
+  evidence: Une FMA NaN rend la CBD NaN ; les métriques divergent alors de R (ex. `CBDcan` NaN avec `np.mean`, 0.2 avec `mean(na.rm = TRUE)` de R), et R lui-même n'est pas cohérent (`max()` sans `na.rm` en 3A/3B). Sévérité medium non vérifiée sur données réelles ; à trancher avec la réponse de l'INRAE à Q9 (probablement NaN sur toutes les bandes, comme D2).

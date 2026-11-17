@@ -1,0 +1,230 @@
+"""
+Canopy metrics of a vertical profile, ported from R `ffuelmetrics2` (steps 1 to 6 of the algorithm):
+- CBD profile with the canopy height threshold as the canopy / shrub limit;
+- canopy top height (CTH) for each canopy top threshold;
+- crown base heights: CBH and CBH2 in the upper canopy, CBHlow in the lower canopy;
+- CBD profile recomputed with CBH2 as the canopy / shrub limit;
+- canopy dominant height (CDH) and mean canopy bulk density (CBDcan).
+
+The R comparison operators, the R order of operations (`CTH * ratio`) and the R choice of the
+first index on ties are kept as is, so that the results are the same as R.
+"""
+
+from collections.abc import Sequence
+
+import numpy as np
+
+from lidar_for_fuel.fuel_metrics.prepare_cbd_profile import compute_cbd
+
+
+def compute_canopy_metrics(
+    pad: np.ndarray,
+    h_center: np.ndarray,
+    dz: float,
+    fma_can: float,
+    fma_shrub: float,
+    bd_max: float,
+    canopy_height_threshold: float,
+    canopy_bd_thresh_frac: float,
+    canopy_top_bd_thresholds: Sequence[float],
+    cbh_threshold_ratio: float,
+) -> tuple[dict[str, float], np.ndarray]:
+    """Compute the canopy metrics of one vertical profile, as R `ffuelmetrics2` does.
+
+    Steps (h is the stratum centre, CHT the canopy height threshold, CBD the bulk density):
+
+    1. CBD with the canopy FMA above CHT (`compute_cbd`).
+    2. `CTH_t` = highest h with CBD >= t, for each threshold t; CTH = the one of the largest t.
+    3. Crown base, only if CTH exists:
+
+       - **3A, upper canopy**, CHT and CTH × ratio < h <= CTH: `CanBDmax` and the first stratum
+         reaching it; `CanBDmin` below it (h > CHT). If CanBDmin < CanBDmax, threshold
+         `S = CanBDmin × (1 − frac) + frac × CanBDmax`, `CBH` = bottom of the lowest stratum
+         >= S between them and `CBH2` = bottom of the stratum above the first one < S met
+         going down from the max.
+       - **3B, lower canopy**, CHT < h <= CTH × ratio: same search for `CanBDlowmax`,
+         `CanBDlowmin` and `CBHlow`, without the `min < max` test.
+       - **3C**: CBH2 falls back on CBHlow, then on CHT.
+
+       `CanBD*` are given even when no crown base is found.
+    4. CBD recomputed from the PAD with the canopy FMA above CBH2.
+    5. `CDH` = highest h with CBD >= 0.1 × CanBDmax (CTH if none), then `min(CDH, CTH)`.
+    6. `CBDcan` = mean CBD of the strata with CBH2 <= h <= min(CDH, CTH), 0 if none.
+
+    Height references (as R): CTH and CDH are stratum centres, CBH, CBH2 and CBHlow stratum
+    bottoms. NaN is the R `NA`: a missing CTH gives NaN for CDH and for CBDcan (R `any(NA)`).
+
+    Args:
+        pad (np.ndarray): Prepared 1-D PAD profile (m²/m³), see `prepare_pad_profile`.
+        h_center (np.ndarray): Height above ground of the centre of each stratum (m),
+            ascending, i.e. `h_bottom + dz / 2`.
+        dz (float): Thickness of the strata (m).
+        fma_can (float): Fuel mass area of the canopy fuel (kg/m²) for this pixel.
+        fma_shrub (float): Fuel mass area of the shrub fuel (kg/m²) for this pixel.
+        bd_max (float): Maximum CBD value (kg/m³).
+        canopy_height_threshold (float): Height (m) separating surface and canopy fuel (CHT).
+        canopy_bd_thresh_frac (float): Fraction between CanBDmin and CanBDmax giving the
+            crown base threshold S.
+        canopy_top_bd_thresholds (Sequence[float]): CBD thresholds of the canopy top (kg/m³).
+        cbh_threshold_ratio (float): Fraction of CTH separating the upper (3A) and lower (3B)
+            crown base searches.
+
+    Returns:
+        tuple[dict[str, float], np.ndarray]:
+            - the metrics, keyed by their R band name: `CTH_{t:0.4f}` (one per threshold,
+              in the configured order, `.` written `p`), `CDH`, `CBH`, `CBH2`, `CBHlow`,
+              `CanBDmax`, `CanBDmin`, `CanBDlowmax`, `CanBDlowmin`, `CBDcan`;
+            - the CBD profile recomputed with CBH2 (step 4), used by the ladder fuel metrics.
+    """
+    pad = np.asarray(pad, dtype=float)
+    h = np.asarray(h_center, dtype=float)
+    cht = canopy_height_threshold
+
+    # 1. CBD with CHT as the canopy / shrub limit
+    cbd = compute_cbd(pad, h, cht, fma_can, fma_shrub, bd_max)
+
+    # 2. Canopy top heights; the reference CTH is the one of the largest threshold
+    cth_by_name = {}
+    for threshold in canopy_top_bd_thresholds:
+        cth_by_name[_cth_name(threshold)] = _highest(h, cbd >= threshold)
+    cth = cth_by_name[_cth_name(max(canopy_top_bd_thresholds))]
+
+    # 3. Crown base heights. In R, a NaN CTH empties both searches (`h > NA`); in Python
+    # `max(cht, nan)` would be cht, so the case is skipped explicitly.
+    upper = lower = (np.nan, np.nan, np.nan, np.nan)
+    if not np.isnan(cth):
+        # 3A. Upper canopy
+        upper = _crown_base(
+            cbd,
+            h,
+            dz,
+            (h > max(cht, cth * cbh_threshold_ratio)) & (h <= cth),
+            cht,
+            canopy_bd_thresh_frac,
+            require_min_below_max=True,
+        )
+        # 3B. Lower canopy
+        lower = _crown_base(
+            cbd,
+            h,
+            dz,
+            (h > cht) & (h <= cth * cbh_threshold_ratio),
+            cht,
+            canopy_bd_thresh_frac,
+            require_min_below_max=False,
+        )
+    can_bd_max, can_bd_min, cbh, cbh2 = upper
+    # R does not walk down to a continuous base in the lower canopy: its CBH2 is not used
+    can_bd_low_max, can_bd_low_min, cbh_low, _ = lower
+
+    # 3C. Fallbacks of CBH2
+    if np.isnan(cbh2):
+        cbh2 = cbh_low
+    if np.isnan(cbh2):
+        cbh2 = cht
+
+    # 4. CBD recomputed from the PAD, with CBH2 as the canopy / shrub limit
+    cbd = compute_cbd(pad, h, cbh2, fma_can, fma_shrub, bd_max)
+
+    # 5. Canopy dominant height, capped by CTH (NaN if CTH is NaN, as R `min(x, NA)`)
+    cdh = _highest(h, cbd >= 0.1 * can_bd_max) if not np.isnan(can_bd_max) else np.nan
+    if np.isnan(cdh):
+        cdh = cth
+    cdh = float(np.minimum(cdh, cth))
+
+    # 6. Mean canopy bulk density between CBH2 and min(CDH, CTH), i.e. CDH, already capped
+    top = cdh
+    if np.isnan(top):
+        # R `any(h >= CBH2 & h <= NA)`: NA if a stratum is above CBH2, FALSE (-> 0) otherwise
+        cbd_can = np.nan if (h >= cbh2).any() else 0.0
+    else:
+        in_canopy = (h >= cbh2) & (h <= top)
+        cbd_can = float(np.mean(cbd[in_canopy])) if in_canopy.any() else 0.0
+
+    metrics = {
+        **cth_by_name,
+        "CDH": cdh,
+        "CBH": cbh,
+        "CBH2": cbh2,
+        "CBHlow": cbh_low,
+        "CanBDmax": can_bd_max,
+        "CanBDmin": can_bd_min,
+        "CanBDlowmax": can_bd_low_max,
+        "CanBDlowmin": can_bd_low_min,
+        "CBDcan": cbd_can,
+    }
+
+    return metrics, cbd
+
+
+def _cth_name(threshold: float) -> str:
+    """R band name of a canopy top height: `sprintf("%0.4f")` with `.` written `p` (0.01 -> CTH_0p0100)."""
+    return "CTH_" + f"{threshold:0.4f}".replace(".", "p")
+
+
+def _highest(h: np.ndarray, mask: np.ndarray) -> float:
+    """Highest height selected by `mask`, NaN if none (R `if (any(m)) max(h[m]) else NA`)."""
+    return float(h[mask].max()) if mask.any() else np.nan
+
+
+def _crown_base(
+    cbd: np.ndarray,
+    h: np.ndarray,
+    dz: float,
+    search: np.ndarray,
+    cht: float,
+    frac: float,
+    require_min_below_max: bool,
+) -> tuple[float, float, float, float]:
+    """Search a crown base in a height range of the CBD profile (steps 3A and 3B of R).
+
+    - `bd_max` = max CBD of the range; `i_max` = first stratum of the range reaching it.
+    - `bd_min` = min CBD between CHT and `i_max` (h > CHT, h < h[i_max]); `i_min` = first
+      stratum reaching it.
+    - Threshold `S = bd_min × (1 − frac) + frac × bd_max`. The crown base is computed if
+      `bd_min < bd_max` (3A only, `require_min_below_max`) or always (3B):
+      - `cbh` = bottom of the lowest stratum with CBD >= S and max(CHT, h[i_min]) < h <= h[i_max];
+      - `cbh2` = going down from `i_max` to `i_min + 1`, bottom of the first stratum k whose
+        lower neighbour has CBD < S. Only computed when `cbh` is found, as in R. It can stay
+        NaN even then: with `frac = 0`, S = `bd_min` and no CBD is < S (CBH2 then falls back
+        on CBHlow or CHT, possibly below CBH, as in R).
+
+    Args:
+        cbd (np.ndarray): CBD profile (kg/m³), no NaN.
+        h (np.ndarray): Height of the stratum centres (m), ascending.
+        dz (float): Thickness of the strata (m).
+        search (np.ndarray): Boolean mask of the strata where the max is searched.
+        cht (float): Canopy height threshold (m).
+        frac (float): Fraction between `bd_min` and `bd_max` giving the threshold S.
+        require_min_below_max (bool): Only search the crown base if `bd_min < bd_max` (3A).
+
+    Returns:
+        tuple[float, float, float, float]: `bd_max`, `bd_min`, `cbh`, `cbh2`, NaN when not found.
+    """
+    bd_max = bd_min = cbh = cbh2 = np.nan
+
+    in_range = np.flatnonzero(search)
+    if in_range.size == 0:
+        return bd_max, bd_min, cbh, cbh2
+    bd_max = float(cbd[in_range].max())
+    i_max = in_range[np.flatnonzero(cbd[in_range] == bd_max)[0]]
+
+    below = np.flatnonzero((h > cht) & (h < h[i_max]))
+    if below.size == 0:
+        return bd_max, bd_min, cbh, cbh2
+    bd_min = float(cbd[below].min())
+    if require_min_below_max and not bd_min < bd_max:
+        return bd_max, bd_min, cbh, cbh2
+    i_min = below[np.flatnonzero(cbd[below] == bd_min)[0]]
+
+    threshold = bd_min * (1 - frac) + frac * bd_max
+    above = (cbd >= threshold) & (h > max(cht, h[i_min])) & (h <= h[i_max])
+    if above.any():
+        cbh = float(h[above].min()) - 0.5 * dz
+        # R: for (k in rev(seq.int(idmin + 1, idmax))) if (CBDval[k - 1] < CanBDTresh) ...
+        for k in range(i_max, i_min, -1):
+            if cbd[k - 1] < threshold:
+                cbh2 = float(h[k]) - 0.5 * dz
+                break
+
+    return bd_max, bd_min, cbh, cbh2
