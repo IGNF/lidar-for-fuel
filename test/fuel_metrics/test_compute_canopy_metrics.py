@@ -69,7 +69,7 @@ def _assert_metrics(metrics, expected):
         np.testing.assert_allclose(metrics[name], expected[name], rtol=1e-12, equal_nan=True, err_msg=name)
 
 
-# --- Hand-written profiles, one per branch of the algorithm (AC-3.3.1) ------------------------
+# --- Hand-written profiles, one per branch of the algorithm -----------------------------------
 
 # h_center: 0.5 1.5   2.5   3.5  4.5  5.5  6.5  7.5  8.5  9.5  10.5   11.5
 _PROFILE_3A = [0.05, 0.05, 0.02, 0.0, 0.2, 0.1, 0.3, 0.5, 0.4, 0.2, 0.005, 0.001]
@@ -235,7 +235,7 @@ def test_canopy_metrics_frac_0_gives_cbh_without_cbh2():
     np.testing.assert_allclose(metrics["CBDcan"], 0.19666666666666668, rtol=1e-12)  # 1.5 to 9.5
 
 
-# --- No canopy top at 0.01 (AC-3.3.2) ----------------------------------------------------------
+# --- No stratum dense enough for the canopy top (CBD < 0.01) -----------------------------------
 
 
 def test_canopy_metrics_no_stratum_above_0p01():
@@ -292,7 +292,7 @@ def test_canopy_metrics_cdh_capped_by_cth():
     np.testing.assert_allclose(metrics["CBDcan"], 0.05)  # 4.5 to 6.5
 
 
-# --- Floating-point bounds of R (AC-3.3.4) ------------------------------------------------------
+# --- Search bounds compared exactly as in R (CTH × ratio) ---------------------------------------
 
 
 def test_canopy_metrics_3a_excludes_the_stratum_at_cth_times_ratio():
@@ -361,7 +361,7 @@ def test_canopy_metrics_cth_names_follow_the_configured_thresholds():
     assert metrics["CDH"] == 9.5  # min(CDH, CTH_0p0500)
 
 
-# --- Parity with R on the reference tile (AC-3.3.3) ---------------------------------------------
+# --- Parity with R on the reference tile --------------------------------------------------------
 
 
 def test_canopy_metrics_parity_with_r():
