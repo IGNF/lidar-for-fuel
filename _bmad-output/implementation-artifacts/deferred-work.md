@@ -21,3 +21,9 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-3-3-canopy-metrics.md`
   summary: Story 3.6 — décider du traitement des pixels sans FMA (NaN renvoyé par `read_fma`) avant le calcul des métriques (Q9 posée à l'INRAE).
   evidence: Une FMA NaN rend la CBD NaN ; les métriques divergent alors de R (ex. `CBDcan` NaN avec `np.mean`, 0.2 avec `mean(na.rm = TRUE)` de R), et R lui-même n'est pas cohérent (`max()` sans `na.rm` en 3A/3B). Sévérité medium non vérifiée sur données réelles ; à trancher avec la réponse de l'INRAE à Q9 (probablement NaN sur toutes les bandes, comme D2).
+- source_spec: `_bmad-output/implementation-artifacts/spec-3-3-canopy-metrics.md`
+  summary: Story 3.4/3.5 (D3) — calculer `CBD_cbh`, `CBD_cbh2` et `CBD_cbhlow` dans `compute_canopy_metrics`, à partir de la CBD de l'étape 1 et des indices de strate (NaN en 3.4 pour la parité, corrigées sur place en 3.5).
+  evidence: R lit ces bandes sur la CBD de l'étape 1, avant le recalcul selon CBH2 (`ffuelmetrics2.R` lignes 179, 186 et 204), et ne remplit `CBD_cbh2` que si CBH2 vient de 3A. La fonction ne renvoie que la CBD de l'étape 4 ; les deux diffèrent dès que `fma_can ≠ fma_shrub`. Passer par l'indice évite l'égalité de flottants `h_bottom == CBH`. À confirmer avec la correction R attendue (Q2 bis).
+- source_spec: `_bmad-output/implementation-artifacts/spec-3-3-canopy-metrics.md`
+  summary: Story 3.4 — donner à `fuel_metrics_core` des arguments explicites (et non `**params` transmis tel quel), calculer `h_center` une seule fois, et décider si l'ordre des clés du dict fait partie du contrat.
+  evidence: `compute_canopy_metrics` refuse `ladder_fuel_bd_thresholds`, `m_perrakis` et `smooth_pad` (`TypeError`). R intercale `FSG` entre `CBH2` et `CBHlow`, alors que `_assert_metrics` fige aujourd'hui l'ordre du dict de la 3.3.

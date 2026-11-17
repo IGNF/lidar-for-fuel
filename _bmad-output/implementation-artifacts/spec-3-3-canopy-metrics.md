@@ -64,3 +64,23 @@ Revue « Blind Hunter » (11 remarques).
 | 9 | La branche « CBDcan = 0 quand le sommet est NaN et qu'aucune strate n'atteint CBH2 » n'est pas testée | low | Réel. **Corrigé** : test sur un profil d'une strate. |
 | 10 | Le test de l'AC-3.3.2 ne vérifie que 5 métriques sur 11 | low | Réel. **Corrigé** : comparaison des 11 métriques. |
 | 11 | `top` recalcule `min(CDH, CTH)` ; la docstring du module parle des étapes 2 à 6 alors que l'étape 1 est faite | low | Réel. **Corrigé** : `top = cdh` et docstring « étapes 1 à 6 ». Le test de l'étape 1 avec des FMA différentes est couvert par le point 4. Le CBH2 calculé puis ignoré en 3B est un choix documenté (voir Structure). |
+
+## Revue à trois relecteurs (17/11/2026, demande de l'utilisatrice)
+
+Relecture de `compute_canopy_metrics` selon trois angles : fidélité à R, cas limites et calcul numérique, conception et contrat. Deux relecteurs ont comparé la fonction à R par Rscript sur 4 000 et 3 000 profils aléatoires (`dz` 0,5 et 1, CHT, `frac`, ratios et seuils variés, égalités dues au plafond `bd_max`). Résultat : **0 écart** sur 10 des 11 métriques ; CBDcan diffère de 1 ulp en float64 dans environ 15 % des cas. Temps mesuré : environ 0,1 ms par pixel.
+
+| # | Remarque | Verdict | Suite donnée |
+|---|---|---|---|
+| 1 | CBH2 renvoyé en `int` quand CHT est un entier de la config | low | **Corrigé** : `cht = float(...)`. |
+| 2 | Le commentaire de la garde « CTH NaN » est inexact : les masques sont de toute façon vides (`h <= nan`) | low | **Corrigé** : le commentaire est juste, la garde est gardée pour la lisibilité. |
+| 3 | Le drapeau `require_min_below_max` n'a aucun effet en 3B (les strates sous le premier max y sont toujours < max) ; la vraie différence, la descente vers CBH2, est calculée puis jetée | low | **Corrigé** (choix (b) de l'utilisatrice) : un drapeau `upper_canopy` commande le test `min < max` et la descente ; CBH2 vaut NaN en 3B. Vérifié par les deux bancs R : 0 écart. |
+| 4 | Dans `_crown_base`, `bd_max` a deux sens (plafond de config et max local) | low | **Corrigé** : renommé en `cbd_max` / `cbd_min`. |
+| 5 | Docstring : « CTH NaN donne CBDcan NaN » trop absolu ; alias `top` inutile ; 3A ne dit pas que CBH2 suppose CBH | low | **Corrigé**. |
+| 6 | Aucun test avec `dz = 0.5`, ni pour `frac = 0` | low | **Corrigé** : deux tests, avec des valeurs calculées par Rscript. |
+| 7 | CBDcan : `np.mean` au lieu de la moyenne `long double` de R (1 ulp), et sans `na.rm` | low | **Gardé** (choix (a) de l'utilisatrice) en attendant la réponse de l'INRAE à Q6 bis ; l'écart est noté dans un commentaire du code. Le cas `na.rm` rejoint le report sur les FMA NaN (story 3.6). |
+| 8 | Seuils CTH de même nom : le dict garde le dernier, R le premier | low | Déjà **reporté** en story 3.7. |
+| 9 | `IndexError` dans `_crown_base` si une CBD NaN tombe dans la zone de recherche | low | Inatteignable aujourd'hui (PAD nettoyé ; une FMA NaN vide les zones). Rejoint le report FMA NaN de la story 3.6. |
+| 10 | `CBD_cbh*` sont lues par R sur la CBD de l'**étape 1**, que la fonction ne renvoie pas | — | **Reporté** en 3.4/3.5 (voir deferred-work). |
+| 11 | Pour la 3.4 : `**params` lèverait `TypeError`, `h_center` à calculer une fois, ordre des clés à décider | — | **Reporté** en 3.4 (voir deferred-work). |
+
+**Tests** : 57 réussis dans `test/fuel_metrics`.

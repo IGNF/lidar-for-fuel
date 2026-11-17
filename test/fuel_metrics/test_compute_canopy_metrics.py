@@ -55,7 +55,7 @@ _INRAE_PARAMS = dict(
 
 
 def _canopy(pad, dz=1.0, **params):
-    """Canopy metrics of a 1 m strata profile starting at 0 m (h_center = 0.5, 1.5, ...)."""
+    """Canopy metrics of a profile of `dz` strata starting at 0 m (h_center = dz/2, 3·dz/2, ...)."""
     pad = np.asarray(pad, dtype=float)
     h_center = dz * np.arange(pad.size) + dz / 2
 
@@ -200,6 +200,39 @@ def test_canopy_metrics_max_on_several_strata_takes_the_first():
     assert metrics["CanBDmax"] == 0.5
     assert metrics["CBH"] == 4.0
     assert metrics["CBH2"] == 6.0
+
+
+def test_canopy_metrics_half_metre_strata():
+    # 3A profile with dz = 0.5 (h_center = 0.25 ... 5.75): bottoms are h - dz / 2, not h - 0.5.
+    # Expected values computed by R ffuelmetrics2 (zval = 0, 0.5, ..., dz = 0.5), 17/11/2026.
+    metrics, _ = _canopy(_PROFILE_3A, dz=0.5)
+
+    _assert_metrics(
+        metrics,
+        {
+            "CTH_0p0012": 5.25,
+            "CTH_0p0100": 4.75,
+            "CDH": 4.75,
+            "CBH": 2.0,  # stratum centred on 2.25 m
+            "CBH2": 3.0,  # stratum centred on 3.25 m
+            "CBHlow": np.nan,
+            "CanBDmax": 0.5,
+            "CanBDmin": 0.0,
+            "CanBDlowmax": 0.02,
+            "CanBDlowmin": np.nan,
+            "CBDcan": 0.34999999999999998,
+        },
+    )
+
+
+def test_canopy_metrics_frac_0_gives_cbh_without_cbh2():
+    # frac = 0: S = CanBDmin, so no stratum is < S on the way down and 3A finds CBH (4.0) but
+    # no CBH2; CBH2 falls back on CHT, below CBH (as R, checked with Rscript on 17/11/2026)
+    metrics, _ = _canopy(_PROFILE_3A, canopy_bd_thresh_frac=0.0)
+
+    assert metrics["CBH"] == 4.0
+    assert metrics["CBH2"] == 1.0
+    np.testing.assert_allclose(metrics["CBDcan"], 0.19666666666666668, rtol=1e-12)  # 1.5 to 9.5
 
 
 # --- No canopy top at 0.01 (AC-3.3.2) ----------------------------------------------------------
