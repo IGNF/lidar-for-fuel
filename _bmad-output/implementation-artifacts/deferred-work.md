@@ -9,3 +9,6 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-3-2-prepare-cbd-profile.md`
   summary: Décider en story 3.4 quoi faire si le premier `h_bottom` n'est pas 0, puisque `FL_k1` et `FL_k2` supposent que la première strate commence au sol.
   evidence: `parse_pad_strata` vérifie que le profil est régulier (même `dz`, ni doublon ni trou), mais pas son point de départ. R calcule `FL_k1 = CBD[1]·dz` sans le vérifier. Imposer 0 dès la story 3.2 risquerait de diverger de R avec un `z0` non nul.
+- source_spec: `_bmad-output/implementation-artifacts/spec-3-2-prepare-cbd-profile.md`
+  summary: FAIT le 17/11/2026 : l'exemple de l'épique est corrigé (AC-3.2.6 et §4 étape 9), il donne maintenant `[0.01, 0.02, 0.05, 0.1]` → 0.05, et deux cas d'égalité exacte sont ajoutés.
+  evidence: Il remplace le premier élément de cette liste.

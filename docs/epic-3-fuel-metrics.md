@@ -388,7 +388,7 @@ Quelques remarques sur ces sorties :
    - Dans tous les cas : `CFL = Σ CBD[h > LadderTop] × dz` et `FSG = CBH2 − LadderTop + dz/2`.
 9. **Valeurs par défaut** : on prend les sorties du seuil **le plus proche de la médiane** pour remplir `LFL`, `CFL`, `FSG` et `ProfType`. C'est la règle de la PR #48, ligne 283 : `seuils[which.min(abs(seuils − median(seuils)))]`.
    - Avec un nombre impair de seuils, c'est la médiane elle‑même : 0.02 pour la configuration par défaut.
-   - Avec un nombre pair, il y a deux seuils à égale distance de la médiane. `which.min` prend le premier rencontré dans **l'ordre de la liste fournie**, qui n'est pas forcément l'ordre trié. Par exemple, `[0.01, 0.02, 0.05, 0.1]` donne 0.02, alors que `[0.05, 0.02, 0.01, 0.1]` donne 0.05. Le Python doit reproduire cette règle : `np.argmin(np.abs(t − np.median(t)))` sur la liste de la config, sans la trier. `np.argmin` renvoie lui aussi le premier indice en cas d'égalité.
+   - Avec un nombre pair, deux seuils sont en théorie à égale distance de la médiane, mais **en double précision ils ne le sont généralement pas** : c'est l'arrondi qui tranche. Par exemple, `[0.01, 0.02, 0.05, 0.1]` donne **0.05**, et non 0.02, quel que soit l'ordre de la liste : |0.05 − 0.035| = 0.01499999… < |0.02 − 0.035| = 0.0150000…03 (vérifié avec Rscript le 17/11/2026). Ce n'est qu'en cas d'égalité exacte, avec des valeurs exactes en binaire, que `which.min` prend le premier seuil dans **l'ordre de la liste fournie** : `[0.25, 0.5, 0.75, 1]` donne 0.5, et `[0.75, 0.5, 0.25, 1]` donne 0.75. Le Python reproduit cette règle et ces arrondis avec `np.argmin(np.abs(t − np.median(t)))` sur la liste de la config, sans la trier. `np.argmin` renvoie lui aussi le premier indice en cas d'égalité.
    - L'étape 8 calcule les métriques d'échelle sur `sorted(set(...))`, mais le suffixe par défaut se cherche dans la liste **brute**.
    - Puis on assemble les sorties dans l'ordre de la section 3.2.
 
@@ -544,8 +544,9 @@ Facile.
 - **AC-3.2.5** — **Étant donné** un profil PAD préparé, `fma_can`, `fma_shrub`, `bd_max` et une hauteur limite, **quand** on calcule la CBD, **alors** elle vaut `min(PAD × FMA, bd_max)`, avec `fma_can` pour les strates au‑dessus de la limite et `fma_shrub` pour les autres. La limite est un paramètre de la fonction : CHT à l'étape 1, `CBH2` à l'étape 4.
 - **AC-3.2.6** — **Étant donné** une liste de seuils d'échelle, **quand** on choisit le seuil par défaut, **alors** on obtient le seuil le plus proche de la médiane, et en cas d'égalité le premier de la liste **dans l'ordre de la config** (règle de la PR #48, A9, §4 étape 9) :
   - `[0.01, 0.02, 0.05]` → 0.02 ;
-  - `[0.01, 0.02, 0.05, 0.1]` → 0.02 ;
+  - `[0.01, 0.02, 0.05, 0.1]` → **0.05** : il n'y a pas d'égalité exacte en double précision, c'est donc l'arrondi qui tranche, comme en R (§4 étape 9) ;
   - `[0.05, 0.02, 0.01, 0.1]` → 0.05 ;
+  - `[0.25, 0.5, 0.75, 1.0]` → 0.5 et `[0.75, 0.5, 0.25, 1.0]` → 0.75 : en cas d'égalité exacte, on prend le premier dans l'ordre de la config ;
   - `[0.02]` → 0.02.
 
   Un nombre pair de seuils ne lève pas d'erreur. **Étant donné** une liste vide, **alors** une `ValueError` est levée.
