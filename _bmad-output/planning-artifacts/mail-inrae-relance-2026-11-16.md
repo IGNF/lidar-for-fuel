@@ -1,4 +1,4 @@
-**Objet :** LidarForFuel – ffuelmetrics2 : suite à vos réponses, quelques précisions (dont un point bloquant sur CBHThresholdRatio)
+**Objet :** LidarForFuel – ffuelmetrics2 : suite à vos réponses, quelques précisions (dont un point bloquant sur CBHThresholdRatio) et carte FMA
 
 Bonjour,
 
@@ -40,6 +40,23 @@ Les deux options possibles :
   - Comprenons-nous bien que l'exigence d'écart nul vaut aussi pour la chaîne complète, étapes 1 et 2 comprises, à MNT, nuage et trajectoires identiques ?
 - **Q3, pour la réunion technique** (non bloquant) : avec `CanopyHeightThreshold` = 1, il n'y a aucun effet. Mais si ce seuil passe à 2 ou 3 m, LadderBot peut se situer entre 1 m et CHT, alors que LadderLoad ne compte que les strates au-dessus de CHT. Est-ce le comportement attendu ?
 - **Q8, validation** : qui validera la chaîne Python côté INRAE, et à quelle date ? Le code sera prêt mi-décembre, et la production nationale démarre en janvier 2027. La validation tombera donc probablement pendant les fêtes.
+- **Q9, carte FMA** (nouveau point) : comme R accepte `FMAcan` et `FMAshrub` en `SpatRaster`, le Python accepte maintenant, pour chacun, soit une valeur, soit la carte FMA (1 bande, 10 m, valeurs de 0,05 à 0,5 kg/m²). Quatre questions :
+  1. **Usage en production** : à partir de quand la carte remplacera-t-elle la valeur 0.2543576 de la config ? La même carte sert-elle pour `FMAcan` et pour `FMAshrub` ?
+  2. **Plafond du PAD** : avec la carte, le plafond du PAD à 5 crée un écart avec R sur les pixels dont la FMA est inférieure à 0,2. Voir Q10 ci-dessous.
+  3. **Pixels sans FMA** (NoData, ou hors de la carte) : faut-il mettre NaN sur les 45 métriques, comme pour Q1, ou utiliser une valeur par défaut (0.2543576) ? Et si une valeur de la carte sort de [0,05 ; 0,5], faut-il bloquer la dalle (c'est notre choix actuel) ou seulement le signaler ?
+  4. **Grille** : la carte est-elle calée sur l'origine réelle de CosiaFrance (98 039,69 ; 7 111 486,70) ? Nos rasters PAD, comme la sortie R, sont calés sur l'origine arrondie (98 039,75 ; 7 111 486,75), soit un décalage de 6 cm. Nous prenons pour chaque pixel PAD le pixel FMA le plus proche, ce qui revient à la même valeur.
+- **Q10, plafond du PAD à 5 : votre spécification et le code R divergent** (nouveau point) :
+  - **La spécification** des profils PAD que vous nous avez transmise indique, pour chaque bande `PAD_*` : « valeurs limites à contrôler : 0–5 (plafonné à 5) ». Le Python applique donc ce plafond à l'étape 2 : toute valeur de PAD supérieure à 5 est écrite à 5.
+  - **Le code R**, lui, ne plafonne pas le PAD (`pad_metrics`) : nous avons observé jusqu'à 7,01 sur la zone pilote.
+
+  Conséquences pour l'écart nul attendu (Q6) :
+  - **à l'étape 2**, les rasters PAD de R et du Python diffèrent sur toutes les strates où le PAD dépasse 5 ;
+  - **à l'étape 3**, il n'y a aucun effet avec la FMA actuelle (0.2543576), car 5 × 0,254 ≥ `bdmax` = 1 : la CBD est plafonnée à 1 dans les deux cas. En revanche, avec la carte FMA (Q9), l'écart apparaît dès que la FMA est inférieure à 0,2, par exemple 0,14 pour *Fraxinus* ou *Castanea* (Martin-Ducup et al. 2025). Ce seuil vaut `bdmax` / 5 = 1 / 5 : en dessous, un PAD plafonné à 5 ne suffit plus pour que la CBD atteigne `bdmax`, alors que le PAD non plafonné de R peut l'atteindre. Par exemple, avec un PAD de 6 et une FMA de 0,14, R donne une CBD de 0,84 et le Python 0,70.
+
+  → **Laquelle des deux fait référence ?**
+  1. **La spécification** : le PAD est plafonné à 5, et vous ajoutez ce plafond dans R.
+  2. **Le code R** : le PAD n'est pas plafonné, nous retirons le plafond du Python et la spécification est corrigée.
+  3. **« À contrôler »** signifie seulement signaler les valeurs hors de [0 ; 5], sans les modifier.
 
 Merci encore. Nous sommes disponibles pour en parler en réunion technique si c'est plus simple.
 

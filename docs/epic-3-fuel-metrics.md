@@ -49,7 +49,7 @@ L'étape 3 est un **calcul pur, pixel par pixel**. Elle ne lit aucun nuage de po
 - **D4** (`cbh_threshold_ratio`) reste **ouverte et bloquante**, car la réponse reçue entre en conflit avec l'écart nul attendu (Q6) ;
 - **Q6** : l'INRAE attend un **écart nul** entre R et Python à entrées et paramètres identiques, et non une tolérance de l'ordre de 5 %.
 
-Une relance est envoyée à l'INRAE sur D4, Q6 et Q8, avec des précisions sur D2 et D3.
+Une relance est envoyée à l'INRAE sur D4, Q6 et Q8, avec des précisions sur D2 et D3, et deux nouvelles questions : Q9 sur la carte FMA (D6 amendée) et Q10 sur le plafond du PAD à 5 (présent dans la spécification INRAE, absent du code R).
 
 ### Grille de sortie
 
@@ -68,7 +68,7 @@ L'étape 3 **ne choisit pas sa grille** : elle écrit sur la grille exacte du ra
 
 > Les données LiDAR prétraitées sont déjà en EPSG:2154 : **aucune reprojection n'est nécessaire**.
 >
-> **Point d'attention : décalage de 6 cm.** La config Python cale les rasters PAD sur l'origine **arrondie** (98 039,75 ; 7 111 486,75), et la sortie R tombe sur cette même grille. L'origine réelle du fichier CosiaFrance est (98 039,6885 ; 7 111 486,6972) : il y a donc un décalage de 6,1 cm en X et de 5,3 cm en Y. Ce décalage est sans effet sur cette épique, car la FMA y est un scalaire de configuration (D6). Il faudra le régler avant d'utiliser la FMA CosiaFrance pixel par pixel.
+> **Point d'attention : décalage de 6 cm.** La config Python cale les rasters PAD sur l'origine **arrondie** (98 039,75 ; 7 111 486,75), et la sortie R tombe sur cette même grille. L'origine réelle du fichier CosiaFrance est (98 039,6885 ; 7 111 486,6972) : il y a donc un décalage de 6,1 cm en X et de 5,3 cm en Y. **Mise à jour du 17/11/2026 (D6 amendée)** : la FMA peut maintenant être la carte FMA nationale, lue pixel par pixel. Le décalage est absorbé par la lecture au pixel le plus proche (`read_fma`, AC-3.2.7) : on tolère un décalage d'au plus 0,1 pixel (1 m).
 
 ### Données en entrée
 
@@ -256,8 +256,8 @@ Les annexes gardent la numérotation 3 à 11, à laquelle renvoient les stories 
 
 | Paramètre R | Nom Python proposé | Valeur (config INRAE zones pilotes) | Rôle |
 |---|---|---|---|
-| `FMAcan` | `fma_can` | 0.2543576 kg/m² | masse surfacique du combustible de canopée |
-| `FMAshrub` | `fma_shrub` | 0.2543576 kg/m² | masse surfacique du combustible arbustif |
+| `FMAcan` | `fma_can` | 0.2543576 kg/m², ou chemin de la carte FMA | masse surfacique du combustible de canopée (valeur ou carte, D6) |
+| `FMAshrub` | `fma_shrub` | 0.2543576 kg/m², ou chemin de la carte FMA | masse surfacique du combustible arbustif (valeur ou carte, D6) |
 | `smooth_pad` | `smooth_pad` | `False` | moyenne mobile sur 3 strates |
 | `LadderFuelBDthresholds` | `ladder_fuel_bd_thresholds` | [0.01, 0.02, 0.05] kg/m³ | seuils de densité pour le combustible en échelle |
 | `CanopyHeightThreshold` | `canopy_height_threshold` | 1 m | limite entre combustible de surface et canopée/échelle |
@@ -267,7 +267,7 @@ Les annexes gardent la numérotation 3 à 11, à laquelle renvoient les stories 
 | `bdmax` | `bd_max` | 1.0 kg/m³ | plafond de la densité CBD |
 | `M` | `m_perrakis` | 2.5 | facteur M de Perrakis (2025) |
 
-> **Condition d'équivalence avec R.** Le PAD Python est plafonné à 5, alors que le PAD R ne l'est pas (maximum observé : 7,01). Les résultats restent identiques tant que `5 × min(fma_can, fma_shrub) ≥ bd_max`, car la densité CBD est de toute façon plafonnée à `bd_max`. C'est vrai avec la configuration actuelle : 5 × 0,254 = 1,27 ≥ 1. C'est aussi vrai seulement si `smooth_pad = False`, car le lissage porterait sur des valeurs déjà plafonnées. La story 3.7 doit vérifier cette condition au démarrage et émettre un avertissement sinon.
+> **Condition d'équivalence avec R.** Le PAD Python est plafonné à 5, alors que le PAD R ne l'est pas (maximum observé : 7,01). Les résultats restent identiques tant que `5 × min(fma_can, fma_shrub) ≥ bd_max`, car la densité CBD est de toute façon plafonnée à `bd_max`. C'est vrai avec la configuration actuelle : 5 × 0,254 = 1,27 ≥ 1. C'est aussi vrai seulement si `smooth_pad = False`, car le lissage porterait sur des valeurs déjà plafonnées. La story 3.7 doit vérifier cette condition au démarrage et émettre un avertissement sinon. **17/11/2026** : le plafond vient de la spécification PAD de l'INRAE (« valeurs limites à contrôler : 0–5 (plafonné à 5) »), mais le code R ne l'applique pas. La question de savoir laquelle des deux fait référence est posée à l'INRAE (Q10). Avec la carte FMA, la condition n'est plus vraie partout (FMA < 0,2).
 
 ### 3.2 Sortie
 
@@ -388,7 +388,7 @@ Quelques remarques sur ces sorties :
    - Dans tous les cas : `CFL = Σ CBD[h > LadderTop] × dz` et `FSG = CBH2 − LadderTop + dz/2`.
 9. **Valeurs par défaut** : on prend les sorties du seuil **le plus proche de la médiane** pour remplir `LFL`, `CFL`, `FSG` et `ProfType`. C'est la règle de la PR #48, ligne 283 : `seuils[which.min(abs(seuils − median(seuils)))]`.
    - Avec un nombre impair de seuils, c'est la médiane elle‑même : 0.02 pour la configuration par défaut.
-   - Avec un nombre pair, il y a deux seuils à égale distance de la médiane. `which.min` prend le premier rencontré dans **l'ordre de la liste fournie**, qui n'est pas forcément l'ordre trié. Par exemple, `[0.01, 0.02, 0.05, 0.1]` donne 0.02, alors que `[0.05, 0.02, 0.01, 0.1]` donne 0.05. Le Python doit reproduire cette règle : `np.argmin(np.abs(t − np.median(t)))` sur la liste de la config, sans la trier. `np.argmin` renvoie lui aussi le premier indice en cas d'égalité.
+   - Avec un nombre pair, deux seuils sont en théorie à égale distance de la médiane, mais **en double précision ils ne le sont généralement pas** : c'est l'arrondi qui tranche. Par exemple, `[0.01, 0.02, 0.05, 0.1]` donne **0.05**, et non 0.02, quel que soit l'ordre de la liste : |0.05 − 0.035| = 0.01499999… < |0.02 − 0.035| = 0.0150000…03 (vérifié avec Rscript le 17/11/2026). Ce n'est qu'en cas d'égalité exacte, avec des valeurs exactes en binaire, que `which.min` prend le premier seuil dans **l'ordre de la liste fournie** : `[0.25, 0.5, 0.75, 1]` donne 0.5, et `[0.75, 0.5, 0.25, 1]` donne 0.75. Le Python reproduit cette règle et ces arrondis avec `np.argmin(np.abs(t − np.median(t)))` sur la liste de la config, sans la trier. `np.argmin` renvoie lui aussi le premier indice en cas d'égalité.
    - L'étape 8 calcule les métriques d'échelle sur `sorted(set(...))`, mais le suffixe par défaut se cherche dans la liste **brute**.
    - Puis on assemble les sorties dans l'ordre de la section 3.2.
 
@@ -425,7 +425,7 @@ Quelques remarques sur ces sorties :
 | **D3** | `CBD_cbh*` (A1) | Les **calculer correctement**, c'est‑à‑dire prendre la CBD de la strate dont le bas vaut CBH (`h_bottom == CBH`), et signaler le bug à l'INRAE. | Les garder à NaN (parité), ou retirer les 3 bandes (on aurait alors 42 bandes au lieu de 45). | Q2 : bug reconnu ; correction dans R, probablement selon la recommandation IGN, après concertation. Métrique probablement pas conservée à la fin | 🟡 **Correction R en cours**. Le Python suivra la correction R (commit à obtenir, Q2 bis) |
 | **D4** | Valeur de `cbh_threshold_ratio` (A3) | Mettre **`0.3333333333333333`** dans la config (= 1/3 en double précision), car c'est la valeur que R utilise réellement, et transmettre **tous** les paramètres. | Mettre 0.333 (la valeur affichée par l'INRAE), mais on diverge alors de la production R. | Q4 : « la paramétrisation dans le fichier config est 0.333 ». Rien sur le fait que R ne transmet pas ce paramètre, ni sur `smooth_pad` | ⚠️ **Ouverte, bloquante**. Elle entre en conflit avec Q6 (voir ci‑dessous et Q4 bis) |
 | **D5** | `zval > 1` codé en dur (A2) | Utiliser `canopy_height_threshold`. Les résultats ne changent pas avec la config actuelle. | Garder 1 en dur. | Q3 : non. Le 1 m sert à caractériser la strate basse ; à rediscuter en réunion technique au besoin | ❌ **Refusée** : on garde 1 m (constante nommée) |
-| **D6** | FMA | Scalaire dans la config pour cette épique. Une FMA en raster (par essence ou par pixel) est différée. | — | — (hors périmètre, brief) | ✅ Retenue |
+| **D6** | FMA | ~~Scalaire dans la config ; FMA en raster différée.~~ **Amendée le 17/11/2026 (demande IGN)** : `fma_can` et `fma_shrub` acceptent chacun une valeur **ou** le chemin de la carte FMA (1 bande `FMA`, 10 m, valeurs de 0,05 à 0,5 kg/m²), comme le `SpatRaster` accepté par R. La FMA dépend de l'essence dominante (Martin‑Ducup et al. 2025, éq. 5 ; Pimont et al. 2026, §2.1). | — | — | ✅ Retenue (amendée) |
 | **D7** | Version R de référence | **Dev `8fcccd2` (1.0.0.9013)**. Elle contient la PR #48, mergée le 12/11/2026, et équivaut pour le calcul à l'ancienne référence « `7c7d35e` + PR #48 ». Les évolutions ultérieures de R ne sont pas suivies : l'INRAE prévient l'IGN de tout changement. | — | Q5 : PR #48 mergée | ✅ Confirmée. **À rebaser** sur le commit R qui corrigera A1 (D3), après vérification du diff |
 
 > **Mise à jour du 16/11/2026 : réponses écrites de l'INRAE.**
@@ -442,7 +442,7 @@ Quelques remarques sur ces sorties :
 >
 > **Q8**, qui valide à l'INRAE et à quelle date : **pas de réponse**, à relancer.
 >
-> **Questions de relance** (mail du 16/11/2026) : Q4 bis (transmission de `CBHThresholdRatio` et de `smooth_pad` dans R, valeur de référence), Q1 bis (NaN aussi dans R ?), Q2 bis (commit et définition de la correction `CBD_cbh*`), Q6 bis (sens de « écart 0 » et périmètre), Q8.
+> **Questions de relance** (mail du 16/11/2026) : Q4 bis (transmission de `CBHThresholdRatio` et de `smooth_pad` dans R, valeur de référence), Q1 bis (NaN aussi dans R ?), Q2 bis (commit et définition de la correction `CBD_cbh*`), Q6 bis (sens de « écart 0 » et périmètre), Q8, Q9 (carte FMA : usage en production, pixels sans FMA, grille), Q10 (plafond du PAD à 5 : la spécification INRAE l'impose, le code R ne l'applique pas ; écart à l'étape 2, et à l'étape 3 si FMA < 0,2).
 >
 > **Statut au 05/11/2026** (historique) : D1, D6 et D7 étaient retenues côté IGN. D2 à D5 devaient être présentées à la réunion de mi‑novembre, avec des réponses attendues d'Olivier Martin et François Pimont.
 
@@ -526,9 +526,10 @@ Facile.
 
 - **Pour qui** : la développeuse de l'étape 3. Cette story est la couche d'entrée du calcul, sur laquelle s'appuient les stories 3.3 et 3.4.
 - **Ce qu'on cherche à faire** :
-  1. **Lire les noms de bandes.** Le raster PAD contient des bandes nommées `PAD_1_0`, `PAD_1_1`…, mêlées à d'autres bandes (`Cover_2`, `N_1_3`…). On ne garde que les bandes `PAD_*`. Leur nom donne l'épaisseur des strates et la hauteur du bas de chaque strate : `PAD_1_10` signifie `dz = 1` m et `h_bottom = 10` m au‑dessus du sol.
-  2. **Passer du PAD à la CBD.** Le **PAD** (*Plant Area Density*, en m²/m³) mesure la quantité de végétation dans chaque strate. La **CBD** (*Canopy Bulk Density*, en kg/m³) mesure la masse de combustible. On passe de l'un à l'autre en multipliant par la masse surfacique du combustible (FMA) : celle de la canopée au‑dessus d'une hauteur limite, celle des arbustes en dessous. Avant ce calcul, les valeurs invalides (NaN, inf, négatives) sont remplacées par 0, et le profil peut être lissé sur 3 strates.
-  3. **Choisir le seuil d'échelle par défaut**, parmi ceux de la config. C'est lui qui servira à remplir les bandes `LFL`, `CFL`, `FSG` et `ProfType`.
+  1. **Lire les hauteurs des strates dans les noms de bandes.** Le raster `{stem}_pad_profile_1m.tif` de l'étape 2 ne contient que les bandes `PAD_1_0` … `PAD_1_59`, rangées par hauteur croissante. Contrairement au raster R, il n'y a pas de bandes `Cover_*`, `N_*`… mêlées : il n'y a donc rien à filtrer. Le nom de chaque bande donne l'épaisseur des strates et la hauteur du bas de la strate : `PAD_1_10` signifie `dz = 1` m et `h_bottom = 10` m au‑dessus du sol.
+  2. **Lire la FMA** sur la grille du raster PAD : soit une valeur de la config, soit la carte FMA nationale (une valeur par pixel, selon l'essence dominante, D6).
+  3. **Passer du PAD à la CBD.** Le **PAD** (*Plant Area Density*, en m²/m³) mesure la quantité de végétation dans chaque strate. La **CBD** (*Canopy Bulk Density*, en kg/m³) mesure la masse de combustible. On passe de l'un à l'autre en multipliant par la masse surfacique du combustible (FMA) : celle de la canopée au‑dessus d'une hauteur limite, celle des arbustes en dessous. Avant ce calcul, les valeurs invalides (NaN, inf, négatives) sont remplacées par 0, et le profil peut être lissé sur 3 strates.
+  4. **Choisir le seuil d'échelle par défaut**, parmi ceux de la config. C'est lui qui servira à remplir les bandes `LFL`, `CFL`, `FSG` et `ProfType`.
 - **Objectif final** : toutes les métriques de combustible se calculent à partir de ce profil CBD. Une entrée propre et validée ici évite de propager des erreurs dans les 45 métriques.
 
 #### Estimation de l'effort
@@ -537,22 +538,27 @@ Facile.
 
 #### Critères d'acceptation
 
-- **AC-3.2.1** — **Étant donné** les noms `PAD_1_0` … `PAD_1_59` mêlés à d'autres bandes (`Cover_2`, `N_1_3`…), **quand** on lit les strates, **alors** on obtient les indices des bandes PAD, `dz = 1` et `h_bottom = [0 … 59]`, triés numériquement. **Étant donné** le nom `PAD_0.5_1.5`, **alors** on obtient `dz = 0.5` et `h_bottom = 1.5`.
-- **AC-3.2.2** — **Étant donné** des bandes PAD d'épaisseurs différentes (par exemple `PAD_1_0` et `PAD_0.5_1`), **quand** on lit les strates, **alors** une `ValueError` est levée.
+- **AC-3.2.1** — **Étant donné** les noms `PAD_1_0` … `PAD_1_59` du raster `pad_profile_1m`, **quand** on lit les hauteurs, **alors** on obtient `dz = 1` et `h_bottom = [0 … 59]`, dans l'ordre des bandes. **Étant donné** les noms `PAD_0.5_0` … `PAD_0.5_1.5`, **alors** on obtient `dz = 0.5` et `h_bottom = [0, 0.5, 1, 1.5]`.
+- **AC-3.2.2** — **Étant donné** une bande qui n'est pas une bande `PAD_{dz}_{h_bas}`, des épaisseurs différentes (par exemple `PAD_1_0` et `PAD_0.5_1`), ou des strates qui ne sont pas contiguës et croissantes, **quand** on lit les hauteurs, **alors** une `ValueError` est levée.
 - **AC-3.2.3** — **Étant donné** un profil PAD qui contient des `NaN`, des `inf` ou des valeurs négatives, **quand** on prépare le profil, **alors** ces valeurs sont remplacées par 0, et le nombre de valeurs corrigées est journalisé en debug.
 - **AC-3.2.4** — **Étant donné** le profil `[0, 3, 0, 0]` et `smooth_pad=True`, **quand** on prépare le profil, **alors** on obtient `[1.5, 1, 1, 0]` : moyenne centrée sur 3 strates, et moyenne sur les 2 valeurs disponibles aux bords.
-- **AC-3.2.5** — **Étant donné** un profil PAD préparé, `fma_can`, `fma_shrub`, `bd_max` et une hauteur limite, **quand** on calcule la CBD, **alors** elle vaut `min(PAD × FMA, bd_max)`, avec `fma_can` pour les strates au‑dessus de la limite et `fma_shrub` pour les autres. La limite est un paramètre de la fonction : CHT à l'étape 1, `CBH2` à l'étape 4.
+- **AC-3.2.5** — **Étant donné** un profil PAD préparé, `fma_can`, `fma_shrub`, `bd_max` et une hauteur limite, **quand** on calcule la CBD, **alors** elle vaut `min(PAD × FMA, bd_max)`, avec `fma_can` pour les strates au‑dessus de la limite et `fma_shrub` pour les autres. La limite est un paramètre de la fonction : CHT à l'étape 1, `CBH2` à l'étape 4. `fma_can` et `fma_shrub` sont les valeurs du pixel traité (AC-3.2.7).
 - **AC-3.2.6** — **Étant donné** une liste de seuils d'échelle, **quand** on choisit le seuil par défaut, **alors** on obtient le seuil le plus proche de la médiane, et en cas d'égalité le premier de la liste **dans l'ordre de la config** (règle de la PR #48, A9, §4 étape 9) :
   - `[0.01, 0.02, 0.05]` → 0.02 ;
-  - `[0.01, 0.02, 0.05, 0.1]` → 0.02 ;
+  - `[0.01, 0.02, 0.05, 0.1]` → **0.05** : il n'y a pas d'égalité exacte en double précision, c'est donc l'arrondi qui tranche, comme en R (§4 étape 9) ;
   - `[0.05, 0.02, 0.01, 0.1]` → 0.05 ;
+  - `[0.25, 0.5, 0.75, 1.0]` → 0.5 et `[0.75, 0.5, 0.25, 1.0]` → 0.75 : en cas d'égalité exacte, on prend le premier dans l'ordre de la config ;
   - `[0.02]` → 0.02.
 
   Un nombre pair de seuils ne lève pas d'erreur. **Étant donné** une liste vide, **alors** une `ValueError` est levée.
+- **AC-3.2.7** — FMA en valeur ou en carte (D6, ajouté le 17/11/2026) :
+  - **Étant donné** une valeur de FMA, **quand** on lit la FMA pour une grille PAD, **alors** on obtient une grille remplie de cette valeur.
+  - **Étant donné** le chemin de la carte FMA, **alors** on obtient, pour chaque pixel PAD, la valeur du pixel de la carte dont le centre est le plus proche. Le décalage de 6 cm entre l'origine arrondie des rasters PAD et l'origine réelle de CosiaFrance est toléré. Les pixels NoData ou hors de la carte valent NaN.
+  - **Étant donné** une carte de CRS ou de résolution différente, décalée de plus de 0,1 pixel, ou dont une valeur de la fenêtre lue sort de [0,05 ; 0,5] kg/m², **alors** une `ValueError` est levée.
 
 #### Informations complémentaires
 
-**Périmètre** : étape 1 de la section 4, lecture de `PAD_{dz}_{h_bas}` (équivalent de `parse_pad_heights` en R, `R/pad_metrics.R:286`) et validation des paramètres. **Fichiers pressentis** : `lidar_for_fuel/fuel_metrics/prepare_cbd_profile.py`, `test/fuel_metrics/test_prepare_cbd_profile.py`. **Dépendances** : aucune.
+**Périmètre** : étape 1 de la section 4, et lecture des hauteurs `PAD_{dz}_{h_bas}`. En R, `parse_pad_heights` (`R/pad_metrics.R:286`) filtre en plus les bandes PAD, mêlées à d'autres dans le raster R. C'est inutile en Python (décision du 17/11/2026). La validation des paramètres de la config est reportée à la story 3.7. **Fichiers pressentis** : `lidar_for_fuel/fuel_metrics/prepare_cbd_profile.py`, `test/fuel_metrics/test_prepare_cbd_profile.py`. **Dépendances** : aucune.
 
 ### Story 3.3 — Métriques de canopée (CTH, CBH, CBH2, CBHlow, CDH, CBDcan)
 
@@ -672,7 +678,7 @@ Normal.
 #### Critères d'acceptation
 
 - **AC-3.6.1** — **Étant donné** un raster PAD, **quand** on calcule et exporte les métriques, **alors** le fichier écrit a exactement la même transform, le même CRS et la même taille que le raster d'entrée. Il contient une bande float32 par métrique (45 avec la config par défaut, voir §3.2), nodata NaN, et les descriptions de bandes sont les noms renvoyés par `fuel_metrics_core`, dans l'ordre.
-- **AC-3.6.2** — **Étant donné** un raster PAD Python (60 bandes PAD) ou un raster PAD R (186 bandes), **quand** on calcule les métriques, **alors** les bandes PAD sont trouvées **par leur nom** (story 3.2), et non par leur position, et les deux rasters sont acceptés.
+- **AC-3.6.2** — **Étant donné** le raster PAD Python `{stem}_pad_profile_1m.tif`, qui n'a que des bandes `PAD_*`, **quand** on calcule les métriques, **alors** les hauteurs des strates sont lues dans les noms de bandes (story 3.2). Le raster PAD R (186 bandes) n'est pas une entrée de production. Les tests de parité n'en gardent que les bandes `PAD_1_*` avant l'appel (décision du 17/11/2026).
 - **AC-3.6.3** — **Étant donné** la fenêtre de référence 3.1, **quand** on produit le raster de métriques, **alors** il est égal au raster R, à l'exception des divergences assumées en 3.5.
 - **AC-3.6.4** — **Étant donné** un pixel dont le PAD est entièrement NaN, **quand** on produit le raster, **alors** ce pixel vaut NaN sur toutes les bandes (D2).
 - **AC-3.6.5** — **Étant donné** le code d'export, **quand** on le relit, **alors** l'écriture passe par `_write_geotiff` de `pad_profile/export_raster.py`, éventuellement déplacé dans `commons/` s'il est partagé. On n'écrit pas de nouvel outil d'écriture.
@@ -686,7 +692,7 @@ Normal.
   - le nombre de pixels entièrement NaN, mis à NaN en sortie (D2) ;
   - le nombre de profils partiellement NaN, inf ou négatifs, corrigés à 0 (A6, AC‑3.2.3) ;
   - le nombre de pixels traités.
-- **AC-3.6.9** — **Étant donné** un raster d'entrée **sans aucune bande `PAD_*`**, **quand** on lance le calcul, **alors** une `ValueError` explicite donne le nom du fichier. Ce n'est pas une dalle atypique mais une erreur d'entrée : on ne produit pas de sortie vide en silence.
+- **AC-3.6.9** — **Étant donné** un raster d'entrée dont les bandes ne sont pas toutes des bandes `PAD_*` (ou qui n'en a aucune), **quand** on lance le calcul, **alors** une `ValueError` explicite donne le nom du fichier. Ce n'est pas une dalle atypique mais une erreur d'entrée : on ne produit pas de sortie vide en silence.
 
 #### Informations complémentaires
 
@@ -789,7 +795,7 @@ Normal.
 
 ## 10. Hors périmètre (différé)
 
-- **FMA en raster**, par pixel ou par essence : R accepte `FMAcan`/`FMAshrub` sous forme de `SpatRaster`.
+- ~~**FMA en raster**~~ : réintégrée dans la story 3.2 le 17/11/2026 (D6 amendée, AC-3.2.7). Reste différée : une FMA qui varie **selon la hauteur** (essences du sous‑étage, piste citée par Martin‑Ducup et al. 2025, §3.2.3).
 - **Graphique `plot_profile`** (contrôle visuel d'un profil).
 - **Calcul au niveau d'une placette** à partir d'un nuage (`cloud_metrics`). La fonction 1‑D de la story 3.4 le permet déjà ; il n'y a juste pas de point d'entrée dédié.
 - **Charge de surface SFL** calculée à partir du profil à 0,5 m (`pad_sb_0.5m`) et **correction par quantile mapping** de `FL_k1`/`FL_k2`, annoncée dans les commentaires R mais pas implémentée.
@@ -798,7 +804,7 @@ Normal.
 - **Version de lidar‑for‑fuel dans les rasters de sortie** : depuis la PR #43, elle est inscrite dans les GPKG. Il faudrait l'étendre aux rasters de métriques, utile si l'INRAE fait évoluer les formules pendant la production.
 
 **Actions hors stories (Malvina)** :
-- **Relance INRAE du 16/11/2026** : obtenir les réponses à Q4 bis (bloquante), Q1 bis, Q2 bis, Q6 bis et Q8 (validateur et date).
+- **Relance INRAE du 16/11/2026** : obtenir les réponses à Q4 bis (bloquante), Q1 bis, Q2 bis, Q6 bis, Q8 (validateur et date), Q9 (carte FMA) et Q10 (plafond du PAD).
 - **Remonter les constats restants à l'INRAE** sous forme d'issue sur `oliviermartin7/LidarForFuel`. Ce qui est déjà réglé :
   - A9 et A11, par le merge de la PR #48 (12/11/2026) ;
   - A1, corrigé par l'INRAE (correction annoncée le 16/11/2026) ;
