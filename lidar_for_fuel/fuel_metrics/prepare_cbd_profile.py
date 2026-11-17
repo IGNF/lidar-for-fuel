@@ -1,10 +1,8 @@
 """
-Input layer of the fuel metrics computation (epic 3, story 3.2), ported from R `ffuelmetrics2`
-(lidarforfuel, Dev 8fcccd2):
-
-- read the PAD strata from the raster band names;
-- prepare a PAD profile and turn it into a CBD profile (step 1 of the algorithm, reused at step 4);
-- pick the default ladder fuel threshold (rule of step 9, needed from the configuration onwards).
+Input layer of the fuel metrics computation, ported from R `ffuelmetrics2`:
+- read the strata heights from the band names of the `pad_profile_1m` raster;
+- prepare a PAD profile and turn it into a CBD profile;
+- pick the default ladder fuel threshold (rule of step, needed from the configuration onwards).
 """
 
 import logging
@@ -18,53 +16,48 @@ logger = logging.getLogger(__name__)
 _PAD_BAND_PATTERN = re.compile(r"^PAD_(\d+(?:\.\d+)?)_(\d+(?:\.\d+)?)$")
 
 
-def parse_pad_strata(band_names: Sequence[str | None]) -> tuple[np.ndarray, float, np.ndarray]:
-    """Find the `PAD_{dz}_{h_bottom}` bands among raster band names and read their strata.
+def read_pad_heights(band_names: Sequence[str | None]) -> tuple[float, np.ndarray]:
+    """Read the strata of the `{stem}_pad_profile_1m.tif` raster from its band names.
 
-    Equivalent of R `parse_pad_heights`, plus a numeric sort and checks that the strata form
-    a regular vertical profile (same thickness, no duplicate, no gap), which the following
-    steps of the algorithm assume. Other bands (`Cover_2`, `N_1_3`, `Ni_1_3`, `date`...) are
-    ignored.
+    Every band is a `PAD_{dz}_{h_bottom}` stratum, written in ascending height order by
+    step 2 (`export_raster`). The bands are used in that order (the profile is not re-sorted),
+    so the names must describe a regular profile: same thickness, contiguous, ascending.
 
     Args:
         band_names (Sequence[str | None]): Band names (descriptions) of the PAD raster,
-            in band order. `None` entries (unnamed bands) are ignored.
+            in band order.
 
     Returns:
-        tuple[np.ndarray, float, np.ndarray]:
-            - indices: 0-based positions of the PAD bands in `band_names`, ordered by height;
+        tuple[float, np.ndarray]:
             - dz: thickness of the strata (m);
-            - h_bottom: height above ground of the bottom of each stratum (m), sorted ascending.
+            - h_bottom: height above ground of the bottom of each stratum (m), in band order.
 
     Raises:
-        ValueError: If no `PAD_*` band is found, if the PAD bands have different or null
-            thicknesses, or if the strata are duplicated or not contiguous.
+        ValueError: If there is no band, if a band is not named `PAD_{dz}_{h_bottom}`, or if
+            the strata do not have one non-null thickness or are not contiguous and ascending.
     """
+    if not band_names:
+        raise ValueError("The PAD raster has no band.")
+
     strata = []
-    for index, name in enumerate(band_names):
+    for name in band_names:
         match = _PAD_BAND_PATTERN.match(name) if name else None
-        if match:
-            strata.append((float(match.group(2)), float(match.group(1)), index))
+        if match is None:
+            raise ValueError(f"Band {name!r} is not a PAD_{{dz}}_{{h_bottom}} band.")
+        strata.append((float(match.group(1)), float(match.group(2))))
 
-    if not strata:
-        raise ValueError("No PAD_{dz}_{h_bottom} band found among the raster band names.")
-
-    thicknesses = sorted({dz for _, dz, _ in strata})
+    thicknesses = sorted({dz for dz, _ in strata})
     if len(thicknesses) > 1:
         raise ValueError(f"PAD bands have different strata thicknesses (dz): {thicknesses}.")
     dz = thicknesses[0]
     if dz <= 0:
         raise ValueError(f"PAD bands have a null strata thickness (dz = {dz}).")
 
-    strata.sort()
-    h_bottom = np.array([h for h, _, _ in strata])
-    indices = np.array([index for _, _, index in strata])
+    h_bottom = np.array([h for _, h in strata])
+    if not np.allclose(h_bottom, h_bottom[0] + dz * np.arange(len(h_bottom))):
+        raise ValueError(f"PAD strata are not contiguous and ascending (dz = {dz}): h_bottom = {h_bottom.tolist()}.")
 
-    expected = h_bottom[0] + dz * np.arange(len(h_bottom))
-    if not np.allclose(h_bottom, expected):
-        raise ValueError(f"PAD strata are duplicated or not contiguous (dz = {dz}): h_bottom = {h_bottom.tolist()}.")
-
-    return indices, dz, h_bottom
+    return dz, h_bottom
 
 
 def prepare_pad_profile(pad: np.ndarray, smooth_pad: bool) -> tuple[np.ndarray, int]:

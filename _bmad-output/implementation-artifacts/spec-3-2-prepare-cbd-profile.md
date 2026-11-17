@@ -86,3 +86,15 @@ Le comportement doit être strictement celui de R (épique 3, §4 étape 1, piè
 | 10 | Le test du log est trop faible (`"5" in caplog.text`) | low | Réel, et la correction est simple. **Corrigé** : on vérifie le niveau et le message exact. |
 | 11 | Tests manquants : raster R à 0,5 m, bandes `None`, doublons | low | **Corrigé** : test paramétré sur les deux rasters R, `None` mêlé aux bandes PAD, doublons, trous et `dz` nul. Le test en 2‑D est rejeté (voir le point 7). La frontière 1,5 m est déjà couverte par `test_compute_cbd_height_limit_is_strict`. |
 | 12 | La docstring du module ne parle que de l'étape 1 | low | **Corrigé** : elle mentionne maintenant les étapes 1, 4 et 9. |
+
+## Changement après livraison (17/11/2026, demande de l'utilisatrice)
+
+- **Décision.** `parse_pad_strata` est remplacée par `read_pad_heights(band_names) -> (dz, h_bottom)`.
+- **Pourquoi.** L'entrée de l'étape 3 est toujours `{stem}_pad_profile_1m.tif`. L'étape 2 Python écrit 8 rasters distincts, et celui-ci ne contient que les bandes `PAD_1_*`, déjà triées. Le filtrage des bandes mêlées et le renvoi d'indices, hérités de `parse_pad_heights` en R, n'ont donc pas d'utilité.
+- **Ce que fait la nouvelle fonction.**
+  - Elle exige que toutes les bandes soient des `PAD_{dz}_{h}` et lève une `ValueError` sinon.
+  - Elle garde l'ordre des bandes, sans retri.
+  - Elle vérifie que `dz` est unique et non nul, et que les strates sont contiguës et croissantes.
+- **Rasters R.** Le raster R (186 bandes) n'est plus accepté directement : les tests de parité en extraient les bandes `PAD_*`.
+- **Épique amendée.** AC-3.2.1, AC-3.2.2, le périmètre de la story 3.2, AC-3.6.2 et AC-3.6.9.
+- **Tests.** 27 tests réussis.

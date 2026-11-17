@@ -7,80 +7,60 @@ import rasterio
 
 from lidar_for_fuel.fuel_metrics.prepare_cbd_profile import (
     compute_cbd,
-    parse_pad_strata,
     prepare_pad_profile,
+    read_pad_heights,
     select_default_ladder_threshold,
 )
 
-# PAD rasters produced by R (lidarforfuel) for story 3.1: PAD_* bands mixed with others
-_REF_PAD_DIR = Path(__file__).resolve().parents[2] / "data/ref_inrae/pad_profile"
-_REF_PAD_RASTER_1M = _REF_PAD_DIR / "512500_6854997_pad_1m.tif"  # 186 bands, PAD_1_0 ... PAD_1_59
-_REF_PAD_RASTER_05M = _REF_PAD_DIR / "512500_6854997_pad_05m.tif"  # 18 bands, PAD_0.5_0 ... PAD_0.5_1.5
+# PAD raster produced by R (lidarforfuel) for story 3.1. Unlike the Python `pad_profile_1m`
+# raster (PAD_1_* bands only), it mixes the PAD_1_* bands with Cover_*, N_*, Ni_*... (186 bands)
+_REF_PAD_RASTER_1M = Path(__file__).resolve().parents[2] / "data/ref_inrae/pad_profile/512500_6854997_pad_1m.tif"
 
 
-# --- parse_pad_strata (AC-3.2.1, AC-3.2.2) ---------------------------------------------------
+# --- read_pad_heights (AC-3.2.1, AC-3.2.2) ---------------------------------------------------
 
 
-def test_parse_pad_strata_keeps_only_pad_bands_sorted_numerically():
-    # Numeric sort: PAD_1_10 must come after PAD_1_2 (alphabetical order would put it before)
-    names = [f"PAD_1_{k}" for k in (10, 2, 0, 1, 3, 4, 5, 6, 7, 8, 9)]
-    names = ["date", "Cover_2", None, *names[:3], "N_1_3", "Ni_1_0", *names[3:]]
-
-    indices, dz, h_bottom = parse_pad_strata(names)
+def test_read_pad_heights_pad_profile_1m():
+    dz, h_bottom = read_pad_heights([f"PAD_1_{k}" for k in range(60)])
 
     assert dz == 1.0
-    np.testing.assert_array_equal(h_bottom, np.arange(11, dtype=float))
-    # Indices point back to the original band positions, in h_bottom order
-    assert [names[i] for i in indices] == [f"PAD_1_{k}" for k in range(11)]
+    np.testing.assert_array_equal(h_bottom, np.arange(60, dtype=float))
 
 
-def test_parse_pad_strata_decimal_names():
-    indices, dz, h_bottom = parse_pad_strata(["PAD_0.5_1.5", "PAD_0.5_0", "PAD_0.5_1", "PAD_0.5_0.5"])
+def test_read_pad_heights_decimal_names():
+    dz, h_bottom = read_pad_heights(["PAD_0.5_0", "PAD_0.5_0.5", "PAD_0.5_1", "PAD_0.5_1.5"])
 
     assert dz == 0.5
     np.testing.assert_array_equal(h_bottom, [0.0, 0.5, 1.0, 1.5])
-    np.testing.assert_array_equal(indices, [1, 3, 2, 0])
+
+
+def test_read_pad_heights_pad_bands_of_r_raster():
+    # Parity tests feed the R PAD raster: they keep only its PAD_* bands, in band order
+    with rasterio.open(_REF_PAD_RASTER_1M) as src:
+        pad_names = [name for name in src.descriptions if name.startswith("PAD_")]
+
+    dz, h_bottom = read_pad_heights(pad_names)
+
+    assert dz == 1.0
+    np.testing.assert_array_equal(h_bottom, np.arange(60, dtype=float))
 
 
 @pytest.mark.parametrize(
-    "raster, dz, expected_names",
+    "names, match",
     [
-        (_REF_PAD_RASTER_1M, 1.0, [f"PAD_1_{k}" for k in range(60)]),
-        (_REF_PAD_RASTER_05M, 0.5, ["PAD_0.5_0", "PAD_0.5_0.5", "PAD_0.5_1", "PAD_0.5_1.5"]),
+        ([], "no band"),
+        (["PAD_1_0", "Cover_2"], "Cover_2"),  # not a PAD band
+        (["PAD_1_0", None], "None"),  # unnamed band
+        (["PAD_1_0", "PAD_0.5_1"], "dz"),  # mixed thicknesses
+        (["PAD_0_0", "PAD_0_1"], "null"),  # null thickness
+        (["PAD_1_0", "PAD_1_1", "PAD_1_1"], "contiguous"),  # duplicate stratum
+        (["PAD_1_0", "PAD_1_2"], "contiguous"),  # gap
+        (["PAD_1_1", "PAD_1_0"], "contiguous"),  # not ascending
     ],
 )
-def test_parse_pad_strata_real_r_raster(raster, dz, expected_names):
-    with rasterio.open(raster) as src:
-        names = list(src.descriptions)
-
-    indices, parsed_dz, h_bottom = parse_pad_strata(names)
-
-    assert parsed_dz == dz
-    np.testing.assert_allclose(h_bottom, dz * np.arange(len(expected_names)))
-    assert [names[i] for i in indices] == expected_names
-
-
-def test_parse_pad_strata_mixed_dz_raises():
-    with pytest.raises(ValueError, match="dz"):
-        parse_pad_strata(["PAD_1_0", "PAD_0.5_1"])
-
-
-@pytest.mark.parametrize(
-    "names",
-    [
-        ["PAD_1_0", "PAD_1_1", "PAD_1_1"],  # duplicate stratum
-        ["PAD_1_0", "PAD_1_2"],  # gap
-        ["PAD_0_0", "PAD_0_1"],  # null thickness
-    ],
-)
-def test_parse_pad_strata_irregular_profile_raises(names):
-    with pytest.raises(ValueError):
-        parse_pad_strata(names)
-
-
-def test_parse_pad_strata_no_pad_band_raises():
-    with pytest.raises(ValueError, match="PAD_"):
-        parse_pad_strata(["Cover_2", "N_1_3", None])
+def test_read_pad_heights_invalid_names_raise(names, match):
+    with pytest.raises(ValueError, match=match):
+        read_pad_heights(names)
 
 
 # --- prepare_pad_profile (AC-3.2.3, AC-3.2.4) ------------------------------------------------

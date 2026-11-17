@@ -526,7 +526,7 @@ Facile.
 
 - **Pour qui** : la développeuse de l'étape 3. Cette story est la couche d'entrée du calcul, sur laquelle s'appuient les stories 3.3 et 3.4.
 - **Ce qu'on cherche à faire** :
-  1. **Lire les noms de bandes.** Le raster PAD contient des bandes nommées `PAD_1_0`, `PAD_1_1`…, mêlées à d'autres bandes (`Cover_2`, `N_1_3`…). On ne garde que les bandes `PAD_*`. Leur nom donne l'épaisseur des strates et la hauteur du bas de chaque strate : `PAD_1_10` signifie `dz = 1` m et `h_bottom = 10` m au‑dessus du sol.
+  1. **Lire les hauteurs des strates dans les noms de bandes.** Le raster `{stem}_pad_profile_1m.tif` de l'étape 2 ne contient que les bandes `PAD_1_0` … `PAD_1_59`, rangées par hauteur croissante. Contrairement au raster R, il n'y a pas de bandes `Cover_*`, `N_*`… mêlées : il n'y a donc rien à filtrer. Le nom de chaque bande donne l'épaisseur des strates et la hauteur du bas de la strate : `PAD_1_10` signifie `dz = 1` m et `h_bottom = 10` m au‑dessus du sol.
   2. **Passer du PAD à la CBD.** Le **PAD** (*Plant Area Density*, en m²/m³) mesure la quantité de végétation dans chaque strate. La **CBD** (*Canopy Bulk Density*, en kg/m³) mesure la masse de combustible. On passe de l'un à l'autre en multipliant par la masse surfacique du combustible (FMA) : celle de la canopée au‑dessus d'une hauteur limite, celle des arbustes en dessous. Avant ce calcul, les valeurs invalides (NaN, inf, négatives) sont remplacées par 0, et le profil peut être lissé sur 3 strates.
   3. **Choisir le seuil d'échelle par défaut**, parmi ceux de la config. C'est lui qui servira à remplir les bandes `LFL`, `CFL`, `FSG` et `ProfType`.
 - **Objectif final** : toutes les métriques de combustible se calculent à partir de ce profil CBD. Une entrée propre et validée ici évite de propager des erreurs dans les 45 métriques.
@@ -537,8 +537,8 @@ Facile.
 
 #### Critères d'acceptation
 
-- **AC-3.2.1** — **Étant donné** les noms `PAD_1_0` … `PAD_1_59` mêlés à d'autres bandes (`Cover_2`, `N_1_3`…), **quand** on lit les strates, **alors** on obtient les indices des bandes PAD, `dz = 1` et `h_bottom = [0 … 59]`, triés numériquement. **Étant donné** le nom `PAD_0.5_1.5`, **alors** on obtient `dz = 0.5` et `h_bottom = 1.5`.
-- **AC-3.2.2** — **Étant donné** des bandes PAD d'épaisseurs différentes (par exemple `PAD_1_0` et `PAD_0.5_1`), **quand** on lit les strates, **alors** une `ValueError` est levée.
+- **AC-3.2.1** — **Étant donné** les noms `PAD_1_0` … `PAD_1_59` du raster `pad_profile_1m`, **quand** on lit les hauteurs, **alors** on obtient `dz = 1` et `h_bottom = [0 … 59]`, dans l'ordre des bandes. **Étant donné** les noms `PAD_0.5_0` … `PAD_0.5_1.5`, **alors** on obtient `dz = 0.5` et `h_bottom = [0, 0.5, 1, 1.5]`.
+- **AC-3.2.2** — **Étant donné** une bande qui n'est pas une bande `PAD_{dz}_{h_bas}`, des épaisseurs différentes (par exemple `PAD_1_0` et `PAD_0.5_1`), ou des strates qui ne sont pas contiguës et croissantes, **quand** on lit les hauteurs, **alors** une `ValueError` est levée.
 - **AC-3.2.3** — **Étant donné** un profil PAD qui contient des `NaN`, des `inf` ou des valeurs négatives, **quand** on prépare le profil, **alors** ces valeurs sont remplacées par 0, et le nombre de valeurs corrigées est journalisé en debug.
 - **AC-3.2.4** — **Étant donné** le profil `[0, 3, 0, 0]` et `smooth_pad=True`, **quand** on prépare le profil, **alors** on obtient `[1.5, 1, 1, 0]` : moyenne centrée sur 3 strates, et moyenne sur les 2 valeurs disponibles aux bords.
 - **AC-3.2.5** — **Étant donné** un profil PAD préparé, `fma_can`, `fma_shrub`, `bd_max` et une hauteur limite, **quand** on calcule la CBD, **alors** elle vaut `min(PAD × FMA, bd_max)`, avec `fma_can` pour les strates au‑dessus de la limite et `fma_shrub` pour les autres. La limite est un paramètre de la fonction : CHT à l'étape 1, `CBH2` à l'étape 4.
@@ -552,7 +552,7 @@ Facile.
 
 #### Informations complémentaires
 
-**Périmètre** : étape 1 de la section 4, lecture de `PAD_{dz}_{h_bas}` (équivalent de `parse_pad_heights` en R, `R/pad_metrics.R:286`) et validation des paramètres. **Fichiers pressentis** : `lidar_for_fuel/fuel_metrics/prepare_cbd_profile.py`, `test/fuel_metrics/test_prepare_cbd_profile.py`. **Dépendances** : aucune.
+**Périmètre** : étape 1 de la section 4, et lecture des hauteurs `PAD_{dz}_{h_bas}`. En R, `parse_pad_heights` (`R/pad_metrics.R:286`) filtre en plus les bandes PAD, mêlées à d'autres dans le raster R. C'est inutile en Python (décision du 17/11/2026). La validation des paramètres de la config est reportée à la story 3.7. **Fichiers pressentis** : `lidar_for_fuel/fuel_metrics/prepare_cbd_profile.py`, `test/fuel_metrics/test_prepare_cbd_profile.py`. **Dépendances** : aucune.
 
 ### Story 3.3 — Métriques de canopée (CTH, CBH, CBH2, CBHlow, CDH, CBDcan)
 
@@ -672,7 +672,7 @@ Normal.
 #### Critères d'acceptation
 
 - **AC-3.6.1** — **Étant donné** un raster PAD, **quand** on calcule et exporte les métriques, **alors** le fichier écrit a exactement la même transform, le même CRS et la même taille que le raster d'entrée. Il contient une bande float32 par métrique (45 avec la config par défaut, voir §3.2), nodata NaN, et les descriptions de bandes sont les noms renvoyés par `fuel_metrics_core`, dans l'ordre.
-- **AC-3.6.2** — **Étant donné** un raster PAD Python (60 bandes PAD) ou un raster PAD R (186 bandes), **quand** on calcule les métriques, **alors** les bandes PAD sont trouvées **par leur nom** (story 3.2), et non par leur position, et les deux rasters sont acceptés.
+- **AC-3.6.2** — **Étant donné** le raster PAD Python `{stem}_pad_profile_1m.tif`, qui n'a que des bandes `PAD_*`, **quand** on calcule les métriques, **alors** les hauteurs des strates sont lues dans les noms de bandes (story 3.2). Le raster PAD R (186 bandes) n'est pas une entrée de production. Les tests de parité n'en gardent que les bandes `PAD_1_*` avant l'appel (décision du 17/11/2026).
 - **AC-3.6.3** — **Étant donné** la fenêtre de référence 3.1, **quand** on produit le raster de métriques, **alors** il est égal au raster R, à l'exception des divergences assumées en 3.5.
 - **AC-3.6.4** — **Étant donné** un pixel dont le PAD est entièrement NaN, **quand** on produit le raster, **alors** ce pixel vaut NaN sur toutes les bandes (D2).
 - **AC-3.6.5** — **Étant donné** le code d'export, **quand** on le relit, **alors** l'écriture passe par `_write_geotiff` de `pad_profile/export_raster.py`, éventuellement déplacé dans `commons/` s'il est partagé. On n'écrit pas de nouvel outil d'écriture.
@@ -686,7 +686,7 @@ Normal.
   - le nombre de pixels entièrement NaN, mis à NaN en sortie (D2) ;
   - le nombre de profils partiellement NaN, inf ou négatifs, corrigés à 0 (A6, AC‑3.2.3) ;
   - le nombre de pixels traités.
-- **AC-3.6.9** — **Étant donné** un raster d'entrée **sans aucune bande `PAD_*`**, **quand** on lance le calcul, **alors** une `ValueError` explicite donne le nom du fichier. Ce n'est pas une dalle atypique mais une erreur d'entrée : on ne produit pas de sortie vide en silence.
+- **AC-3.6.9** — **Étant donné** un raster d'entrée dont les bandes ne sont pas toutes des bandes `PAD_*` (ou qui n'en a aucune), **quand** on lance le calcul, **alors** une `ValueError` explicite donne le nom du fichier. Ce n'est pas une dalle atypique mais une erreur d'entrée : on ne produit pas de sortie vide en silence.
 
 #### Informations complémentaires
 
