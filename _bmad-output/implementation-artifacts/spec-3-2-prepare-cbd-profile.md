@@ -98,3 +98,18 @@ Le comportement doit être strictement celui de R (épique 3, §4 étape 1, piè
 - **Rasters R.** Le raster R (186 bandes) n'est plus accepté directement : les tests de parité en extraient les bandes `PAD_*`.
 - **Épique amendée.** AC-3.2.1, AC-3.2.2, le périmètre de la story 3.2, AC-3.6.2 et AC-3.6.9.
 - **Tests.** 27 tests réussis.
+
+## Changement après livraison n° 2 (17/11/2026, demande de l'utilisatrice) : FMA en carte
+
+- **Décision.** D6 est amendée : `fma_can` et `fma_shrub` acceptent chacun une valeur **ou** le chemin de la carte FMA nationale (1 bande `FMA`, 10 m, valeurs de 0,05 à 0,5 kg/m²). C'est ce que permet R : `FMAcan` et `FMAshrub` en `numeric` ou en `SpatRaster`, empilés avec le PAD dans `ffuelmetrics2Rast`.
+- **Fonction ajoutée** : `read_fma(fma, transform, shape, crs) -> ndarray (H, W)`.
+  - **Une valeur** : la grille est remplie avec cette valeur.
+  - **Un chemin** :
+    - on lit la fenêtre de la carte qui couvre la grille PAD, en prenant pour chaque pixel le pixel de carte le plus proche ;
+    - un décalage d'au plus 0,1 pixel est toléré, ce qui couvre les 6 cm de l'origine CosiaFrance ;
+    - les pixels NoData ou hors de la carte valent NaN ;
+    - une `ValueError` est levée si le CRS (codes EPSG) ou la résolution diffèrent, si la grille est mal alignée, ou si une valeur sort de [0,05 ; 0,5].
+- **`compute_cbd` ne change pas** : elle reçoit les FMA scalaires du pixel traité. C'est la boucle par pixel de la story 3.6 qui les prend dans les grilles renvoyées par `read_fma`.
+- **Épique amendée** : D6, le paragraphe sur le décalage de 6 cm, le tableau 3.1, le périmètre de la story 3.2, AC-3.2.5, le nouvel AC-3.2.7 et le §10.
+- **Point reporté** : la condition d'équivalence avec R (`5 × min(FMA) ≥ bd_max`) n'est plus garantie avec la carte. Voir deferred-work, story 3.7.
+- **Tests** : 36 réussis (9 nouveaux).

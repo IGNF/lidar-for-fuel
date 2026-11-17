@@ -12,3 +12,6 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-3-2-prepare-cbd-profile.md`
   summary: FAIT le 17/11/2026 : l'exemple de l'épique est corrigé (AC-3.2.6 et §4 étape 9), il donne maintenant `[0.01, 0.02, 0.05, 0.1]` → 0.05, et deux cas d'égalité exacte sont ajoutés.
   evidence: Il remplace le premier élément de cette liste.
+- source_spec: `_bmad-output/implementation-artifacts/spec-3-2-prepare-cbd-profile.md`
+  summary: Story 3.7 (AC-3.7.3, AC-E.7) — revoir la condition d'équivalence avec R `5 × min(fma_can, fma_shrub) ≥ bd_max` quand une FMA est la carte : elle doit porter sur le minimum de la carte, ou être évaluée par pixel.
+  evidence: La carte FMA va de 0,05 à 0,5 kg/m². Pour un pixel où FMA < 0,2, on a 5 × FMA < 1 = `bd_max`. Le PAD Python plafonné à 5 donne alors une CBD plus faible que le PAD R non plafonné (maximum observé 7,01). Il y a donc un écart avec R sur ces pixels si PAD > 5, en contradiction avec Q6, qui demande un écart nul. Avec la valeur scalaire 0,254 de la config, la condition reste vraie.
