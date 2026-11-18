@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import numpy as np
+import pytest
 import rasterio
 
 from lidar_for_fuel.fuel_metrics.calculate_fuel_metrics import fuel_metrics_core
@@ -165,23 +166,21 @@ def test_fuel_metrics_single_stratum_gives_nan_second_load():
     assert np.isnan(metrics["FL_k2"])
 
 
-def test_fuel_metrics_defaults_are_those_of_the_median_threshold():
-    metrics = _core(_HAND_PAD)
+@pytest.mark.parametrize(
+    "thresholds, suffix",
+    [
+        pytest.param([0.01, 0.02, 0.05], "0p020", id="median_threshold"),
+        # closest to the median in double precision, whatever the order (PR #48)
+        pytest.param([0.1, 0.02, 0.01, 0.05], "0p050", id="even_number_of_thresholds"),
+    ],
+)
+def test_fuel_metrics_defaults_are_those_of_the_threshold_closest_to_the_median(thresholds, suffix):
+    metrics = _core(_HAND_PAD, ladder_fuel_bd_thresholds=thresholds)
 
-    assert metrics["LFL"] == metrics["LadderLoad_0p020"]
-    assert metrics["CFL"] == metrics["CFL_0p020"]
-    assert metrics["FSG"] == metrics["FSG_0p020"]
-    assert metrics["ProfType"] == metrics["ProfType_0p020"]
-
-
-def test_fuel_metrics_defaults_with_an_even_number_of_thresholds():
-    # [0.01, 0.02, 0.05, 0.1] -> 0.05 (closest to the median in double precision, PR #48)
-    metrics = _core(_HAND_PAD, ladder_fuel_bd_thresholds=[0.1, 0.02, 0.01, 0.05])
-
-    assert metrics["LFL"] == metrics["LadderLoad_0p050"]
-    assert metrics["CFL"] == metrics["CFL_0p050"]
-    assert metrics["FSG"] == metrics["FSG_0p050"]
-    assert metrics["ProfType"] == metrics["ProfType_0p050"]
+    assert metrics["LFL"] == metrics[f"LadderLoad_{suffix}"]
+    assert metrics["CFL"] == metrics[f"CFL_{suffix}"]
+    assert metrics["FSG"] == metrics[f"FSG_{suffix}"]
+    assert metrics["ProfType"] == metrics[f"ProfType_{suffix}"]
 
 
 def test_fuel_metrics_all_nan_profile_gives_the_zeros_of_r():

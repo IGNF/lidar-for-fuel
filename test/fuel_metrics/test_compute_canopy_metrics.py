@@ -75,15 +75,15 @@ def _assert_metrics(metrics, expected):
 _PROFILE_3A = [0.05, 0.05, 0.02, 0.0, 0.2, 0.1, 0.3, 0.5, 0.4, 0.2, 0.005, 0.001]
 
 
-def test_canopy_metrics_3a_normal():
-    # CTH = 9.5; 3A searches 3.17 < h <= 9.5: max 0.5 at 7.5, min 0 at 3.5 below it,
-    # S = 0.3 * 0.5 = 0.15. CBH = lowest stratum >= S above 3.5 (4.5) -> 4.0;
-    # CBH2: going down from 7.5, the first stratum below S is 5.5 -> 6.5 - 0.5 = 6.0.
-    # 3B searches 1 < h <= 3.17: max 0.05 at 1.5, nothing between 1 m and 1.5 m -> no min.
-    metrics, _ = _canopy(_PROFILE_3A)
-
-    _assert_metrics(
-        metrics,
+# Each case: PAD profile, parameters overriding _HAND_PARAMS (and dz), expected metrics.
+_HAND_CASES = [
+    pytest.param(
+        # CTH = 9.5; 3A searches 3.17 < h <= 9.5: max 0.5 at 7.5, min 0 at 3.5 below it,
+        # S = 0.3 * 0.5 = 0.15. CBH = lowest stratum >= S above 3.5 (4.5) -> 4.0;
+        # CBH2: going down from 7.5, the first stratum below S is 5.5 -> 6.5 - 0.5 = 6.0.
+        # 3B searches 1 < h <= 3.17: max 0.05 at 1.5, nothing between 1 m and 1.5 m -> no min.
+        _PROFILE_3A,
+        {},
         {
             "CTH_0p0012": 10.5,
             "CTH_0p0100": 9.5,
@@ -97,16 +97,13 @@ def test_canopy_metrics_3a_normal():
             "CanBDlowmin": np.nan,
             "CBDcan": np.mean([0.3, 0.5, 0.4, 0.2]),  # 6.5 to 9.5
         },
-    )
-
-
-def test_canopy_metrics_3a_min_equal_max_gives_no_cbh_and_falls_back_on_cht():
-    # Flat profile: the 3A min (1.5-2.5 m) equals the 3A max -> no CBH, but CanBDmax and
-    # CanBDmin are still given. 3B has no stratum between 1 m and its max (1.5 m) -> no CBHlow.
-    metrics, _ = _canopy([0.2] * 10)
-
-    _assert_metrics(
-        metrics,
+        id="3a_normal",
+    ),
+    pytest.param(
+        # Flat profile: the 3A min (1.5-2.5 m) equals the 3A max -> no CBH, but CanBDmax and
+        # CanBDmin are still given. 3B has no stratum between 1 m and its max (1.5 m) -> no CBHlow.
+        [0.2] * 10,
+        {},
         {
             "CTH_0p0012": 9.5,
             "CTH_0p0100": 9.5,
@@ -120,17 +117,14 @@ def test_canopy_metrics_3a_min_equal_max_gives_no_cbh_and_falls_back_on_cht():
             "CanBDlowmin": np.nan,
             "CBDcan": 0.2,  # 1.5 to 9.5
         },
-    )
-
-
-def test_canopy_metrics_falls_back_on_cbhlow():
-    # CTH = 15.5. 3A (5.17 < h <= 15.5) is sparse (0.1) while 1.5-4.5 m is denser: CanBDmin
-    # (0.2) > CanBDmax (0.1) -> no CBH. 3B (1 < h <= 5.17): max 0.6, first at 3.5 (tie with
-    # 4.5), min 0.2 at 1.5, S = 0.7 * 0.2 + 0.3 * 0.6 = 0.32 -> CBHlow = 3.5 - 0.5 = 3.0.
-    metrics, _ = _canopy([0.0, 0.2, 0.3, 0.6, 0.6] + [0.1] * 11)
-
-    _assert_metrics(
-        metrics,
+        id="3a_min_equal_max_gives_no_cbh_and_falls_back_on_cht",
+    ),
+    pytest.param(
+        # CTH = 15.5. 3A (5.17 < h <= 15.5) is sparse (0.1) while 1.5-4.5 m is denser: CanBDmin
+        # (0.2) > CanBDmax (0.1) -> no CBH. 3B (1 < h <= 5.17): max 0.6, first at 3.5 (tie with
+        # 4.5), min 0.2 at 1.5, S = 0.7 * 0.2 + 0.3 * 0.6 = 0.32 -> CBHlow = 3.5 - 0.5 = 3.0.
+        [0.0, 0.2, 0.3, 0.6, 0.6] + [0.1] * 11,
+        {},
         {
             "CTH_0p0012": 15.5,
             "CTH_0p0100": 15.5,
@@ -144,16 +138,13 @@ def test_canopy_metrics_falls_back_on_cbhlow():
             "CanBDlowmin": 0.2,
             "CBDcan": np.mean([0.6, 0.6] + [0.1] * 11),  # 3.5 to 15.5
         },
-    )
-
-
-def test_canopy_metrics_surface_only_falls_back_on_cht():
-    # Only the first stratum is dense: CTH = 0.5 is below 1 m, no canopy search at all.
-    # CDH falls back on CTH; no stratum between CBH2 (1 m) and 0.5 m -> CBDcan = 0.
-    metrics, _ = _canopy([0.5, 0.0, 0.0, 0.0])
-
-    _assert_metrics(
-        metrics,
+        id="falls_back_on_cbhlow",
+    ),
+    pytest.param(
+        # Only the first stratum is dense: CTH = 0.5 is below 1 m, no canopy search at all.
+        # CDH falls back on CTH; no stratum between CBH2 (1 m) and 0.5 m -> CBDcan = 0.
+        [0.5, 0.0, 0.0, 0.0],
+        {},
         {
             "CTH_0p0012": 0.5,
             "CTH_0p0100": 0.5,
@@ -167,7 +158,54 @@ def test_canopy_metrics_surface_only_falls_back_on_cht():
             "CanBDlowmin": np.nan,
             "CBDcan": 0.0,
         },
-    )
+        id="surface_only_falls_back_on_cht",
+    ),
+    pytest.param(
+        # 3A profile with dz = 0.5 (h_center = 0.25 ... 5.75): bottoms are h - dz / 2, not h - 0.5.
+        # Expected values computed by R ffuelmetrics2 (zval = 0, 0.5, ..., dz = 0.5), 17/11/2026.
+        _PROFILE_3A,
+        {"dz": 0.5},
+        {
+            "CTH_0p0012": 5.25,
+            "CTH_0p0100": 4.75,
+            "CDH": 4.75,
+            "CBH": 2.0,  # stratum centred on 2.25 m
+            "CBH2": 3.0,  # stratum centred on 3.25 m
+            "CBHlow": np.nan,
+            "CanBDmax": 0.5,
+            "CanBDmin": 0.0,
+            "CanBDlowmax": 0.02,
+            "CanBDlowmin": np.nan,
+            "CBDcan": 0.34999999999999998,
+        },
+        id="half_metre_strata",
+    ),
+    pytest.param(
+        [0.005] * 6 + [0.0] * 4,
+        {},
+        {
+            "CTH_0p0012": 5.5,
+            "CTH_0p0100": np.nan,
+            "CDH": np.nan,
+            "CBH": np.nan,
+            "CBH2": 1.0,
+            "CBHlow": np.nan,
+            "CanBDmax": np.nan,
+            "CanBDmin": np.nan,
+            "CanBDlowmax": np.nan,
+            "CanBDlowmin": np.nan,
+            "CBDcan": np.nan,
+        },
+        id="no_stratum_above_0p01",
+    ),
+]
+
+
+@pytest.mark.parametrize("pad, params, expected", _HAND_CASES)
+def test_canopy_metrics_hand_profile(pad, params, expected):
+    metrics, _ = _canopy(pad, **params)
+
+    _assert_metrics(metrics, expected)
 
 
 def test_canopy_metrics_null_profile():
@@ -202,29 +240,6 @@ def test_canopy_metrics_max_on_several_strata_takes_the_first():
     assert metrics["CBH2"] == 6.0
 
 
-def test_canopy_metrics_half_metre_strata():
-    # 3A profile with dz = 0.5 (h_center = 0.25 ... 5.75): bottoms are h - dz / 2, not h - 0.5.
-    # Expected values computed by R ffuelmetrics2 (zval = 0, 0.5, ..., dz = 0.5), 17/11/2026.
-    metrics, _ = _canopy(_PROFILE_3A, dz=0.5)
-
-    _assert_metrics(
-        metrics,
-        {
-            "CTH_0p0012": 5.25,
-            "CTH_0p0100": 4.75,
-            "CDH": 4.75,
-            "CBH": 2.0,  # stratum centred on 2.25 m
-            "CBH2": 3.0,  # stratum centred on 3.25 m
-            "CBHlow": np.nan,
-            "CanBDmax": 0.5,
-            "CanBDmin": 0.0,
-            "CanBDlowmax": 0.02,
-            "CanBDlowmin": np.nan,
-            "CBDcan": 0.34999999999999998,
-        },
-    )
-
-
 def test_canopy_metrics_frac_0_gives_cbh_without_cbh2():
     # frac = 0: S = CanBDmin, so no stratum is < S on the way down and 3A finds CBH (4.0) but
     # no CBH2; CBH2 falls back on CHT, below CBH (as R, checked with Rscript on 17/11/2026)
@@ -236,27 +251,6 @@ def test_canopy_metrics_frac_0_gives_cbh_without_cbh2():
 
 
 # --- No stratum dense enough for the canopy top (CBD < 0.01) -----------------------------------
-
-
-def test_canopy_metrics_no_stratum_above_0p01():
-    metrics, _ = _canopy([0.005] * 6 + [0.0] * 4)
-
-    _assert_metrics(
-        metrics,
-        {
-            "CTH_0p0012": 5.5,
-            "CTH_0p0100": np.nan,
-            "CDH": np.nan,
-            "CBH": np.nan,
-            "CBH2": 1.0,
-            "CBHlow": np.nan,
-            "CanBDmax": np.nan,
-            "CanBDmin": np.nan,
-            "CanBDlowmax": np.nan,
-            "CanBDlowmin": np.nan,
-            "CBDcan": np.nan,
-        },
-    )
 
 
 def test_canopy_metrics_no_canopy_top_and_no_stratum_above_cbh2():
