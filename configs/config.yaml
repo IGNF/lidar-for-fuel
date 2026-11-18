@@ -68,6 +68,18 @@ pad_profile:
     origin_y: 7111486.75
     resolution_factor: 10.0
 
+ffuelmetrics2:
+  fma_can: 0.2543576
+  fma_shrub: 0.2543576
+  smooth_pad: false
+  dz: 1
+  ladder_fuel _BDthresholds: [0.01, 0.02, 0.05]
+  canopy_height_threshold: 1
+  canopy_bd_thresh_frac: 0.3
+  canopy_top_bd_thresholds: [0.0012, 0.01]
+  cbh_threshold_ratio: 0.333
+  bdmax: 1
+
 dtm:
   download:
     resolution: 0.5 # Pixel size in metres

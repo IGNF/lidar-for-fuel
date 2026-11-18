@@ -129,30 +129,30 @@ def test_prepare_pad_profile_smoothing_single_stratum():
 # --- compute_cbd: PAD × FMA (canopy or shrub by height), capped at bd_max ---------------------
 
 
-def test_compute_cbd_uses_fma_by_height_limit_and_caps_at_bd_max():
+def test_compute_cbd_uses_fma_height_limit_and_caps_at_bd_max():
     pad = np.array([1.0, 1.0, 1.0, 5.0])
     h_center = np.array([0.5, 1.5, 2.5, 3.5])
 
-    cbd = compute_cbd(pad, h_center, height_limit=1.0, fma_can=0.3, fma_shrub=0.1, bd_max=1.0)
+    cbd = compute_cbd(pad, h_center, fma_height_limit=1.0, fma_can=0.3, fma_shrub=0.1, bd_max=1.0)
 
     np.testing.assert_allclose(cbd, [0.1, 0.3, 0.3, 1.0])
 
 
-def test_compute_cbd_height_limit_is_strict():
+def test_compute_cbd_fma_height_limit_is_strict():
     # A stratum centred exactly on the limit uses fma_shrub (R: zval > limit)
     cbd = compute_cbd(
-        np.array([1.0, 1.0]), np.array([1.5, 2.5]), height_limit=1.5, fma_can=0.3, fma_shrub=0.1, bd_max=1.0
+        np.array([1.0, 1.0]), np.array([1.5, 2.5]), fma_height_limit=1.5, fma_can=0.3, fma_shrub=0.1, bd_max=1.0
     )
 
     np.testing.assert_allclose(cbd, [0.1, 0.3])
 
 
-def test_compute_cbd_height_limit_as_cbh2():
+def test_compute_cbd_fma_height_limit_as_cbh2():
     # Same function is reused at step 4 with CBH2 as the limit
     pad = np.ones(6)
     h_center = np.arange(6) + 0.5
 
-    cbd = compute_cbd(pad, h_center, height_limit=3.0, fma_can=0.25, fma_shrub=0.2, bd_max=1.0)
+    cbd = compute_cbd(pad, h_center, fma_height_limit=3.0, fma_can=0.25, fma_shrub=0.2, bd_max=1.0)
 
     np.testing.assert_allclose(cbd, [0.2, 0.2, 0.2, 0.25, 0.25, 0.25])
 

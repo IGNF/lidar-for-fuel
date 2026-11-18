@@ -248,7 +248,7 @@ def _moving_mean_3(values: np.ndarray) -> np.ndarray:
 def compute_cbd(
     pad: np.ndarray,
     h_center: np.ndarray,
-    height_limit: float,
+    fma_height_limit: float,
     fma_can: float,
     fma_shrub: float,
     bd_max: float,
@@ -256,14 +256,14 @@ def compute_cbd(
     """Convert a PAD profile into a CBD (Canopy Bulk Density) profile.
 
     `CBD = min(PAD × FMA, bd_max)`, with `fma_can` for the strata whose centre is strictly
-    above `height_limit` and `fma_shrub` for the others. The limit is the canopy height
+    above `fma_height_limit` and `fma_shrub` for the others. The limit is the canopy height
     threshold at step 1 of the algorithm and CBH2 when the CBD is recomputed at step 4.
 
     Args:
         pad (np.ndarray): Prepared 1-D PAD profile (m²/m³), see `prepare_pad_profile`.
         h_center (np.ndarray): Height above ground of the centre of each stratum (m),
             i.e. `h_bottom + dz / 2`.
-        height_limit (float): Height (m) above which the canopy FMA is used.
+        fma_height_limit (float): Height (m) above which the canopy FMA is used.
         fma_can (float): Fuel mass area of the canopy fuel (kg/m²) for this pixel, see `read_fma`.
         fma_shrub (float): Fuel mass area of the shrub fuel (kg/m²) for this pixel, see `read_fma`.
         bd_max (float): Maximum CBD value (kg/m³).
@@ -271,7 +271,7 @@ def compute_cbd(
     Returns:
         np.ndarray: CBD profile (kg/m³), same shape as `pad`.
     """
-    fma = np.where(np.asarray(h_center) > height_limit, fma_can, fma_shrub)
+    fma = np.where(np.asarray(h_center) > fma_height_limit, fma_can, fma_shrub)
 
     return np.minimum(np.asarray(pad) * fma, bd_max)
 
