@@ -20,7 +20,7 @@ from lidar_for_fuel.fuel_metrics.prepare_cbd_profile import (
 _REF_PAD_RASTER_1M = Path(__file__).resolve().parents[2] / "data/ref_inrae/pad_profile/512500_6854997_pad_1m.tif"
 
 
-# --- read_pad_heights (AC-3.2.1, AC-3.2.2) ---------------------------------------------------
+# --- read_pad_heights: strata heights read from the PAD band names ---------------------------
 
 
 def test_read_pad_heights_pad_profile_1m():
@@ -66,7 +66,7 @@ def test_read_pad_heights_invalid_names_raise(names, match):
         read_pad_heights(names)
 
 
-# --- prepare_pad_profile (AC-3.2.3, AC-3.2.4) ------------------------------------------------
+# --- prepare_pad_profile: invalid values set to 0, optional 3-strata smoothing ---------------
 
 
 def test_prepare_pad_profile_replaces_invalid_values_by_zero(caplog):
@@ -126,7 +126,7 @@ def test_prepare_pad_profile_smoothing_single_stratum():
     np.testing.assert_allclose(cleaned, [2.0])
 
 
-# --- compute_cbd (AC-3.2.5) -------------------------------------------------------------------
+# --- compute_cbd: PAD × FMA (canopy or shrub by height), capped at bd_max ---------------------
 
 
 def test_compute_cbd_uses_fma_by_height_limit_and_caps_at_bd_max():
@@ -157,7 +157,7 @@ def test_compute_cbd_height_limit_as_cbh2():
     np.testing.assert_allclose(cbd, [0.2, 0.2, 0.2, 0.25, 0.25, 0.25])
 
 
-# --- read_fma (AC-3.2.7) -----------------------------------------------------------------------
+# --- read_fma: FMA as a single value or read from the FMA map ----------------------------------
 
 # PAD grid of the R reference tile 512500_6854997 (10 m, origin on the rounded CosiaFrance grid)
 _PAD_TRANSFORM = from_origin(512489.75, 6854996.75, 10.0, 10.0)
@@ -242,7 +242,7 @@ def test_read_fma_map_incompatible_grid_raises(tmp_path, fma_transform, crs, mat
         read_fma(path, _PAD_TRANSFORM, (2, 2), _LAMBERT_93)
 
 
-# --- select_default_ladder_threshold (AC-3.2.6) ----------------------------------------------
+# --- select_default_ladder_threshold: threshold closest to the median ------------------------
 
 
 @pytest.mark.parametrize(
