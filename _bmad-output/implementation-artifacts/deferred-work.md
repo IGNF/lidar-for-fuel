@@ -27,3 +27,12 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-3-3-canopy-metrics.md`
   summary: Story 3.4 — donner à `fuel_metrics_core` des arguments explicites (et non `**params` transmis tel quel), calculer `h_center` une seule fois, et décider si l'ordre des clés du dict fait partie du contrat.
   evidence: `compute_canopy_metrics` refuse `ladder_fuel_bd_thresholds`, `m_perrakis` et `smooth_pad` (`TypeError`). R intercale `FSG` entre `CBH2` et `CBHlow`, alors que `_assert_metrics` fige aujourd'hui l'ordre du dict de la 3.3.
+- source_spec: `_bmad-output/implementation-artifacts/spec-3-4-fuel-loads-ladder-assembly.md`
+  summary: Story 3.7 — refuser les seuils `ladder_fuel_bd_thresholds` distincts mais de même nom au format `%0.3f` (ex. 0.0101 et 0.0102 → `0p010`).
+  evidence: `compute_ladder_metrics` range les 8 métriques de chaque seuil dans un dict ; deux seuils de même suffixe fusionnent (37 clés au lieu de 45, sans erreur) et le seuil par défaut peut désigner le bloc écrasé. Même cas que les seuils CTH de la 3.3 ; ne survient qu'avec une config anormale, à contrôler à la lecture de la config.
+- source_spec: `_bmad-output/implementation-artifacts/spec-3-4-fuel-loads-ladder-assembly.md`
+  summary: Story 3.7 — tester que la section `fuel_metrics` de `configs/config.yaml` se passe telle quelle à `fuel_metrics_core` (`**cfg.fuel_metrics`).
+  evidence: Les arguments de `fuel_metrics_core` portent les noms des clés de la config, ce qui est vérifié à la main. Pourtant, aucun test ne protège ce contrat : une clé renommée ne serait détectée qu'à l'exécution. Le test de parité garde ses propres paramètres, pour ne pas dépendre des valeurs par défaut de la config (D4 ouverte).
+- source_spec: `_bmad-output/implementation-artifacts/spec-3-4-fuel-loads-ladder-assembly.md`
+  summary: Story 3.6 — compter et journaliser par dalle les pixels entièrement NaN et les valeurs de PAD corrigées (A6, AC-E.5), car `fuel_metrics_core` ignore le compte renvoyé par `prepare_pad_profile`.
+  evidence: `fuel_metrics_core` renvoie seulement le dict des métriques, ce qui garde un contrat simple pour l'assemblage. Le compte se fait plus simplement en un seul calcul sur le raster PAD (`np.isnan(pad).all(0)`, `~np.isfinite | < 0`), au moment où la 3.6 le lit.
