@@ -35,20 +35,23 @@ def compute_ladder_metrics(
     - ladder strata: CBD >= t and `LADDER_MIN_HEIGHT` < h <= CBH2. Only the first continuous
       block counts: `LadderBot` = bottom of its first stratum, `LadderTop` = top of its last.
     - `ProfType` = 3 if `LadderBot` <= CHT (ladder continuous from the surface), 4 otherwise
-      (suspended ladder). As the search starts at 1 m, a ladder is always of type 4 when
-      CHT < 1 m (as R).
+      (suspended ladder). As the search starts above 1 m, `LadderBot` > 1 − dz / 2: a ladder
+      is always of type 4 when CHT <= 1 − dz / 2, e.g. CHT = 0.5 m with 1 m strata (as R).
     - `LadderLoad` = Σ CBD × dz of the strata with CHT < h <= `LadderTop`;
       `SFLeq0` = M × LadderLoad × CBH2 / (CBH2 − LadderTop / 2) and
       `SFLeq_intot` = M × Σ (CBD × CBH2 / (CBH2 − h)) × dz on the same strata.
     - Without ladder strata: `LadderBot` = `LadderTop` = CHT, loads 0, `ProfType` = 1 if
-      CBH2 = CHT (no crown base found), 2 otherwise (canopy without ladder).
+      CBH2 fell back on CHT (neither CBH2 nor CBHlow found), 2 otherwise (canopy without
+      ladder).
     - In all cases: `CFL` = Σ CBD × dz above `LadderTop`, `FSG` = CBH2 − LadderTop + dz / 2.
 
     Args:
         cbd (np.ndarray): CBD profile (kg/m³) recomputed with CBH2, see `compute_canopy_metrics`.
         h_center (np.ndarray): Height above ground of the centre of each stratum (m), ascending.
         dz (float): Thickness of the strata (m).
-        cbh2 (float): Continuous crown base height (m), see `compute_canopy_metrics`.
+        cbh2 (float): Continuous crown base height (m), see `compute_canopy_metrics`. When it
+            fell back on CHT, it must be exactly `canopy_height_threshold` (as returned by
+            `compute_canopy_metrics`): a recomputed or float32 value gives `ProfType` 2, not 1.
         canopy_height_threshold (float): Height (m) separating surface and canopy fuel (CHT).
         ladder_fuel_bd_thresholds (Sequence[float]): CBD thresholds of the ladder fuel (kg/m³).
         m_perrakis (float): M factor of the equivalent surface fuel load (Perrakis 2025).
@@ -95,8 +98,11 @@ def _ladder_for_threshold(
     """
     ladder_bot = ladder_top = cht
     load = sfl_eq0 = sfl_eq_int = 0.0
-    # CBH2 equals CHT exactly when it fell back on it; isclose for robustness (no parity effect)
-    prof_type = 1 if np.isclose(cbh2, cht) else 2
+    # Written as R (`CBH2 == CanopyHeightThreshold`). CBH2 is CHT itself when it fell back on it;
+    # otherwise it is the CBH2 or the CBHlow found, the bottom of a stratum above the CanBDmin
+    # stratum, whose centre is above CHT: strictly above CHT + dz / 2. The exact comparison is
+    # then safe whatever dz
+    prof_type = 1 if cbh2 == cht else 2
 
     above = (cbd >= threshold) & (h > LADDER_MIN_HEIGHT) & (h <= cbh2)
     in_ladder = np.flatnonzero(above)

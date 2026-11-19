@@ -181,6 +181,8 @@ _HAND_CASES = [
         id="half_metre_strata",
     ),
     pytest.param(
+        # No stratum dense enough for the 0.01 canopy top (CBD < 0.01): CTH_0p0100 and CDH are
+        # NaN, 3A finds nothing and CBH2 falls back on CHT; the 0.0012 canopy top still exists
         [0.005] * 6 + [0.0] * 4,
         {},
         {
@@ -251,6 +253,7 @@ def test_canopy_metrics_frac_0_gives_cbh_without_cbh2():
 
 
 # --- No stratum dense enough for the canopy top (CBD < 0.01) -----------------------------------
+# The profile with a 0.0012 canopy top only is the hand case `no_stratum_above_0p01` above.
 
 
 def test_canopy_metrics_no_canopy_top_and_no_stratum_above_cbh2():

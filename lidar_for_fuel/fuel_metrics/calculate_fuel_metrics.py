@@ -56,7 +56,16 @@ def fuel_metrics_core(
 
     - a profile with no data (all NaN) gives the metrics of a null profile (zeros,
       `CBH2` = CHT, `ProfType` = 1), not NaN (A5);
+    - NaN, inf and negative PAD values of a partly valid profile are set to 0, with a debug
+      log only; their count is not returned (A6, counted in story 3.6);
     - `CBD_cbh`, `CBD_cbh2` and `CBD_cbhlow` are always NaN (A1).
+
+    The parameters are used as given. The R rasters (`ffuelmetrics2Rast`) pass on neither
+    `smooth_pad` nor `CBHThresholdRatio` and always use `smooth_pad = False` and a ratio of
+    1/3 (A3): to reproduce them, the caller must pass these values, whatever the configured
+    ones (stories 3.6 and 3.7). With the PAD of the `pad_profile` stage, capped at 5 unlike
+    the R one, the results are also guaranteed to be the same as R if
+    `5 × min(fma_can, fma_shrub) >= bd_max` (the CBD is capped at `bd_max` anyway).
 
     Args:
         pad (np.ndarray): Raw 1-D PAD profile of the pixel (m²/m³), one value per stratum,
@@ -93,13 +102,13 @@ def fuel_metrics_core(
         profile,
         h_center,
         dz,
-        fma_can,
-        fma_shrub,
-        bd_max,
-        cht,
-        canopy_bd_thresh_frac,
-        canopy_top_bd_thresholds,
-        cbh_threshold_ratio,
+        fma_can=fma_can,
+        fma_shrub=fma_shrub,
+        bd_max=bd_max,
+        canopy_height_threshold=cht,
+        canopy_bd_thresh_frac=canopy_bd_thresh_frac,
+        canopy_top_bd_thresholds=canopy_top_bd_thresholds,
+        cbh_threshold_ratio=cbh_threshold_ratio,
     )
 
     # 7. Fuel loads, on the CBD recomputed with CBH2
@@ -108,7 +117,15 @@ def fuel_metrics_core(
     fl_k2 = float(cbd[1]) * dz if cbd.size > 1 else np.nan  # R: CBDval[2] is NA
 
     # 8. Ladder fuel metrics, for each ladder threshold
-    ladders = compute_ladder_metrics(cbd, h_center, dz, canopy["CBH2"], cht, ladder_fuel_bd_thresholds, m_perrakis)
+    ladders = compute_ladder_metrics(
+        cbd,
+        h_center,
+        dz,
+        cbh2=canopy["CBH2"],
+        canopy_height_threshold=cht,
+        ladder_fuel_bd_thresholds=ladder_fuel_bd_thresholds,
+        m_perrakis=m_perrakis,
+    )
 
     # 9. Default ladder metrics: those of the threshold closest to the median
     default = ladder_suffix(select_default_ladder_threshold(ladder_fuel_bd_thresholds))

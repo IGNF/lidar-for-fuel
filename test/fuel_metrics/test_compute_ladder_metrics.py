@@ -5,7 +5,8 @@ from lidar_for_fuel.fuel_metrics.compute_ladder_metrics import compute_ladder_me
 
 _LADDER_PREFIXES = ["LadderBot", "LadderTop", "LadderLoad", "SFLeq0", "SFLeq_intot", "ProfType", "CFL", "FSG"]
 
-# Hand-written profiles: CBD given directly, 1 m strata starting at 0 m, CHT = 1 m, M = 2.5
+# Hand-written profiles: CBD given directly, strata starting at 0 m (1 m thick unless dz is
+# given), CHT = 1 m unless given, M = 2.5
 _HAND_PARAMS = dict(canopy_height_threshold=1.0, ladder_fuel_bd_thresholds=[0.02], m_perrakis=2.5)
 
 
@@ -139,6 +140,24 @@ _HAND_CASES = [
             2.5 - 2 + 0.25,
         ],
         id="half_metre_strata",
+    ),
+    pytest.param(
+        # h_center: 1     3     5 (2 m strata): the stratum centred on 1 m is not searched
+        # (R `zval > 1`), the ladder starts at 2 m, above CHT (type 4)
+        [0.05, 0.05, 0.3],
+        4.0,
+        {"dz": 2.0},
+        [
+            2.0,
+            4.0,
+            0.05 * 2,
+            2.5 * 0.05 * 2 * 4 / (4 - 4 / 2),
+            2.5 * 0.05 * 4 / (4 - 3) * 2,
+            4,
+            0.3 * 2,
+            4 - 4 + 1,
+        ],
+        id="stratum_centred_on_1_m_is_not_searched",
     ),
 ]
 

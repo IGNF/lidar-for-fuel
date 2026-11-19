@@ -256,6 +256,8 @@ def test_read_fma_map_incompatible_grid_raises(tmp_path, fma_transform, crs, mat
         # Exact tie (binary-exact values): first one in the configured order, as R
         ([0.25, 0.5, 0.75, 1.0], 0.5),
         ([0.75, 0.5, 0.25, 1.0], 0.75),
+        # Repeated thresholds count in the median (raw list, as R): median 0.015, not 0.02
+        ([0.01, 0.01, 0.02, 0.05], 0.01),
         ([0.02], 0.02),
     ],
 )

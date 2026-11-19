@@ -36,7 +36,8 @@ _HAND_PARAMS = {**_INRAE_PARAMS, "fma_can": 1.0, "fma_shrub": 0.5}
 
 # R ffuelmetrics2(PADval = _HAND_PAD, FMAcan = 1, FMAshrub = 0.5, zval = 0:7, dz = 1,
 # CanopyBDTreshFrac = 0.3, CBHThresholdRatio = 1/3), computed with Rscript (Dev 8fcccd2
-# equivalent). One ladder of each kind: type 3 at 0.01 and 0.02, type 2 at 0.05.
+# equivalent). Ladder continuous from the surface (type 3) at 0.01 and 0.02, canopy without
+# ladder (type 2) at 0.05.
 _HAND_R_METRICS = {
     "CLFL": 0.655,
     "FL_k1": 0.025,
@@ -158,6 +159,80 @@ def test_fuel_metrics_canopy_load_starts_at_cht():
     np.testing.assert_allclose(metrics["CLFL"], (0.03 + 0.03 + 0.0) * 0.5 + 0.2 + 0.3 + 0.1, rtol=1e-12)
 
 
+def test_fuel_metrics_load_excludes_the_stratum_centred_on_cht():
+    # CHT = 0.5 m, centre of the first stratum: `h > CHT` excludes it from CLFL and from the
+    # ladder load; the ladder found above 1 m is suspended (type 4). Values computed by R:
+    # call of _HAND_R_METRICS with CanopyHeightThreshold = 0.5.
+    metrics = _core(_HAND_PAD, canopy_height_threshold=0.5)
+
+    expected = {
+        "CBH2": 5.0,
+        "CLFL": 0.655,
+        "LadderBot_0p020": 1.0,  # above CHT: suspended
+        "LadderTop_0p020": 2.0,
+        "LadderLoad_0p020": 0.025,
+        "SFLeq0_0p020": 0.078125,
+        "SFLeq_intot_0p020": 0.0892857142857143,
+        "ProfType_0p020": 4.0,
+        "CFL_0p020": 0.63,
+        "FSG_0p020": 3.5,
+    }
+    for name, value in expected.items():
+        np.testing.assert_allclose(metrics[name], value, rtol=1e-12, err_msg=name)
+
+
+@pytest.mark.parametrize(
+    "params, expected",
+    [
+        pytest.param(
+            {"smooth_pad": True},
+            {
+                "CLFL": 0.693333333333333,
+                "FL_k2": 0.0216666666666667,
+                "CBH2": 4.0,
+                "CanBDmax": 0.2,
+                "CanBDmin": 0.02,
+                "CBDcan": 0.160833333333333,
+                "LFL": 0.0216666666666667,
+                "CFL": 0.671666666666667,
+            },
+            id="smooth_pad",
+        ),
+        pytest.param(
+            # CBD of the stratum at 6.5 m (0.3) capped at 0.2
+            {"bd_max": 0.2},
+            {"CLFL": 0.555, "CanBDmax": 0.2, "CBDcan": 0.166666666666667, "CFL": 0.53},
+            id="bd_max",
+        ),
+        pytest.param(
+            # the lower canopy search goes up to 0.8 × CTH = 6 m: a CBHlow is found
+            {"cbh_threshold_ratio": 0.8},
+            {"CBHlow": 5.0, "CanBDlowmax": 0.2, "CanBDlowmin": 0.0},
+            id="cbh_threshold_ratio",
+        ),
+        pytest.param(
+            {"canopy_bd_thresh_frac": 0.8},
+            {"CBH2": 6.0, "CLFL": 0.555, "CFL": 0.53, "FSG": 4.5},
+            id="canopy_bd_thresh_frac",
+        ),
+        pytest.param(
+            {"m_perrakis": 3.0},
+            {"SFLeq0_0p020": 0.09375, "SFLeq_intot_0p020": 0.10714285714285714},
+            id="m_perrakis",
+        ),
+    ],
+)
+def test_fuel_metrics_profile_parameters_are_passed_on(params, expected):
+    # R ffuelmetrics2(PADval = _HAND_PAD, FMAcan = 1, FMAshrub = 0.5, zval = 0:7, dz = 1,
+    # CanopyBDTreshFrac = 0.3, CBHThresholdRatio = 1/3, M = 2.5), with the parameter of the
+    # case instead (smooth_pad, bdmax, CBHThresholdRatio, CanopyBDTreshFrac or M), computed
+    # with Rscript (Dev 8fcccd2 equivalent)
+    metrics = _core(_HAND_PAD, **params)
+
+    for name, value in expected.items():
+        np.testing.assert_allclose(metrics[name], value, rtol=1e-12, err_msg=name)
+
+
 def test_fuel_metrics_single_stratum_gives_nan_second_load():
     # R: CBDval[2] is NA with one stratum
     metrics = _core([0.05])
@@ -167,26 +242,60 @@ def test_fuel_metrics_single_stratum_gives_nan_second_load():
 
 
 @pytest.mark.parametrize(
-    "thresholds, suffix",
+    "pad, thresholds, suffix, r_lfl",
     [
-        pytest.param([0.01, 0.02, 0.05], "0p020", id="median_threshold"),
-        # closest to the median in double precision, whatever the order (PR #48)
-        pytest.param([0.1, 0.02, 0.01, 0.05], "0p050", id="even_number_of_thresholds"),
+        pytest.param(_HAND_PAD, [0.01, 0.02, 0.05], "0p020", 0.025, id="median_threshold"),
+        # 0.02 and 0.05 are both 0.015 from the median 0.035: 0.05 is closer in double
+        # precision (PR #48); the 0.05 ladder differs from the 3 others (0.01 and 0.02 are equal)
+        pytest.param(
+            [0.05, 0.3, 0.15, 0.08, 0.0, 0.4, 0.5, 0.2],
+            [0.1, 0.02, 0.01, 0.05],
+            "0p050",
+            0.225,
+            id="even_number_of_thresholds",
+        ),
+        # 0.5 and 0.75 are exactly 0.125 from the median 0.625: the first of the list given
+        # wins, not the first of the sorted thresholds
+        pytest.param(
+            [0.05, 1.8, 1.2, 0.6, 0.0, 3, 3, 1],
+            [0.75, 0.5, 0.25, 1],
+            "0p750",
+            0.9,
+            id="exact_tie_keeps_the_order_given",
+        ),
     ],
 )
-def test_fuel_metrics_defaults_are_those_of_the_threshold_closest_to_the_median(thresholds, suffix):
-    metrics = _core(_HAND_PAD, ladder_fuel_bd_thresholds=thresholds)
+def test_fuel_metrics_defaults_are_those_of_the_threshold_closest_to_the_median(pad, thresholds, suffix, r_lfl):
+    # r_lfl: LFL computed by R (call of _HAND_R_METRICS with PADval = pad and these thresholds)
+    metrics = _core(pad, ladder_fuel_bd_thresholds=thresholds)
 
-    assert metrics["LFL"] == metrics[f"LadderLoad_{suffix}"]
-    assert metrics["CFL"] == metrics[f"CFL_{suffix}"]
-    assert metrics["FSG"] == metrics[f"FSG_{suffix}"]
+    np.testing.assert_allclose(metrics["LFL"], r_lfl, rtol=1e-12)
+    # LFL, CFL and FSG of the default threshold differ from those of the other thresholds
+    for default, prefix in [("LFL", "LadderLoad"), ("CFL", "CFL"), ("FSG", "FSG")]:
+        others = [
+            value for name, value in metrics.items() if name.startswith(f"{prefix}_") and name != f"{prefix}_{suffix}"
+        ]
+        assert metrics[default] not in others, default
+        assert metrics[default] == metrics[f"{prefix}_{suffix}"], default
     assert metrics["ProfType"] == metrics[f"ProfType_{suffix}"]
+
+
+def test_fuel_metrics_invalid_pad_values_are_set_to_0():
+    # Strict parity: NaN, inf and negative values of a partly valid profile count as 0 (A6)
+    pad = np.array(_HAND_PAD)
+    invalid = pad.copy()
+    invalid[[1, 4, 7]] = [np.nan, -1.0, np.inf]
+    zeroed = pad.copy()
+    zeroed[[1, 4, 7]] = 0.0
+
+    np.testing.assert_equal(_core(invalid), _core(zeroed))
 
 
 def test_fuel_metrics_all_nan_profile_gives_the_zeros_of_r():
     # Strict parity: R turns a no-data pixel into a null profile (A5, corrected in story 3.5)
     metrics = _core([np.nan] * 8)
 
+    np.testing.assert_equal(metrics, _core([0.0] * 8))
     assert metrics["CLFL"] == metrics["FL_k1"] == metrics["LFL"] == metrics["CFL"] == 0.0
     assert metrics["CBH2"] == 1.0
     assert metrics["ProfType"] == 1.0
