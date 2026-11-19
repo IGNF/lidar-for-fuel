@@ -29,7 +29,7 @@ context:
   - Une passe par seuil de `sorted(set(...))` donne 8 clés, dans l'ordre de R : `LadderBot_s`, `LadderTop_s`, `LadderLoad_s`, `SFLeq0_s`, `SFLeq_intot_s`, `ProfType_s`, `CFL_s`, `FSG_s`. Le suffixe est `f"{t:0.3f}".replace(".", "p")`.
   - Le bas de la zone de recherche est une constante nommée `LADDER_MIN_HEIGHT = 1.0` (`zval > 1` codé en dur en R, voulu par l'INRAE, D5 refusée), indépendante de CHT. La charge `K` part, elle, de CHT (`zlow`), comme R.
   - Seul le premier bloc continu de A compte (`while above[j]`).
-  - Pour initialiser `ProfType`, on teste `CBH2 == CHT` avec `np.isclose` (piège 5).
+  - Pour initialiser `ProfType`, on teste `CBH2 == CHT` avec `==`, comme R. La première implémentation utilisait `np.isclose` (piège 5), remplacé par `==` sur décision de l'utilisatrice du 18/11/2026. Les deux sont équivalents : en repli, CBH2 vaut exactement CHT ; sinon, il est strictement au-dessus de CHT + dz/2 (voir les revues de code).
   - Formules de Perrakis calculées en flottants numpy, pour donner `inf`/NaN comme R au lieu de `ZeroDivisionError`. Ce cas est inatteignable avec des strates régulières qui commencent au sol.
 - **`fuel_metrics_core(pad, h_bottom, dz, fma_can, fma_shrub, smooth_pad, ladder_fuel_bd_thresholds, canopy_height_threshold, canopy_bd_thresh_frac, canopy_top_bd_thresholds, cbh_threshold_ratio, bd_max, m_perrakis) -> dict[str, float]`**.
   - Arguments explicites, nommés **comme la section `fuel_metrics` de la config** : la 3.7 pourra passer cette section telle quelle, et une clé inconnue lèvera une `TypeError`. C'est le point reporté de la 3.3.
