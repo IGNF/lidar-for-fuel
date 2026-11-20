@@ -3,8 +3,8 @@ Fuel metrics of a vertical PAD profile, ported from R `ffuelmetrics2`: profile p
 canopy metrics, fuel loads, ladder fuel metrics, default ladder metrics and assembly of the
 outputs in the R order and with the R band names (45 with the default configuration).
 
-This is a strict port of R, without any correction of its known defects: the defects kept
-are listed in `fuel_metrics_core`, their corrections come afterwards (story 3.5).
+This is a port of R that keeps its known defects, except the assumed divergence agreed with
+INRAE. `fuel_metrics_core` lists the divergence and the defects kept.
 """
 
 from collections.abc import Sequence
@@ -52,10 +52,14 @@ def fuel_metrics_core(
     4. Default `LFL`, `CFL`, `FSG` and `ProfType`: those of the threshold closest to the
        median (`select_default_ladder_threshold`, step 9).
 
-    Strict parity with R, including its defects:
+    Assumed divergence from R:
 
-    - a profile with no data (all NaN) gives the metrics of a null profile (zeros,
-      `CBH2` = CHT, `ProfType` = 1), not NaN (A5);
+    - a profile with no data (all PAD values NaN) gives NaN for all the metrics (D2). R gives
+      the metrics of a null profile (zeros, `CBH2` = CHT, `ProfType` = 1, A5), which would
+      show areas without measurement as areas without fuel.
+
+    Otherwise, strict parity with R, including its defects:
+
     - NaN, inf and negative PAD values of a partly valid profile are set to 0, with a debug
       log only; their count is not returned (A6, counted in story 3.6);
     - `CBD_cbh`, `CBD_cbh2` and `CBD_cbhlow` are always NaN (A1).
@@ -92,8 +96,10 @@ def fuel_metrics_core(
             `CTH_*` (one per canopy top threshold), `CDH`, `CBH`, `CBH2`, `FSG`, `CBHlow`,
             `CanBDmax`, `CanBDmin`, `CanBDlowmax`, `CanBDlowmin`, `CBDcan`, `CBD_cbh`,
             `CBD_cbh2`, `CBD_cbhlow`, `LFL`, `CFL`, `ProfType`
-            (19 + 8 × n_distinct_ladder_thresholds + n_canopy_top_thresholds).
+            (19 + 8 × n_distinct_ladder_thresholds + n_canopy_top_thresholds), all NaN when
+            the profile has no data.
     """
+    no_data = bool(np.isnan(pad).all())
     profile, _ = prepare_pad_profile(pad, smooth_pad)
     h_center = np.asarray(h_bottom, dtype=float) + dz / 2
     cht = float(canopy_height_threshold)
@@ -132,7 +138,7 @@ def fuel_metrics_core(
 
     cth = {name: value for name, value in canopy.items() if name.startswith("CTH_")}
 
-    return {
+    metrics = {
         "CLFL": clfl,
         "FL_k1": fl_k1,
         "FL_k2": fl_k2,
@@ -156,3 +162,6 @@ def fuel_metrics_core(
         "CFL": ladders[f"CFL_{default}"],
         "ProfType": ladders[f"ProfType_{default}"],
     }
+
+    # Metrics computed on the null profile first, so that the keys stay those of the contract
+    return dict.fromkeys(metrics, np.nan) if no_data else metrics
