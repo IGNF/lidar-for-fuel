@@ -1,3 +1,15 @@
+# not yet released
+- [Work in progress] Add fuel metrics computation (port of R "ffuelmetrics2"):
+    - Add function "read PAD heights" from the PAD band names
+    - Add function "prepare PAD profile" (invalid values set to 0, optional 3-strata smoothing)
+    - Add function "compute CBD" (PAD x FMA, capped at bd_max)
+    - Add function "read FMA" as a single value or from an FMA map
+    - Add function "select default ladder threshold" (threshold closest to the median)
+    - Add function "compute canopy metrics" (CTH, CDH, CBH, CBH2, CBHlow, CanBD*, CBDcan)
+    - Add function "compute ladder metrics" (LadderBot, LadderTop, LadderLoad, SFLeq0, SFLeq_intot, ProfType, CFL, FSG for each ladder threshold)
+    - Add function "fuel metrics core": fuel loads (CLFL, FL_k1, FL_k2), default ladder metrics (LFL, CFL, FSG, ProfType) and all metrics with the R band names and order
+- Config: align the "fuel_metrics" section with the code parameter names
+
 # v0.3.0
 - Fix outliers : Classify statistical outliers using height above ground without removing points, and assign in classe "18"
 - Fix for downloading DTM : The output grid is aligned on the native DTM grid and extends half a pixel beyond the tile bounds

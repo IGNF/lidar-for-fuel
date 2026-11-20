@@ -27,3 +27,24 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-3-3-canopy-metrics.md`
   summary: Story 3.4 — donner à `fuel_metrics_core` des arguments explicites (et non `**params` transmis tel quel), calculer `h_center` une seule fois, et décider si l'ordre des clés du dict fait partie du contrat.
   evidence: `compute_canopy_metrics` refuse `ladder_fuel_bd_thresholds`, `m_perrakis` et `smooth_pad` (`TypeError`). R intercale `FSG` entre `CBH2` et `CBHlow`, alors que `_assert_metrics` fige aujourd'hui l'ordre du dict de la 3.3.
+- source_spec: `_bmad-output/implementation-artifacts/spec-3-4-fuel-loads-ladder-assembly.md`
+  summary: Story 3.7 — refuser les seuils `ladder_fuel_bd_thresholds` distincts mais de même nom au format `%0.3f` (ex. 0.0101 et 0.0102 → `0p010`).
+  evidence: `compute_ladder_metrics` range les 8 métriques de chaque seuil dans un dict ; deux seuils de même suffixe fusionnent (37 clés au lieu de 45, sans erreur) et le seuil par défaut peut désigner le bloc écrasé. Même cas que les seuils CTH de la 3.3 ; ne survient qu'avec une config anormale, à contrôler à la lecture de la config.
+- source_spec: `_bmad-output/implementation-artifacts/spec-3-4-fuel-loads-ladder-assembly.md`
+  summary: Story 3.7 — tester que la section `fuel_metrics` de `configs/config.yaml` se passe telle quelle à `fuel_metrics_core` (`**cfg.fuel_metrics`).
+  evidence: Les arguments de `fuel_metrics_core` portent les noms des clés de la config, ce qui est vérifié à la main. Pourtant, aucun test ne protège ce contrat : une clé renommée ne serait détectée qu'à l'exécution. Le test de parité garde ses propres paramètres, pour ne pas dépendre des valeurs par défaut de la config (D4 ouverte).
+- source_spec: `_bmad-output/implementation-artifacts/spec-3-4-fuel-loads-ladder-assembly.md`
+  summary: Story 3.6 — compter et journaliser par dalle les pixels entièrement NaN et les valeurs de PAD corrigées (A6, AC-E.5), car `fuel_metrics_core` ignore le compte renvoyé par `prepare_pad_profile`.
+  evidence: `fuel_metrics_core` renvoie seulement le dict des métriques, ce qui garde un contrat simple pour l'assemblage. Le compte se fait plus simplement en un seul calcul sur le raster PAD (`np.isnan(pad).all(0)`, `~np.isfinite | < 0`), au moment où la 3.6 le lit.
+
+## Deferred from: code review of spec-3-4-fuel-loads-ladder-assembly (2026-11-18)
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-3-4-fuel-loads-ladder-assembly.md`
+  summary: Corriger dans l'épique 3 (§3.2, ligne de `LadderLoad`, et description de la story 3.4 pour `CLFL`) « entre 1 m et LadderTop » / « au‑dessus de 1 m » en « au‑dessus de CHT ».
+  evidence: R (`zlow <- CanopyHeightThreshold`, `ffuelmetrics2.R` l. 110, 236, 264), le §4 (étapes 7 et 8) et le code partent de CHT. Le texte ne coïncide avec le code que si CHT = 1 m. Comme l'épique est une spec, sa correction revient à l'utilisatrice.
+- source_spec: `_bmad-output/implementation-artifacts/spec-3-4-fuel-loads-ladder-assembly.md`
+  summary: Stories 3.6/3.7 — `fuel_metrics_core` attend une FMA par pixel. Avec une carte FMA (D6), la section `fuel_metrics` ne peut pas lui être passée telle quelle : il faut d'abord la résoudre avec `read_fma`, puis passer la valeur du pixel.
+  evidence: Le spec 3.4 (et l'entrée « tester que la section `fuel_metrics` se passe telle quelle ») suppose des FMA scalaires. Avec un chemin de carte, `compute_cbd` recevrait une chaîne. Le contrat de la boucle pixel (3.6) doit séparer les paramètres scalaires des FMA lues par pixel.
+- source_spec: `_bmad-output/implementation-artifacts/spec-3-4-fuel-loads-ladder-assembly.md`
+  summary: (Facultatif) Élargir le piège 5 de l'épique 3 (§7) : l'égalité `CBH2 == CHT` est exacte quel que soit `dz`, pas seulement « tant que `dz` vaut 0,5 ou 1 ». `np.isclose` et `==` sont donc équivalents ; le code garde le `==` de R.
+  evidence: Revues de code du 18 et du 19/11/2026. CBH2 vaut CHT exactement en repli ; sinon c'est le CBH2 ou le CBHlow trouvé, strictement au-dessus de CHT + dz/2 (vérifié sur 40 000 profils aléatoires, dz de 0,1 à 1). La recommandation du piège (« aucun effet sur la parité ») reste juste ; seule la portée annoncée est trop restrictive. Le choix de `==` est une décision de l'utilisatrice du 18/11/2026 (écriture de R).
