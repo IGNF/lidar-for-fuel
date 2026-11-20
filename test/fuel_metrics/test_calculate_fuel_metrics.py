@@ -291,15 +291,26 @@ def test_fuel_metrics_invalid_pad_values_are_set_to_0():
     np.testing.assert_equal(_core(invalid), _core(zeroed))
 
 
-def test_fuel_metrics_all_nan_profile_gives_the_zeros_of_r():
-    # Strict parity: R turns a no-data pixel into a null profile (A5, corrected in story 3.5)
-    metrics = _core([np.nan] * 8)
+@pytest.mark.parametrize("thresholds", [[0.01, 0.02, 0.05], [0.01, 0.02, 0.05, 0.1]])
+def test_fuel_metrics_all_nan_profile_gives_nan_on_all_metrics(thresholds):
+    # Assumed divergence from R (D2): R turns a no-data pixel into a null profile (zeros,
+    # ProfType 1, A5), which reads as "no fuel" on the maps
+    metrics = _core([np.nan] * 8, ladder_fuel_bd_thresholds=thresholds)
 
-    np.testing.assert_equal(metrics, _core([0.0] * 8))
-    assert metrics["CLFL"] == metrics["FL_k1"] == metrics["LFL"] == metrics["CFL"] == 0.0
-    assert metrics["CBH2"] == 1.0
-    assert metrics["ProfType"] == 1.0
-    assert np.isnan(metrics["CTH_0p0100"])
+    assert list(metrics) == list(_core(_HAND_PAD, ladder_fuel_bd_thresholds=thresholds))
+    assert all(isinstance(value, float) and np.isnan(value) for value in metrics.values())
+
+
+def test_fuel_metrics_one_finite_pad_value_is_enough_to_compute_the_metrics():
+    # Only an all-NaN profile has no data: the NaN of a partly valid profile count as 0 (A6)
+    pad = np.full(8, np.nan)
+    pad[5] = 0.2
+    zeroed = np.where(np.isnan(pad), 0.0, pad)
+
+    metrics = _core(pad)
+
+    np.testing.assert_equal(metrics, _core(zeroed))
+    assert metrics["CLFL"] > 0.0
 
 
 # --- Parity with R ----------------------------------------------------------------------------
@@ -324,11 +335,23 @@ def test_fuel_metrics_parity_with_r():
             assert list(metrics) == names
             result[:, row, col] = list(metrics.values())
 
-    # the tile has no-data pixels (R zeros), the 4 profile types for each ladder threshold,
-    # and the CBD_cbh* bands are all NaN in R (A1)
-    assert np.isnan(pad).all(axis=0).any()
+    # the tile has the 4 profile types for each ladder threshold, and the CBD_cbh* bands are
+    # all NaN in R (A1)
     for name in names:
         if name.startswith("ProfType_"):
             assert set(np.unique(ref[names.index(name)])) == {1.0, 2.0, 3.0, 4.0}, name
+
+    # Assumed divergence (D2, docs/epic-3-fuel-metrics.md §6): no-data pixels are NaN on all
+    # bands, where R gives the metrics of a null profile; they are excluded from the parity
+    # check below. The tile has no partly NaN pixel: that case is covered by the hand profiles.
+    no_data = np.isnan(pad).all(axis=0)
+    assert no_data.any()
+    assert (ref[names.index("CLFL"), no_data] == 0.0).all()
+    assert (ref[names.index("CBH2"), no_data] == _INRAE_PARAMS["canopy_height_threshold"]).all()
+    assert (ref[names.index("ProfType"), no_data] == 1.0).all()
+    assert np.isnan(result[:, no_data]).all()
+
     for band, name in enumerate(names):
-        np.testing.assert_allclose(result[band], ref[band], rtol=1e-5, atol=1e-6, equal_nan=True, err_msg=name)
+        np.testing.assert_allclose(
+            result[band, ~no_data], ref[band, ~no_data], rtol=1e-5, atol=1e-6, equal_nan=True, err_msg=name
+        )

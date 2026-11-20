@@ -8,6 +8,7 @@
     - Add function "compute canopy metrics" (CTH, CDH, CBH, CBH2, CBHlow, CanBD*, CBDcan)
     - Add function "compute ladder metrics" (LadderBot, LadderTop, LadderLoad, SFLeq0, SFLeq_intot, ProfType, CFL, FSG for each ladder threshold)
     - Add function "fuel metrics core": fuel loads (CLFL, FL_k1, FL_k2), default ladder metrics (LFL, CFL, FSG, ProfType) and all metrics with the R band names and order
+    - Assumed divergence from R (decision D2 of docs/epic-3-fuel-metrics.md): a pixel with no data (PAD all NaN) gets NaN on all the fuel metrics, instead of the metrics of a null profile (zero loads, CBH2 = canopy height threshold, ProfType 1) given by R
 - Config: align the "fuel_metrics" section with the code parameter names
 
 # v0.3.0
