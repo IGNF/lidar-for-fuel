@@ -27,11 +27,12 @@ Ajouter à lidar-for-fuel la 3ᵉ et dernière étape de la chaîne LidarForFuel
 - **`cbh_threshold_ratio`** : la décision est encore ouverte. En attendant, on utilise 1/3 exact (`0.3333333333333333`), la valeur que R calcule réellement en mode raster, et on n'utilise **pas** 0.333.
 - **Robustesse nationale.** Le traitement ne s'interrompt jamais sur une dalle atypique (eau, bord de chantier, dalle vide). Ce qui est corrigé est signalé dans les logs, pas masqué.
 - **Performance.** Environ 3 s par dalle en boucle Python pixel par pixel. Aucune vectorisation ni parallélisation n'est requise.
+- **Bandes `CBD_cbh`, `CBD_cbh2`, `CBD_cbhlow`** : gardées à NaN, comme R (D3, 20/11/2026). On ne les corrige pas ; on les retirera si l'INRAE les supprime dans R.
 - **Nombre de bandes piloté par la config** : 19 + 8·n_seuils_échelle + n_seuils_CTH. Ne jamais coder 45 en dur.
 
 ## Technical Decisions
 
-- **Version R de référence** : branche Dev `8fcccd2` (lidarforfuel 1.0.0.9013, qui inclut la PR #48). Elle sera rebasée quand l'INRAE aura corrigé les bandes `CBD_cbh*`.
+- **Version R de référence** : branche Dev `8fcccd2` (lidarforfuel 1.0.0.9013, qui inclut la PR #48). Elle sera rebasée si l'INRAE supprime ou modifie les bandes `CBD_cbh*`.
 - **Entrée** : `{stem}_pad_profile_1m.tif`, bandes nommées `PAD_{dz}_{h_bas}` (ex. `PAD_1_10`, `PAD_0.5_1.5`), mêlées à d'autres bandes. Valeurs en float32, nodata NaN, PAD plafonné à [0, 5]. Les bandes PAD se trouvent **par leur nom**, jamais par leur position. Le raster R a 186 bandes, le raster Python 60.
 - **Hauteurs** : `h_bottom` est le bas de strate, lu dans le nom de bande, et `h = h_bottom + dz/2` est le centre de strate (le `zval` de R). En Python, les hauteurs au‑dessus du sol se nomment `h_*`, jamais `z*` (`z` désigne l'altitude brute).
 - **Préparation du profil** :
