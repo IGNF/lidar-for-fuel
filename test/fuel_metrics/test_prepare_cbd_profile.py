@@ -116,6 +116,10 @@ def test_cap_pad_custom_pad_max():
     np.testing.assert_array_equal(capped, [[[3.0, 2.0]]])
     assert n_capped == 1
 
+    # A NumPy scalar bound keeps the float32 dtype of the raster
+    capped, _ = cap_pad(np.array([[[3.5, 2.0]]], dtype=np.float32), ["PAD_1_0"], pad_max=np.float64(3.0))
+    assert capped.dtype == np.float32
+
 
 def test_cap_pad_band_names_do_not_match_the_bands_raises():
     with pytest.raises(ValueError, match="2 band names for 1 PAD band"):

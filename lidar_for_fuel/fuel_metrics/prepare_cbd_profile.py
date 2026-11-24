@@ -85,10 +85,10 @@ def read_pad_heights(band_names: Sequence[str | None]) -> tuple[float, np.ndarra
 def cap_pad(pad: np.ndarray, band_names: Sequence[str], pad_max: float = PAD_MAX) -> tuple[np.ndarray, int]:
     """Bring the PAD bands of the `{stem}_pad_profile_1m.tif` raster back into [0, `pad_max`].
 
-    Since the INRAE answer on the PAD cap at 5 (24/11/2026), step 2 writes the raw PAD, as R
-    `pad_metrics`: it can go above 5 (up to 7.01 on the pilot zone), or be inf. This
-    post-processing applies, when step 3 reads the raster, the cap that step 2 applied before
-    (`np.clip(pad, 0, 5)`):
+    Since the INRAE answer on the PAD cap at 5 (23/11/2026; cap removed from step 2 on
+    24/11/2026), step 2 writes the raw PAD, as R `pad_metrics`: it can go above 5 (up to 7.01
+    on the pilot zone), or be inf. This post-processing applies, when step 3 reads the raster,
+    the cap that step 2 applied before (`np.clip(pad, 0, 5)`):
 
     - values above `pad_max` (+inf included) become `pad_max`;
     - negative values (-inf included) become 0;
@@ -128,7 +128,7 @@ def cap_pad(pad: np.ndarray, band_names: Sequence[str], pad_max: float = PAD_MAX
             by_band,
         )
 
-    return np.clip(pad, PAD_MIN, pad_max), n_capped
+    return np.clip(pad, PAD_MIN, pad_max).astype(pad.dtype, copy=False), n_capped
 
 
 def read_fma(

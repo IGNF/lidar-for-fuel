@@ -52,7 +52,7 @@ Ajouter à lidar-for-fuel la 3ᵉ et dernière étape de la chaîne LidarForFuel
   - un module par responsabilité, des arguments explicites, des docstrings Google ;
   - adapter les fonctions existantes plutôt que d'en créer des parallèles (réutiliser `_write_geotiff` et `_format_num` de `pad_profile/export_raster.py`) ;
   - point d'entrée Hydra comme `main_pad_profile.py`.
-- ~~**Condition d'équivalence avec R**~~ : sans objet depuis le retrait du plafond du PAD (Q10, 24/11/2026) ; pas d'avertissement au démarrage (AC-3.7.3 retiré).
+- **Condition d'équivalence avec R** : de nouveau valable pour le plafond de `cap_pad` (`5 × min(FMA) ≥ bd_max` et `smooth_pad = False`, plus le PAD +inf) ; l'avertissement au démarrage (ancien AC-3.7.3) est à décider en 3.7.
 
 ## Cross-Story Dependencies
 

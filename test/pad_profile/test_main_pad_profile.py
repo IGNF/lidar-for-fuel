@@ -127,8 +127,8 @@ def test_pad_profile_one_tile_real_las_writes_coherent_rasters(tmp_path):
     # At least one pixel passed the quality guards, otherwise the run wrote 8 empty grids
     # and every assertion below would hold vacuously.
     assert not np.isnan(pad_profile).all()
-    # PAD is written raw, not capped (INRAE answer on the PAD cap at 5); it is >= 0 while ground_margin < dz (-log of
-    # values <= 1). NaN cells are pixels that produced no value.
+    # PAD is written raw, not capped (INRAE answer on the PAD cap at 5); it is >= 0 while
+    # ground_margin < dz (-log of values <= 1). NaN cells are pixels that produced no value.
     assert np.nanmin(pad_profile) >= 0.0
 
     with rasterio.open(written["cover"]) as src:

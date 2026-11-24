@@ -59,3 +59,35 @@ Revue Blind Hunter du 24/11/2026 : 13 remarques.
 | 11 | Rien n'appelle encore `cap_pad` | false | Le lecteur (story 3.6) n'existe pas ; l'AC-3.6.2 impose l'appel juste après la lecture. |
 | 12 | Tests manquants (`pad_max` invalide, effet sur les métriques, raster Python) | low | Rejeté : l'effet sur les métriques passe par `compute_cbd`, déjà testé ; un test sur raster relève de la 3.6. |
 | 13 | Spec incomplète, « vérifie » sans contrôle bloquant | false | La spec est complétée à la finalisation ; « vérifier » = repérer, corriger et journaliser, comme demandé (« post-traiter »). |
+
+### Review Findings
+
+Revue de code du 24/11/2026 (PR #61, `db82e10..ee5e973`) : Blind Hunter, Edge Case Hunter, Verification Gap (aucun manque) et Acceptance Auditor.
+
+- [x] [Review][Defer] Un seul compte pour trois cas dans `cap_pad` [lidar_for_fuel/fuel_metrics/prepare_cbd_profile.py:118] — deferred: le log par dalle naît en 3.6 : l'appelant comptera les +inf avant `cap_pad`, sans changer sa signature d'ici là. `cap_pad` additionne les valeurs juste au-dessus de 5 (post-traitement normal), les +inf (anomalie A6, qui fait passer la CBD de 0 à min(5 × FMA, `bd_max`)) et les négatifs. L'AC-3.6.8 réécrite ne compte plus à part les inf et les négatifs : ils sont noyés dans le compte du plafond. Le n° 10 du premier triage a rejeté le mélange dans le log, mais pas la perte du compte A6 dans l'AC-3.6.8.
+- [x] [Review][Patch] La condition d'équivalence du §3.1 est encore dite « sans objet » à plusieurs endroits [docs/epic-3-fuel-metrics.md:273] — titre de la note du §3.1 (« historique, sans objet depuis le 24/11/2026 ») ; début de l'AC-E.7 (l. 240) ; motif de l'AC-3.7.3 (l. 743, « n'a plus lieu d'être ») ; puce barrée de `epic-3-context.md` (l. 55, « sans objet… pas d'avertissement au démarrage »). Celui qui écrira la story 3.7 lira des consignes contradictoires.
+- [x] [Review][Patch] Le plafond n'est pas listé comme divergence assumée là où l'épique l'exige [lidar_for_fuel/fuel_metrics/calculate_fuel_metrics.py:55] — la section « Assumed divergence from R » de `fuel_metrics_core` ne cite que D2 (AC-3.5.5) ; l'AC-3.6.3 (l. 705) n'exempte que « les divergences assumées en 3.5 », alors que l'AC-3.6.2 met `cap_pad` dans le chemin du raster. Le test de parité de la 3.6 n'a donc pas d'exemption documentée pour le plafond.
+- [x] [Review][Patch] « Un PAD +inf donne CBD = `bd_max` » est faux si FMA < 0,2 [docs/epic-3-fuel-metrics.md:579] — CBD = min(5 × FMA, `bd_max`) (`compute_cbd`) ; même formule au §3.1 (l. 273, « donc CBD = `bd_max` »).
+- [x] [Review][Patch] Date de la réponse INRAE fausse dans la docstring de `cap_pad` [lidar_for_fuel/fuel_metrics/prepare_cbd_profile.py:88] — « answer … (24/11/2026) » ; l'INRAE a répondu le 23/11 (`export_raster.py`, épique), le plafond a été retiré le 24/11.
+- [x] [Review][Patch] `cap_pad` renvoie du float64 pour un raster float32 si `pad_max` est un scalaire NumPy [lidar_for_fuel/fuel_metrics/prepare_cbd_profile.py:131] — vérifié sous NumPy 2.4.3 : `np.clip(float32, 0.0, np.float64(5))` → float64, contre la docstring (« same dtype for a float raster »). Correction : `.astype(pad.dtype, copy=False)`.
+- [x] [Review][Patch] Commentaire mal recoupé après la retouche [test/pad_profile/test_main_pad_profile.py:130] — une ligne de 117 caractères suivie du fragment `# values <= 1).`
+- [x] [Review][Patch] Double ligne vide avant la nouvelle entrée [_bmad-output/implementation-artifacts/deferred-work.md:73]
+
+**Rejeté** :
+- `pad_max` NaN ou négatif (tout NaN, ou PAD négatif partout) — low : seule la valeur par défaut est utilisée, aucun appelant ; la validation est déjà dans `deferred-work.md` (story 3.7).
+- `pad_max = None` (mode « sans plafond » prévu) → `TypeError` — low : ce mode n'existe pas encore, et l'erreur est bruyante.
+- Entrée non 3-D ou 0-d non contrôlée — low : inatteignable, `src.read(indexes)` renvoie toujours (bandes, lignes, colonnes) ; il faudrait ajouter un garde.
+- Raster sans bande PAD → erreur de `reshape` peu claire — low : `read_pad_heights` lève d'abord « The PAD raster has no band », et l'AC-3.6.9 impose une erreur explicite.
+- Tableau masqué (`read(masked=True)`) dont le masque serait perdu — low : inatteignable, le nodata est NaN et aucune lecture masquée n'est prévue.
+- `None.startswith` dans le test sur la dalle de référence — false : toutes les bandes de la dalle ont une description, et le test passe.
+- CHANGELOG sans −inf ni NaN, et AC-E.1 « seule D2 » — false : −inf est une valeur négative, donc couverte ; l'AC-E.1 limite le test à `fuel_metrics_core` sans le plafond.
+- CHANGELOG « the cap is now applied when the fuel metrics read » alors que rien n'appelle `cap_pad` — false : l'étape 3 n'est pas encore exécutable, donc aucun utilisateur ne s'en sert.
+- « Q10 » retiré des commentaires du code — choix voulu (commit `29df3ab`).
+- Pas de test `cap_pad` → `compute_cbd` sur un pixel +inf — low : chaque fonction est testée et l'enchaînement est trivial ; un tel test relève de l'appelant (3.6).
+- Tests de cas limites et annotation `Sequence[str]` (noms `None`) — low : les noms sont validés avant par `read_pad_heights`, qui rejette `None`.
+- Le test sur la dalle de référence serait une tautologie — false : il affirme seulement que la parité testée sur cette dalle n'est pas touchée, ce qu'il prouve.
+- `PAD_MIN` en dur, et mode `pad_max: null` futur — false : ce mode n'existe pas ; l'entrée différée de la 3.7 le couvre.
+- Pas de renvoi croisé dans `deferred-work.md` vers l'entrée Q10 — low : la nouvelle entrée la complète explicitement (n° 3 du premier triage).
+- « Réalisé » cite le §6 alors que le diff modifie la Description — rejeté : la correction porterait sur la spec revue ; la puce Q10 du §6 est le compte rendu daté de la réponse INRAE du 23/11.
+- Tableaux d'entrée « ≥ 0, non plafonné (Q10) » — false : ils décrivent le contenu du fichier, qui n'est pas plafonné.
+- `epic-3-context.md`, « les valeurs non finies ou négatives passent à 0 » — false : c'est toujours ce que fait `prepare_pad_profile`.

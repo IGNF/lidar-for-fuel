@@ -58,6 +58,10 @@ def fuel_metrics_core(
       NaN), gives NaN for all the metrics (D2). R gives the metrics of a null profile for an
       all-NaN PAD (zeros, `CBH2` = CHT, `ProfType` = 1, A5), which would show areas without
       measurement as areas without fuel. INRAE will apply D2 in R too (Q1 bis).
+    - upstream of this function, step 3 brings the PAD raster back into [0, 5] when it reads it
+      (`cap_pad`, AC-3.2.8): R does not cap. Values above 5 can change the CBD when
+      5 × FMA < bd_max or with smoothing, and a +inf PAD gives min(5 × FMA, bd_max) instead
+      of 0 (A6). This function itself does not cap, so the parity tests are not affected.
 
     Otherwise, strict parity with R, including its defects:
 
@@ -66,8 +70,7 @@ def fuel_metrics_core(
 
     The parameters are used as given, as R `ffuelmetrics2Rast` does since Dev 00c654c (A3
     fixed). The PAD of the `pad_profile` stage is not capped, as the R one (INRAE answer on
-    the PAD cap at 5), and neither is it here: step 3 brings the PAD raster back into [0, 5]
-    when it reads it (`cap_pad`), before this function.
+    the PAD cap at 5).
 
     Args:
         pad (np.ndarray): Raw 1-D PAD profile of the pixel (m²/m³), one value per stratum,

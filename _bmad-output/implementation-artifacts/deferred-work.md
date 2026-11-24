@@ -70,7 +70,10 @@
   summary: Étape 2 — journaliser par dalle le nombre de valeurs de PAD supérieures à 5 et non finies, pour donner des chiffres au point technique sur un éventuel plafond en post-traitement (Q10) et repérer les valeurs aberrantes en production.
   evidence: Revue du 24/11/2026 (Blind Hunter). Sans plafond, plus rien ne signale ces valeurs, alors que la spécification PAD de l'INRAE parle de « valeurs limites à contrôler : 0–5 ». C'est une évolution, pas une régression : R ne les signale pas non plus.
 
-
 - source_spec: `_bmad-output/implementation-artifacts/spec-3-2-pad-cap-on-read.md`
   summary: Story 3.7 — exposer `pad_max` dans la section `fuel_metrics` de la config (avec `null` pour désactiver le plafond, ce qui redonne la parité stricte avec R), le valider (fini, ≥ 0), et décider avec l'INRAE si l'avertissement d'équivalence (`smooth_pad` vrai ou `5 × min(FMA) < bd_max`, ancien AC-3.7.3) revient pour ce plafond.
   evidence: Revue du 24/11/2026 (Blind Hunter). `cap_pad` plafonne à 5 sans interrupteur, alors que R ne plafonne pas : écart avec R si FMA < 0,2 (carte FMA), `smooth_pad = True` ou PAD +inf. Rien ne lit encore la config de l'étape 3 (story 3.7), et `pad_max = NaN` mettrait toute la dalle à NaN en silence.
+
+## Deferred from: code review of spec-3-2-pad-cap-on-read (2026-11-24)
+
+- Story 3.6 — `cap_pad` donne un seul compte pour les valeurs > 5, les +inf (anomalie A6 : CBD min(5 × FMA, `bd_max`) au lieu de 0) et les négatifs ; l'AC-3.6.8 réécrite ne compte plus à part les inf et les négatifs. Raison du report : le log par dalle naît en 3.6 : l'appelant comptera les +inf avant `cap_pad`, sans changer sa signature d'ici là.
