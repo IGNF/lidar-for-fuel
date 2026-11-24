@@ -186,8 +186,8 @@ def test_export_raster_places_pixel_value_at_correct_row_col_and_leaves_rest_nod
 
 
 def test_export_raster_writes_raw_pad_values_and_bounds_the_cover(tmp_path, aggregated_single_pixel):
-    # PAD is written as computed, with no bound, as R `pad_metrics` (INRAE answer to Q10,
-    # 23/11/2026): R goes up to 7.01 (1 m) and 11.83 (0.5 m) on the pilot zone. The cover
+    # PAD is written as computed, with no bound, as R `pad_metrics` (INRAE answer on the PAD
+    # cap at 5, 23/11/2026): R goes up to 7.01 (1 m) and 11.83 (0.5 m) on the pilot zone. The cover
     # keeps its [0, 1] bound.
     aggregated, origin_pixel, nb_pixels = aggregated_single_pixel
     aggregated = aggregated.copy()

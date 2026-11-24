@@ -187,7 +187,7 @@ def export_raster(
         "cover": ["Cover_2", "Cover_4", "Cover_6"],
         "dates_pad": ["Date_maj", "Date_min", "Date_max"],
     }
-    # PAD is not capped, as R `pad_metrics` (INRAE answer to Q10, 23/11/2026)
+    # PAD is not capped, as R `pad_metrics` (INRAE answer on the PAD cap at 5, 23/11/2026)
     raster_clip: dict[str, tuple | None] = {
         "pad_sb_0.5m": None,
         "pad_profile_1m": None,

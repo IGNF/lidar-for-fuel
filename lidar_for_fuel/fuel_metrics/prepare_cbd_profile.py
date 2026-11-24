@@ -1,6 +1,8 @@
 """
 Input layer of the fuel metrics computation, ported from R `ffuelmetrics2`:
 - read the strata heights from the band names of the `pad_profile_1m` raster;
+- bring the PAD bands of that raster back into [0, 5] (cap removed from step 2 after the INRAE
+  answer on the PAD cap at 5);
 - read the fuel mass area (FMA), either a configured value or the FMA map, on the PAD grid;
 - prepare a PAD profile and turn it into a CBD profile;
 - pick the default ladder fuel threshold (rule of step, needed from the configuration onwards).
@@ -20,6 +22,12 @@ from rasterio.windows import Window
 logger = logging.getLogger(__name__)
 
 _PAD_BAND_PATTERN = re.compile(r"^PAD_(\d+(?:\.\d+)?)_(\d+(?:\.\d+)?)$")
+
+# PAD range (m²/m³) of the INRAE PAD specification ("0-5, capped at 5"). Step 2 writes the raw PAD,
+# as R `pad_metrics` (INRAE answer on the PAD cap at 5); the cap is applied when step 3 reads the
+# PAD raster (`cap_pad`)
+PAD_MIN = 0.0
+PAD_MAX = 5.0
 
 # Valid range of the FMA map values (kg/m²), from the FMA map specification
 FMA_MAP_MIN = 0.05
@@ -72,6 +80,55 @@ def read_pad_heights(band_names: Sequence[str | None]) -> tuple[float, np.ndarra
         raise ValueError(f"PAD strata are not contiguous and ascending (dz = {dz}): h_bottom = {h_bottom.tolist()}.")
 
     return dz, h_bottom
+
+
+def cap_pad(pad: np.ndarray, band_names: Sequence[str], pad_max: float = PAD_MAX) -> tuple[np.ndarray, int]:
+    """Bring the PAD bands of the `{stem}_pad_profile_1m.tif` raster back into [0, `pad_max`].
+
+    Since the INRAE answer on the PAD cap at 5 (24/11/2026), step 2 writes the raw PAD, as R
+    `pad_metrics`: it can go above 5 (up to 7.01 on the pilot zone), or be inf. This
+    post-processing applies, when step 3 reads the raster, the cap that step 2 applied before
+    (`np.clip(pad, 0, 5)`):
+
+    - values above `pad_max` (+inf included) become `pad_max`;
+    - negative values (-inf included) become 0;
+    - NaN stays NaN, so a pixel without data stays one (D2).
+
+    R does not cap. With the configured FMA (0.254) and `smooth_pad = False` the metrics do not
+    change, as `5 × FMA ≥ bd_max`. They can with an FMA below 0.2 (FMA map), with smoothing,
+    or where the PAD is +inf (5 instead of 0, A6).
+
+    Args:
+        pad (np.ndarray): PAD raster (m²/m³), of shape (bands, rows, cols), in band order.
+        band_names (Sequence[str]): Names of the PAD bands, in band order (for the log).
+        pad_max (float): Upper bound of the PAD (m²/m³). Default `PAD_MAX` (5).
+
+    Returns:
+        tuple[np.ndarray, int]: The capped raster (new array, same dtype for a float raster;
+            the input is not modified) and the number of values brought back into the range, also logged
+            in info, band by band.
+
+    Raises:
+        ValueError: If there are not as many band names as PAD bands.
+    """
+    pad = np.asarray(pad)
+    if len(band_names) != pad.shape[0]:
+        raise ValueError(f"{len(band_names)} band names for {pad.shape[0]} PAD band(s).")
+
+    out_of_range = (pad < PAD_MIN) | (pad > pad_max)
+    n_by_band = out_of_range.reshape(pad.shape[0], -1).sum(axis=1)
+    n_capped = int(n_by_band.sum())
+    if n_capped:
+        by_band = ", ".join(f"{name}: {n}" for name, n in zip(band_names, n_by_band) if n)
+        logger.info(
+            "PAD raster: %d value(s) outside [%g, %g] brought back into it (%s)",
+            n_capped,
+            PAD_MIN,
+            pad_max,
+            by_band,
+        )
+
+    return np.clip(pad, PAD_MIN, pad_max), n_capped
 
 
 def read_fma(

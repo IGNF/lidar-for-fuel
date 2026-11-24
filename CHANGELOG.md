@@ -4,6 +4,7 @@
     - Add function "prepare PAD profile" (invalid values set to 0, optional 3-strata smoothing)
     - Add function "compute CBD" (PAD x FMA, capped at bd_max)
     - Add function "read FMA" as a single value or from an FMA map
+    - Add function "cap PAD": the PAD bands read from pad_profile_1m are brought back into [0, 5] (values above 5 and +inf set to 5, negative values set to 0), the cap that step 2 applied up to v0.3.0; R does not cap: assumed divergence, to be validated by INRAE (see docs/epic-3-fuel-metrics.md)
     - Add function "select default ladder threshold" (threshold closest to the median)
     - Add function "compute canopy metrics" (CTH, CDH, CBH, CBH2, CBHlow, CanBD*, CBDcan)
     - Add function "compute ladder metrics" (LadderBot, LadderTop, LadderLoad, SFLeq0, SFLeq_intot, ProfType, CFL, FSG for each ladder threshold)
@@ -13,7 +14,7 @@
 - Config: align the "fuel_metrics" section with the code parameter names
 - Config: "cbh_threshold_ratio" set to 0.333, the INRAE value, now passed on by R (D4)
 - Add the R reference fuel metrics computed with R lidarforfuel Dev 00c654c and its script
-- PAD profile: the PAD rasters (pad_profile_1m, pad_sb_0.5m) are no longer capped at 5, as in R "pad_metrics" (INRAE answer to Q10); PAD rasters written by v0.3.0 or earlier are capped and must be regenerated before a comparison with R
+- PAD profile: the PAD rasters (pad_profile_1m, pad_sb_0.5m) are no longer capped at 5, as in R "pad_metrics" (INRAE answer to Q10); PAD rasters written by v0.3.0 or earlier are capped and must be regenerated before a comparison with R; the cap is now applied when the fuel metrics read the PAD raster
 
 # v0.3.0
 - Fix outliers : Classify statistical outliers using height above ground without removing points, and assign in classe "18"
