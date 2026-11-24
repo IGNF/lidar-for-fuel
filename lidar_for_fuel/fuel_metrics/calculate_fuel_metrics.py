@@ -65,7 +65,9 @@ def fuel_metrics_core(
       log only; their count is not returned (A6, counted in story 3.6).
 
     The parameters are used as given, as R `ffuelmetrics2Rast` does since Dev 00c654c (A3
-    fixed). The PAD of the `pad_profile` stage is not capped, as the R one (Q10).
+    fixed). The PAD of the `pad_profile` stage is not capped, as the R one (Q10), and neither
+    is it here: step 3 brings the PAD raster back into [0, 5] when it reads it (`cap_pad`),
+    before this function.
 
     Args:
         pad (np.ndarray): Raw 1-D PAD profile of the pixel (m²/m³), one value per stratum,

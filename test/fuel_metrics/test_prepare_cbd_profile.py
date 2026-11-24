@@ -8,6 +8,7 @@ from rasterio.crs import CRS
 from rasterio.transform import from_origin
 
 from lidar_for_fuel.fuel_metrics.prepare_cbd_profile import (
+    cap_pad,
     compute_cbd,
     prepare_pad_profile,
     read_fma,
@@ -64,6 +65,74 @@ def test_read_pad_heights_pad_bands_of_r_raster():
 def test_read_pad_heights_invalid_names_raise(names, match):
     with pytest.raises(ValueError, match=match):
         read_pad_heights(names)
+
+
+# --- cap_pad: PAD bands brought back into [0, 5] when the pad_profile_1m raster is read --------
+
+
+def test_cap_pad_brings_each_band_back_into_0_5(caplog):
+    # Raster (bands, rows, cols), as read from pad_profile_1m; same cap as step 2 before Q10
+    pad = np.array(
+        [
+            [[7.01, np.nan], [-0.5, 2.0]],
+            [[np.inf, -np.inf], [5.0, 0.0]],
+            [[np.nan, np.nan], [4.99, 0.1]],
+        ],
+        dtype=np.float32,
+    )
+
+    with caplog.at_level(logging.INFO, logger="lidar_for_fuel.fuel_metrics.prepare_cbd_profile"):
+        capped, n_capped = cap_pad(pad, ["PAD_1_0", "PAD_1_1", "PAD_1_2"])
+
+    expected = np.array(
+        [[[5.0, np.nan], [0.0, 2.0]], [[5.0, 0.0], [5.0, 0.0]], [[np.nan, np.nan], [4.99, 0.1]]],
+        dtype=np.float32,
+    )
+    np.testing.assert_array_equal(capped, expected)  # NaN stays NaN (pixel without data, D2)
+    assert capped.dtype == np.float32
+    assert n_capped == 4
+    assert [(r.levelno, r.getMessage()) for r in caplog.records] == [
+        (logging.INFO, "PAD raster: 4 value(s) outside [0, 5] brought back into it (PAD_1_0: 2, PAD_1_1: 2)")
+    ]
+    # Input is not modified in place
+    assert pad[0, 0, 0] == np.float32(7.01)
+
+
+def test_cap_pad_valid_raster_unchanged_and_not_logged(caplog):
+    pad = np.array([[[0.0, np.nan]], [[5.0, 1.2]]], dtype=np.float32)
+
+    with caplog.at_level(logging.INFO, logger="lidar_for_fuel.fuel_metrics.prepare_cbd_profile"):
+        capped, n_capped = cap_pad(pad, ["PAD_1_0", "PAD_1_1"])
+
+    np.testing.assert_array_equal(capped, pad)
+    assert n_capped == 0
+    assert caplog.records == []
+
+
+def test_cap_pad_custom_pad_max():
+    capped, n_capped = cap_pad(np.array([[[3.5, 2.0]]]), ["PAD_1_0"], pad_max=3.0)
+
+    np.testing.assert_array_equal(capped, [[[3.0, 2.0]]])
+    assert n_capped == 1
+
+
+def test_cap_pad_band_names_do_not_match_the_bands_raises():
+    with pytest.raises(ValueError, match="2 band names for 1 PAD band"):
+        cap_pad(np.zeros((1, 2, 2)), ["PAD_1_0", "PAD_1_1"])
+
+
+def test_cap_pad_leaves_the_r_reference_tile_unchanged():
+    # The PAD of the reference tile stays within [0, 5] (max 2.04; the pilot zone max of 7.01 is
+    # on other tiles): the cap does not change the parity tests run on this tile
+    with rasterio.open(_REF_PAD_RASTER_1M) as src:
+        indexes = [i for i, name in enumerate(src.descriptions, start=1) if name.startswith("PAD_1_")]
+        pad = src.read(indexes)
+        names = [src.descriptions[i - 1] for i in indexes]
+
+    capped, n_capped = cap_pad(pad, names)
+
+    assert n_capped == 0
+    np.testing.assert_array_equal(capped, pad)
 
 
 # --- prepare_pad_profile: invalid values set to 0, optional 3-strata smoothing ---------------
