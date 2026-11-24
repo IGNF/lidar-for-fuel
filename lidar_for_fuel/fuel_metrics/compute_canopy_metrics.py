@@ -2,7 +2,8 @@
 Canopy metrics of a vertical profile, ported from R `ffuelmetrics2`:
 - CBD profile with the canopy height threshold as the canopy / shrub limit;
 - canopy top height (CTH) for each canopy top threshold;
-- crown base heights: CBH and CBH2 in the upper canopy, CBHlow in the lower canopy;
+- crown base heights: CBH and CBH2 in the upper canopy, CBHlow in the lower canopy, and the
+  CBD at these heights;
 - CBD profile recomputed with CBH2 as the canopy / shrub limit;
 - canopy dominant height (CDH) and mean canopy bulk density (CBDcan).
 
@@ -46,7 +47,10 @@ def compute_canopy_metrics(
          `CanBDlowmin` and `CBHlow`, without the walk down to a continuous base.
        - **3C**: CBH2 falls back on CBHlow, then on CHT.
 
-       `CanBD*` are given even when no crown base is found.
+       `CanBD*` are given even when no crown base is found. `CBD_cbh`, `CBD_cbh2` and
+       `CBD_cbhlow` are the CBD of step 1 (not the one recomputed with CBH2) of the stratum
+       whose bottom is CBH, CBH2 or CBHlow, as R Dev 00c654c: `CBD_cbh2` only for a CBH2
+       found in 3A, NaN when CBH2 falls back on CBHlow or CHT.
     4. CBD recomputed from the PAD with the canopy FMA above CBH2.
     5. `CDH` = highest h with CBD >= 0.1 × CanBDmax (CTH if none), then `min(CDH, CTH)`.
     6. `CBDcan` = mean CBD of the strata with CBH2 <= h <= min(CDH, CTH), 0 if none.
@@ -74,7 +78,8 @@ def compute_canopy_metrics(
         tuple[dict[str, float], np.ndarray]:
             - the metrics, keyed by their R band name: `CTH_{t:0.4f}` (one per threshold,
               in the configured order, `.` written `p`), `CDH`, `CBH`, `CBH2`, `CBHlow`,
-              `CanBDmax`, `CanBDmin`, `CanBDlowmax`, `CanBDlowmin`, `CBDcan`;
+              `CanBDmax`, `CanBDmin`, `CanBDlowmax`, `CanBDlowmin`, `CBDcan`, `CBD_cbh`,
+              `CBD_cbh2`, `CBD_cbhlow`;
             - the CBD profile recomputed with CBH2 (step 4), used by the ladder fuel metrics.
     """
     pad = np.asarray(pad, dtype=float)
@@ -117,6 +122,11 @@ def compute_canopy_metrics(
     can_bd_max, can_bd_min, cbh, cbh2 = upper
     can_bd_low_max, can_bd_low_min, cbh_low, _ = lower  # no continuous base (CBH2) in 3B
 
+    # CBD at the crown base heights, in the step 1 CBD and before the CBH2 fallbacks (as R)
+    cbd_cbh = _cbd_at_bottom(cbd, h, cbh, dz)
+    cbd_cbh2 = _cbd_at_bottom(cbd, h, cbh2, dz)
+    cbd_cbh_low = _cbd_at_bottom(cbd, h, cbh_low, dz)
+
     # 3C. Fallbacks of CBH2
     if np.isnan(cbh2):
         cbh2 = cbh_low
@@ -152,6 +162,9 @@ def compute_canopy_metrics(
         "CanBDlowmax": can_bd_low_max,
         "CanBDlowmin": can_bd_low_min,
         "CBDcan": cbd_can,
+        "CBD_cbh": cbd_cbh,
+        "CBD_cbh2": cbd_cbh2,
+        "CBD_cbhlow": cbd_cbh_low,
     }
 
     return metrics, cbd
@@ -165,6 +178,15 @@ def _cth_name(threshold: float) -> str:
 def _highest(h: np.ndarray, mask: np.ndarray) -> float:
     """Highest height selected by `mask`, NaN if none (R `if (any(m)) max(h[m]) else NA`)."""
     return float(h[mask].max()) if mask.any() else np.nan
+
+
+def _cbd_at_bottom(cbd: np.ndarray, h: np.ndarray, h_bottom: float, dz: float) -> float:
+    """CBD of the first stratum whose bottom is `h_bottom`, NaN if none or if `h_bottom` is NaN.
+
+    R: `CBDval[zval == CBH + (0.5 * dz)][1]`, with the same exact comparison of the centre.
+    """
+    match = np.flatnonzero(h == h_bottom + 0.5 * dz)
+    return float(cbd[match[0]]) if match.size else np.nan
 
 
 def _crown_base(

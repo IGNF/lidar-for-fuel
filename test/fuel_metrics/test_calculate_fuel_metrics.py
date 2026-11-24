@@ -8,13 +8,13 @@ from lidar_for_fuel.fuel_metrics.calculate_fuel_metrics import fuel_metrics_core
 from lidar_for_fuel.fuel_metrics.prepare_cbd_profile import read_pad_heights
 
 _REF_DIR = Path(__file__).resolve().parents[2] / "data/ref_inrae"
-# R (lidarforfuel) PAD raster and fuel metrics of the same 500 m tile (story 3.1)
+# R (lidarforfuel) PAD raster of a 500 m tile (story 3.1) and its fuel metrics computed by
+# R Dev 00c654c (data/ref_inrae/fuel_metrics/make_fuel_metrics_00c654c.R)
 _REF_PAD_RASTER_1M = _REF_DIR / "pad_profile/512500_6854997_pad_1m.tif"
-_REF_FUEL_METRICS = _REF_DIR / "fuel_metrics/512500_6854997_fuel_metrics.tif"
+_REF_FUEL_METRICS = _REF_DIR / "fuel_metrics/512500_6854997_fuel_metrics_00c654c.tif"
 
 # Parameters of the R reference tile: INRAE config `ffuelmetrics2` section of
-# data/ref_inrae/2026-09-28_fuel_metrics_zones-pilotes.yml, except the ratio:
-# R ffuelmetrics2Rast does not pass CBHThresholdRatio on and uses 1/3, not 0.333 (A3)
+# data/ref_inrae/2026-09-28_fuel_metrics_zones-pilotes.yml
 _INRAE_PARAMS = dict(
     fma_can=0.2543576,
     fma_shrub=0.2543576,
@@ -23,21 +23,22 @@ _INRAE_PARAMS = dict(
     canopy_height_threshold=1.0,
     canopy_bd_thresh_frac=0.3,
     canopy_top_bd_thresholds=[0.0012, 0.01],
-    cbh_threshold_ratio=1 / 3,
+    cbh_threshold_ratio=0.333,
     bd_max=1.0,
     m_perrakis=2.5,
 )
 
 # Hand-written profile, 1 m strata from 0 m, with distinct FMA so that the loads and the
-# ladder use the CBD recomputed with CBH2 (shrub FMA up to CBH2 = 5 m).
+# ladder use the CBD recomputed with CBH2 (shrub FMA up to CBH2 = 5 m). The ratio stays 1/3,
+# the value of the R computations below (with 0.333, the 2.5 m stratum would move to 3A).
 # h_center: 0.5  1.5   2.5   3.5   4.5  5.5  6.5  7.5
 _HAND_PAD = [0.05, 0.05, 0.03, 0.03, 0.0, 0.2, 0.3, 0.1]
-_HAND_PARAMS = {**_INRAE_PARAMS, "fma_can": 1.0, "fma_shrub": 0.5}
+_HAND_PARAMS = {**_INRAE_PARAMS, "fma_can": 1.0, "fma_shrub": 0.5, "cbh_threshold_ratio": 1 / 3}
 
 # R ffuelmetrics2(PADval = _HAND_PAD, FMAcan = 1, FMAshrub = 0.5, zval = 0:7, dz = 1,
 # CanopyBDTreshFrac = 0.3, CBHThresholdRatio = 1/3), computed with Rscript (Dev 8fcccd2
-# equivalent). Ladder continuous from the surface (type 3) at 0.01 and 0.02, canopy without
-# ladder (type 2) at 0.05.
+# equivalent; CBD_cbh* with Dev 00c654c, 23/11/2026, other values unchanged). Ladder
+# continuous from the surface (type 3) at 0.01 and 0.02, canopy without ladder (type 2) at 0.05.
 _HAND_R_METRICS = {
     "CLFL": 0.655,
     "FL_k1": 0.025,
@@ -78,8 +79,8 @@ _HAND_R_METRICS = {
     "CanBDlowmax": 0.05,
     "CanBDlowmin": np.nan,
     "CBDcan": 0.2,
-    "CBD_cbh": np.nan,
-    "CBD_cbh2": np.nan,
+    "CBD_cbh": 0.2,  # stratum centred on 5.5 m (CBH = CBH2 = 5 m)
+    "CBD_cbh2": 0.2,
     "CBD_cbhlow": np.nan,
     "LFL": 0.025,
     "CFL": 0.63,
@@ -301,6 +302,16 @@ def test_fuel_metrics_all_nan_profile_gives_nan_on_all_metrics(thresholds):
     assert all(isinstance(value, float) and np.isnan(value) for value in metrics.values())
 
 
+@pytest.mark.parametrize("fma", ["fma_can", "fma_shrub"])
+def test_fuel_metrics_no_fma_gives_nan_on_all_metrics(fma):
+    # D2 extended (INRAE, 23/11/2026): a pixel without FMA (NaN, i.e. NoData or outside the
+    # FMA map) has no vegetation information, so all its metrics are NaN, as a no-data PAD
+    metrics = _core(_HAND_PAD, **{fma: np.nan})
+
+    assert list(metrics) == list(_core(_HAND_PAD))
+    assert all(isinstance(value, float) and np.isnan(value) for value in metrics.values())
+
+
 def test_fuel_metrics_one_finite_pad_value_is_enough_to_compute_the_metrics():
     # Only an all-NaN profile has no data: the NaN of a partly valid profile count as 0 (A6)
     pad = np.full(8, np.nan)
@@ -335,15 +346,16 @@ def test_fuel_metrics_parity_with_r():
             assert list(metrics) == names
             result[:, row, col] = list(metrics.values())
 
-    # the tile has the 4 profile types for each ladder threshold, and the CBD_cbh* bands are
-    # all NaN in R (A1)
+    # the tile has the 4 profile types for each ladder threshold
     for name in names:
         if name.startswith("ProfType_"):
             assert set(np.unique(ref[names.index(name)])) == {1.0, 2.0, 3.0, 4.0}, name
 
     # Assumed divergence (D2, docs/epic-3-fuel-metrics.md §6): no-data pixels are NaN on all
-    # bands, where R gives the metrics of a null profile; they are excluded from the parity
-    # check below. The tile has no partly NaN pixel: that case is covered by the hand profiles.
+    # bands, where R 00c654c still gives the metrics of a null profile; they are excluded from
+    # the parity check below. INRAE will make them NaN in R too (Q1 bis, 23/11/2026): this mask
+    # goes once the reference is rebuilt with that R version. The tile has no partly NaN
+    # pixel: that case is covered by the hand profiles.
     no_data = np.isnan(pad).all(axis=0)
     assert no_data.any()
     assert (ref[names.index("CLFL"), no_data] == 0.0).all()
