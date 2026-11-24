@@ -33,7 +33,7 @@ Ajouter à lidar-for-fuel la 3ᵉ et dernière étape de la chaîne LidarForFuel
 ## Technical Decisions
 
 - **Version R de référence** : branche Dev `00c654c` (lidarforfuel 1.0.0.9014, 23/11/2026). Référence de test : `data/ref_inrae/fuel_metrics/512500_6854997_fuel_metrics_00c654c.tif`, produite par `make_fuel_metrics_00c654c.R` (l'ancienne, R `8fcccd2`, est gardée pour l'historique).
-- **Entrée** : `{stem}_pad_profile_1m.tif`, bandes nommées `PAD_{dz}_{h_bas}` (ex. `PAD_1_10`, `PAD_0.5_1.5`), mêlées à d'autres bandes. Valeurs en float32, nodata NaN, PAD plafonné à [0, 5] (plafond à retirer, Q10 : branche séparée, étape 2). Les bandes PAD se trouvent **par leur nom**, jamais par leur position. Le raster R a 186 bandes, le raster Python 60.
+- **Entrée** : `{stem}_pad_profile_1m.tif`, bandes nommées `PAD_{dz}_{h_bas}` (ex. `PAD_1_10`, `PAD_0.5_1.5`), mêlées à d'autres bandes. Valeurs en float32, nodata NaN, PAD non plafonné, comme dans R (plafond à 5 retiré le 24/11/2026, Q10). Les bandes PAD se trouvent **par leur nom**, jamais par leur position. Le raster R a 186 bandes, le raster Python 60.
 - **Hauteurs** : `h_bottom` est le bas de strate, lu dans le nom de bande, et `h = h_bottom + dz/2` est le centre de strate (le `zval` de R). En Python, les hauteurs au‑dessus du sol se nomment `h_*`, jamais `z*` (`z` désigne l'altitude brute).
 - **Préparation du profil** :
   - les valeurs non finies ou négatives passent à 0 ;
@@ -52,7 +52,7 @@ Ajouter à lidar-for-fuel la 3ᵉ et dernière étape de la chaîne LidarForFuel
   - un module par responsabilité, des arguments explicites, des docstrings Google ;
   - adapter les fonctions existantes plutôt que d'en créer des parallèles (réutiliser `_write_geotiff` et `_format_num` de `pad_profile/export_raster.py`) ;
   - point d'entrée Hydra comme `main_pad_profile.py`.
-- **Condition d'équivalence avec R** : `5 × min(fma_can, fma_shrub) ≥ bd_max` et `smooth_pad = False`, tant que le PAD est plafonné à 5. Le point d'entrée émet un avertissement si elle n'est pas remplie ; condition et avertissement disparaissent avec le retrait du plafond (Q10).
+- ~~**Condition d'équivalence avec R**~~ : sans objet depuis le retrait du plafond du PAD (Q10, 24/11/2026) ; pas d'avertissement au démarrage (AC-3.7.3 retiré).
 
 ## Cross-Story Dependencies
 

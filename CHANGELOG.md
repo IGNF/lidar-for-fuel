@@ -13,6 +13,7 @@
 - Config: align the "fuel_metrics" section with the code parameter names
 - Config: "cbh_threshold_ratio" set to 0.333, the INRAE value, now passed on by R (D4)
 - Add the R reference fuel metrics computed with R lidarforfuel Dev 00c654c and its script
+- PAD profile: the PAD rasters (pad_profile_1m, pad_sb_0.5m) are no longer capped at 5, as in R "pad_metrics" (INRAE answer to Q10); PAD rasters written by v0.3.0 or earlier are capped and must be regenerated before a comparison with R
 
 # v0.3.0
 - Fix outliers : Classify statistical outliers using height above ground without removing points, and assign in classe "18"

@@ -52,7 +52,7 @@ L'étape 3 est un **calcul pur, pixel par pixel**. Elle ne lit aucun nuage de po
 - **D4** (`cbh_threshold_ratio`) est **fermée** : R transmet maintenant le paramètre, la valeur de référence est **0.333** ;
 - **D5** (seuil de 1 m codé en dur) est **refusée** : le 1 m est voulu et on le garde ;
 - **Q6 / Q6 bis** : l'INRAE attend un **écart nul** entre R et Python à entrées et paramètres identiques, **à 10⁻⁴ près**, aussi sur la chaîne complète (étapes 1 et 2 comprises) ;
-- **Q10** : le plafond du PAD à 5 est **retiré du Python** (étape 2, branche séparée), comme dans le code R.
+- **Q10** : le plafond du PAD à 5 est **retiré du Python** (étape 2, 24/11/2026), comme dans le code R.
 
 Les réponses du 16/11/2026 ont fait l'objet d'une relance (D4, Q6, Q8, précisions sur D2 et D3, nouvelles questions Q9 et Q10). L'INRAE y a répondu le 23/11/2026.
 
@@ -88,12 +88,12 @@ L'étape 3 **ne choisit pas sa grille** : elle écrit sur la grille exacte du ra
 
 | Nom canaux | Format | Valeurs limites à contrôler | Définition |
 | --- | --- | --- | --- |
-| PAD_1_0 | Décimal (float32, nodata NaN) | 0–5 (plafonné à 5) | PAD entre 0 et 1 m (m²/m³). 1er chiffre = résolution verticale ; 2e chiffre = hauteur du bas de la strate. |
-| PAD_1_1 | Décimal | 0–5 (plafonné à 5) | PAD entre 1 et 2 m (m²/m³) |
-| … | Décimal | 0–5 (plafonné à 5) | … |
-| PAD_1_i | Décimal | 0–5 (plafonné à 5) | PAD entre i et i+1 m (m²/m³) |
-| … | Décimal | 0–5 (plafonné à 5) | … |
-| PAD_1_59 | Décimal | 0–5 (plafonné à 5) | PAD entre 59 et 60 m (m²/m³) |
+| PAD_1_0 | Décimal (float32, nodata NaN) | ≥ 0, non plafonné (Q10) | PAD entre 0 et 1 m (m²/m³). 1er chiffre = résolution verticale ; 2e chiffre = hauteur du bas de la strate. |
+| PAD_1_1 | Décimal | ≥ 0, non plafonné (Q10) | PAD entre 1 et 2 m (m²/m³) |
+| … | Décimal | ≥ 0, non plafonné (Q10) | … |
+| PAD_1_i | Décimal | ≥ 0, non plafonné (Q10) | PAD entre i et i+1 m (m²/m³) |
+| … | Décimal | ≥ 0, non plafonné (Q10) | … |
+| PAD_1_59 | Décimal | ≥ 0, non plafonné (Q10) | PAD entre 59 et 60 m (m²/m³) |
 
 Le nombre de canaux suit la config de l'étape 2 (`nlayers: 60`). L'étape 3 lit les hauteurs dans les noms de canaux : elle ne suppose pas qu'il y en a 60.
 
@@ -103,7 +103,7 @@ Une nouvelle section `fuel_metrics` de la config contient les FMA de canopée et
 
 #### Donnée disponible mais non utilisée dans cette épique : PAD de la strate basse
 
-`{stem}_pad_sb_0.5m.tif` (4 canaux `PAD_0.5_0` à `PAD_0.5_1.5`, pas de 10 m, résolution verticale 0,5 m, plafonné à 5) est produit par l'étape 2. R ne l'utilise pas dans `ffuelmetrics2`. Il ne servira qu'à la future charge de surface SFL corrigée par quantile mapping, **hors périmètre** (§10).
+`{stem}_pad_sb_0.5m.tif` (4 canaux `PAD_0.5_0` à `PAD_0.5_1.5`, pas de 10 m, résolution verticale 0,5 m, non plafonné depuis Q10) est produit par l'étape 2. R ne l'utilise pas dans `ffuelmetrics2`. Il ne servira qu'à la future charge de surface SFL corrigée par quantile mapping, **hors périmètre** (§10).
 
 ### Données en sortie
 
@@ -145,7 +145,7 @@ Le schéma suit l'ordre des stories. À l'exécution, c'est le point d'entrée (
 ┌──────────────────────────────────────────────────────────────────────────┐
 │  ENTRÉES                                                                 │
 │  • {stem}_pad_profile_1m.tif (sortie de l'étape 2) : bandes PAD_1_0 …    │
-│    PAD_1_59, float32, nodata NaN, PAD plafonné à 5 (à retirer, Q10)      │
+│    PAD_1_59, float32, nodata NaN, PAD ≥ 0 non plafonné (Q10), 10 m       │
 │  • Config, section fuel_metrics : fma_can, fma_shrub, smooth_pad,        │
 │    seuils d'échelle et de CTH, canopy_height_threshold,                  │
 │    cbh_threshold_ratio, bd_max, m_perrakis                               │
@@ -183,8 +183,8 @@ Le schéma suit l'ordre des stories. À l'exécution, c'est le point d'entrée (
                            │  {stem}_fuel_metrics.tif pour une dalle
                     ╔══════▼══════╗
                     ║   US-3.7    ║  Point d'entrée main_fuel_metrics (Hydra) :
-                    ║             ║  fichier ou dossier, config, contrôle
-                    ╚══════╤══════╝  d'équivalence R, doc
+                    ║             ║  fichier ou dossier, config,
+                    ╚══════╤══════╝  documentation
                            │
 ┌──────────────────────────▼───────────────────────────────────────────────┐
 │  SORTIES                                                                 │
@@ -237,7 +237,7 @@ Le calendrier de validation, qui tombe pendant les fêtes, reste aussi un risque
 - **AC-E.4 — Canaux pilotés par la configuration.** **Étant donné** une configuration avec n seuils d'échelle et m seuils de sommet de canopée, **quand** l'étape 3 s'exécute, **alors** la sortie a 19 + 8n + m canaux, nommés d'après les seuils configurés. Les canaux `LFL`, `CFL`, `FSG` et `ProfType` prennent les valeurs du seuil le plus proche de la médiane.
 - **AC-E.5 — Pixels sans donnée.** **Étant donné** un pixel dont tout le profil PAD est NaN, ou sans FMA (NoData ou hors de la carte FMA), **quand** l'étape 3 s'exécute, **alors** le pixel vaut NaN sur tous les canaux (D2, acceptée par l'INRAE le 16/11/2026, étendue aux pixels sans FMA le 23/11/2026, Q9) et n'apparaît pas comme « sans combustible ». Le nombre de ces pixels est journalisé par dalle.
 - **AC-E.6 — Robustesse à l'échelle nationale.** **Étant donné** une dalle atypique (eau, bord de chantier, dalle entièrement vide), **quand** l'étape 3 s'exécute, **alors** elle ne s'interrompt pas, écrit sa sortie et journalise les pixels vides et les profils corrigés.
-- **AC-E.7 — Lancement comme les étapes 1 et 2.** **Étant donné** un fichier ou un dossier de rasters PAD et la configuration, **quand** on lance `main_fuel_metrics`, **alors** on obtient une sortie par dalle. Tant que le PAD de l'étape 2 est plafonné à 5, un avertissement est émis si la condition d'équivalence avec R n'est pas remplie : `5 × min(fma_can, fma_shrub) ≥ bd_max` et `smooth_pad = False`. Cet avertissement disparaît avec le retrait du plafond (Q10).
+- **AC-E.7 — Lancement comme les étapes 1 et 2.** **Étant donné** un fichier ou un dossier de rasters PAD et la configuration, **quand** on lance `main_fuel_metrics`, **alors** on obtient une sortie par dalle. ~~Un avertissement est émis si la condition d'équivalence avec R n'est pas remplie.~~ Sans objet depuis le retrait du plafond du PAD (Q10, 24/11/2026) : le PAD Python n'est plus plafonné, comme celui de R.
 - **AC-E.8 — Validation par l'INRAE.** **Étant donné** le code final de la mi-décembre, **quand** l'INRAE examine le test de parité (AC-E.1) et la mesure des écarts refaite sur la version finale (story 3.8, passe 2), **alors** elle donne son accord avant le lancement de la production en janvier 2027. Proposition de l'INRAE (Q8, 23/11/2026, à confirmer par l'IGN) : la vérification de la correspondance des sorties Python et R est faite par l'IGN avec son outil de comparaison (Q6, Q6 bis).
 
 ---
@@ -253,7 +253,7 @@ Les annexes gardent la numérotation 3 à 11, à laquelle renvoient les stories 
 - `{stem}_pad_profile_1m.tif`, produit par `export_raster` ([lidar_for_fuel/pad_profile/export_raster.py](../lidar_for_fuel/pad_profile/export_raster.py)) :
   - bandes `PAD_1_0` … `PAD_1_59`, au format `PAD_{dz}_{h_bas}`, où `h_bas` est la hauteur du bas de la strate au‑dessus du sol ;
   - float32, nodata = NaN ;
-  - PAD **plafonné à [0, 5]** au moment de l'export. **23/11/2026 (Q10)** : l'INRAE demande de retirer ce plafond, comme dans le code R. Le retrait se fait dans une branche séparée (étape 2) ; un éventuel plafond sera un post‑traitement des rasters PAD, à discuter en point technique ;
+  - PAD **non plafonné**, comme dans R (Q10, plafond à [0, 5] retiré le 24/11/2026, branche `fix/pad_profile_no_cap`). Il est ≥ 0 tant que `ground_margin < dz` (−log d'une fraction ≤ 1 ; NaN si NRD dépasse la couverture). Un éventuel plafond sera un post‑traitement des rasters PAD, à discuter en point technique ;
   - grille CosiaFrance à 10 m, EPSG:2154, calée sur l'origine arrondie de la config (98039.75, 7111486.75), soit à 6 cm de l'origine réelle du fichier CosiaFrance (voir « Grille de sortie »).
 - Paramètres : voir le tableau ci‑dessous et la proposition de config en story 3.7.
 
@@ -270,7 +270,7 @@ Les annexes gardent la numérotation 3 à 11, à laquelle renvoient les stories 
 | `bdmax` | `bd_max` | 1.0 kg/m³ | plafond de la densité CBD |
 | `M` | `m_perrakis` | 2.5 | facteur M de Perrakis (2025) |
 
-> **Condition d'équivalence avec R.** Le PAD Python est plafonné à 5, alors que le PAD R ne l'est pas (maximum observé : 7,01). Les résultats restent identiques tant que `5 × min(fma_can, fma_shrub) ≥ bd_max`, car la densité CBD est de toute façon plafonnée à `bd_max`. C'est vrai avec la configuration actuelle : 5 × 0,254 = 1,27 ≥ 1. C'est aussi vrai seulement si `smooth_pad = False`, car le lissage porterait sur des valeurs déjà plafonnées. La story 3.7 doit vérifier cette condition au démarrage et émettre un avertissement sinon. **17/11/2026** : le plafond vient de la spécification PAD de l'INRAE (« valeurs limites à contrôler : 0–5 (plafonné à 5) »), mais le code R ne l'applique pas. La question de savoir laquelle des deux fait référence est posée à l'INRAE (Q10). Avec la carte FMA, la condition n'est plus vraie partout (FMA < 0,2). **23/11/2026** : le code R fait référence, le plafond est retiré du Python (branche séparée). La condition, et l'avertissement de la story 3.7, disparaîtront alors.
+> **Condition d'équivalence avec R** *(historique, sans objet depuis le 24/11/2026)*. Le PAD Python était plafonné à 5, alors que le PAD R ne l'est pas (maximum observé : 7,01). Les résultats restaient identiques tant que `5 × min(fma_can, fma_shrub) ≥ bd_max`, car la densité CBD est de toute façon plafonnée à `bd_max`. C'était vrai avec la configuration d'alors : 5 × 0,254 = 1,27 ≥ 1. C'était aussi vrai seulement si `smooth_pad = False`, car le lissage porterait sur des valeurs déjà plafonnées. ~~La story 3.7 doit vérifier cette condition au démarrage et émettre un avertissement sinon.~~ **17/11/2026** : le plafond vient de la spécification PAD de l'INRAE (« valeurs limites à contrôler : 0–5 (plafonné à 5) »), mais le code R ne l'applique pas. La question de savoir laquelle des deux fait référence est posée à l'INRAE (Q10). Avec la carte FMA, la condition n'est plus vraie partout (FMA < 0,2). **23/11/2026** : le code R fait référence. **24/11/2026** : le plafond est retiré du Python ; la condition n'a plus lieu d'être, et l'avertissement de la story 3.7 (AC-3.7.3) est retiré.
 
 ### 3.2 Sortie
 
@@ -738,7 +738,7 @@ Facile.
 
 - **AC-3.7.1** — **Étant donné** `configs/config.yaml`, **quand** on l'ouvre, **alors** il contient une section `fuel_metrics:` avec les paramètres du tableau 3.1, nommés en snake_case. Les valeurs par défaut sont celles de la config INRAE. Pour `cbh_threshold_ratio`, on met `0.333` : R `00c654c` transmet ce paramètre (D4 fermée le 23/11/2026). ~~`0.3333333333333333` tant que D4 est ouverte.~~
 - **AC-3.7.2** — **Étant donné** un dossier qui contient des fichiers `*_pad_profile_1m.tif`, **quand** on lance `python -m lidar_for_fuel.main_fuel_metrics io.input_dir=… io.output_dir=…`, **alors** tous les fichiers du dossier sont traités, ou seulement `io.input_filename` s'il est renseigné, et un fichier `{stem}_fuel_metrics.tif` est écrit pour chacun. **Étant donné** un `input_dir` ou un `output_dir` invalide, **alors** les messages d'erreur sont identiques à ceux de `main_pad_profile.py`.
-- **AC-3.7.3** — **Étant donné** une config où `smooth_pad` est vrai ou bien `5 × min(FMA) < bd_max`, **quand** on lance le traitement, **alors** un avertissement est journalisé au démarrage : la condition d'équivalence avec R de la section 3.1 n'est pas remplie. **23/11/2026** : AC à retirer si le plafond du PAD à 5 est supprimé avant la story 3.7 (Q10, branche séparée) ; la condition n'a plus lieu d'être sans plafond.
+- ~~**AC-3.7.3**~~ — **Retiré** (24/11/2026) : le plafond du PAD à 5 est supprimé (Q10), la condition d'équivalence avec R de la section 3.1 n'a plus lieu d'être. ~~Avertissement au démarrage si `smooth_pad` est vrai ou si `5 × min(FMA) < bd_max`.~~
 - **AC-3.7.4** — **Étant donné** la story livrée, **quand** on consulte le dépôt, **alors** on y trouve :
   - `scripts/example_launch_fuel_metrics.sh` ;
   - le README mis à jour (étape 3, contenu de la sortie, tableau des 45 bandes ou lien vers ce tableau) ;
@@ -824,7 +824,7 @@ Normal.
 - **Vectorisation ou parallélisation dans une dalle** : inutile à 3 s par dalle. À l'échelle nationale, il faut environ 550 000 dalles × 3 s ≈ 460 h CPU. Ce volume se parallélise **dalle par dalle** par la GPAO, sans travail dans cette épique. L'estimation est à recaler sur le nombre réel de dalles LiDAR HD.
 - **Veille sur la branche Dev de R** : comparer Dev à la version figée (`00c654c`, D7) et signaler les changements dans `R/ffuelmetrics2.R` et `R/pad_metrics.R`. C'est une idée retenue pour plus tard ; en attendant, l'INRAE s'engage à prévenir l'IGN.
 - **Suppression des bandes `CBD_cbh*`** : sans objet pour l'instant, R les calcule depuis `00c654c` (D3, 23/11/2026). Si l'INRAE les supprime plus tard (« métrique probablement pas conservée à la fin », Q2), retirer les 3 clés de `fuel_metrics_core` : la sortie passerait à 16 + 8 × n_échelle + n_CTH bandes (42 par défaut), et les AC qui donnent le nombre de bandes seraient à mettre à jour (AC-E.4, AC-3.4.1, AC-3.6.1, AC-3.7.5).
-- **Retrait du plafond du PAD à 5** (Q10, 23/11/2026) : étape 2, branche séparée (`export_raster.py`) ; il entraîne le retrait de la condition d'équivalence (§3.1) et de l'AC-3.7.3.
+- ~~**Retrait du plafond du PAD à 5**~~ : fait le 24/11/2026 (Q10, branche `fix/pad_profile_no_cap`). Reste hors périmètre : un éventuel plafond en post‑traitement des rasters PAD, à discuter en point technique.
 - **Retrait du masque D2 du test de parité** quand R mettra les pixels sans donnée à NaN (Q1 bis) : régénérer la référence avec ce commit R.
 - **Version de lidar‑for‑fuel dans les rasters de sortie** : depuis la PR #43, elle est inscrite dans les GPKG. Il faudrait l'étendre aux rasters de métriques, utile si l'INRAE fait évoluer les formules pendant la production.
 

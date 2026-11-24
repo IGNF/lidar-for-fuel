@@ -65,10 +65,7 @@ def fuel_metrics_core(
       log only; their count is not returned (A6, counted in story 3.6).
 
     The parameters are used as given, as R `ffuelmetrics2Rast` does since Dev 00c654c (A3
-    fixed). With the PAD of the `pad_profile` stage, capped at 5 unlike the R one, the results
-    are guaranteed to be the same as R only if `5 × min(fma_can, fma_shrub) >= bd_max` (the
-    CBD is capped at `bd_max` anyway) and `smooth_pad` is false; INRAE asked to remove the cap
-    (Q10, 23/11/2026).
+    fixed). The PAD of the `pad_profile` stage is not capped, as the R one (Q10).
 
     Args:
         pad (np.ndarray): Raw 1-D PAD profile of the pixel (m²/m³), one value per stratum,
