@@ -1,7 +1,8 @@
 """
 Input layer of the fuel metrics computation, ported from R `ffuelmetrics2`:
 - read the strata heights from the band names of the `pad_profile_1m` raster;
-- bring the PAD bands of that raster back into [0, 5] (cap removed from step 2 by Q10);
+- bring the PAD bands of that raster back into [0, 5] (cap removed from step 2 after the INRAE
+  answer on the PAD cap at 5);
 - read the fuel mass area (FMA), either a configured value or the FMA map, on the PAD grid;
 - prepare a PAD profile and turn it into a CBD profile;
 - pick the default ladder fuel threshold (rule of step, needed from the configuration onwards).
@@ -23,7 +24,8 @@ logger = logging.getLogger(__name__)
 _PAD_BAND_PATTERN = re.compile(r"^PAD_(\d+(?:\.\d+)?)_(\d+(?:\.\d+)?)$")
 
 # PAD range (m²/m³) of the INRAE PAD specification ("0-5, capped at 5"). Step 2 writes the raw PAD,
-# as R `pad_metrics` (Q10); the cap is applied when step 3 reads the PAD raster (`cap_pad`)
+# as R `pad_metrics` (INRAE answer on the PAD cap at 5); the cap is applied when step 3 reads the
+# PAD raster (`cap_pad`)
 PAD_MIN = 0.0
 PAD_MAX = 5.0
 
@@ -83,9 +85,10 @@ def read_pad_heights(band_names: Sequence[str | None]) -> tuple[float, np.ndarra
 def cap_pad(pad: np.ndarray, band_names: Sequence[str], pad_max: float = PAD_MAX) -> tuple[np.ndarray, int]:
     """Bring the PAD bands of the `{stem}_pad_profile_1m.tif` raster back into [0, `pad_max`].
 
-    Since Q10 (24/11/2026), step 2 writes the raw PAD, as R `pad_metrics`: it can go above 5
-    (up to 7.01 on the pilot zone), or be inf. This post-processing applies, when step 3 reads
-    the raster, the cap that step 2 applied before (`np.clip(pad, 0, 5)`):
+    Since the INRAE answer on the PAD cap at 5 (24/11/2026), step 2 writes the raw PAD, as R
+    `pad_metrics`: it can go above 5 (up to 7.01 on the pilot zone), or be inf. This
+    post-processing applies, when step 3 reads the raster, the cap that step 2 applied before
+    (`np.clip(pad, 0, 5)`):
 
     - values above `pad_max` (+inf included) become `pad_max`;
     - negative values (-inf included) become 0;

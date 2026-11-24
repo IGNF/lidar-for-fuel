@@ -71,7 +71,8 @@ def test_read_pad_heights_invalid_names_raise(names, match):
 
 
 def test_cap_pad_brings_each_band_back_into_0_5(caplog):
-    # Raster (bands, rows, cols), as read from pad_profile_1m; same cap as step 2 before Q10
+    # Raster (bands, rows, cols), as read from pad_profile_1m; same cap as step 2 before the
+    # INRAE answer on the PAD cap at 5
     pad = np.array(
         [
             [[7.01, np.nan], [-0.5, 2.0]],
