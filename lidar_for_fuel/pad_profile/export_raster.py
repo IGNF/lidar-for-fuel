@@ -3,6 +3,7 @@ Assemble `compute_pixel_aggregates`'s per-pixel PAD metrics into 8 georeferenced
 multi-band GeoTIFFs aligned on the CosiaFrance grid.
 
 """
+
 import logging
 from pathlib import Path
 
@@ -70,7 +71,7 @@ def _band_array(values: pd.Series, origin_pixel: tuple, nb_pixels: int, clip: tu
         origin_pixel (tuple): CosiaFrance grid corner (ix, iy) the tile's window is anchored on.
         nb_pixels (int): Tile side length in pixels.
         clip (tuple | None): Optional (min, max) bounds the values are clipped to
-            before being written (e.g. (0.0, 5.0) to cap PAD). Default None.
+            before being written (e.g. (0.0, 1.0) to bound the cover). Default None.
 
     Returns:
         np.ndarray: (nb_pixels, nb_pixels) float32 grid, `NaN` where no pixel matched.
@@ -79,7 +80,7 @@ def _band_array(values: pd.Series, origin_pixel: tuple, nb_pixels: int, clip: tu
 
     data = values.to_numpy(dtype=np.float64)
 
-    # Clip = capping of PADs and cover.
+    # Clip = bounding of the cover (PAD is written raw, as R).
     if clip is not None:
         data = np.clip(data, *clip)
 
@@ -186,9 +187,10 @@ def export_raster(
         "cover": ["Cover_2", "Cover_4", "Cover_6"],
         "dates_pad": ["Date_maj", "Date_min", "Date_max"],
     }
+    # PAD is not capped, as R `pad_metrics` (INRAE answer to Q10, 23/11/2026)
     raster_clip: dict[str, tuple | None] = {
-        "pad_sb_0.5m": (0.0, 5.0),
-        "pad_profile_1m": (0.0, 5.0),
+        "pad_sb_0.5m": None,
+        "pad_profile_1m": None,
         "class_count": None,
         "entering_rays": None,
         "intercept_ray": None,

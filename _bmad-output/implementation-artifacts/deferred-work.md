@@ -5,7 +5,7 @@
   evidence: Vérifié avec Rscript, `which.min(abs(s - median(s)))` renvoie 0.05 pour les deux ordres de liste, car il n'y a pas d'égalité exacte en double précision. Le code et les tests suivent R. Comme l'épique est une spec, sa correction revient à l'utilisatrice.
 - source_spec: `_bmad-output/implementation-artifacts/spec-3-2-prepare-cbd-profile.md`
   summary: Valider les paramètres scientifiques de la section `fuel_metrics` de la config au démarrage : FMA > 0 et finies, `bd_max` > 0, seuils non vides, finis et positifs (story 3.7).
-  evidence: Le périmètre de la story 3.2 mentionne une « validation des paramètres ». Pourtant, `select_default_ladder_threshold([nan, …])` renvoie le premier seuil sans erreur, et `compute_cbd` accepte des FMA négatives. Ces valeurs viennent de la config, que la story 3.7 lit et contrôle déjà (avertissement d'équivalence AC-3.7.3).
+  evidence: Le périmètre de la story 3.2 mentionne une « validation des paramètres ». Pourtant, `select_default_ladder_threshold([nan, …])` renvoie le premier seuil sans erreur, et `compute_cbd` accepte des FMA négatives. Ces valeurs viennent de la config, que la story 3.7 lit. *(24/11/2026 : l'avertissement d'équivalence AC-3.7.3 est retiré ; cette validation reste à faire à la lecture de la config.)*
 - source_spec: `_bmad-output/implementation-artifacts/spec-3-2-prepare-cbd-profile.md`
   summary: Décider en story 3.4 quoi faire si le premier `h_bottom` n'est pas 0, puisque `FL_k1` et `FL_k2` supposent que la première strate commence au sol.
   evidence: `parse_pad_strata` vérifie que le profil est régulier (même `dz`, ni doublon ni trou), mais pas son point de départ. R calcule `FL_k1 = CBD[1]·dz` sans le vérifier. Imposer 0 dès la story 3.2 risquerait de diverger de R avec un `z0` non nul.
@@ -13,7 +13,7 @@
   summary: FAIT le 17/11/2026 : l'exemple de l'épique est corrigé (AC-3.2.6 et §4 étape 9), il donne maintenant `[0.01, 0.02, 0.05, 0.1]` → 0.05, et deux cas d'égalité exacte sont ajoutés.
   evidence: Il remplace le premier élément de cette liste.
 - source_spec: `_bmad-output/implementation-artifacts/spec-3-2-prepare-cbd-profile.md`
-  summary: Story 3.7 (AC-3.7.3, AC-E.7) — revoir la condition d'équivalence avec R `5 × min(fma_can, fma_shrub) ≥ bd_max` quand une FMA est la carte : elle doit porter sur le minimum de la carte, ou être évaluée par pixel.
+  summary: **Sans objet depuis le 24/11/2026 (plafond du PAD retiré, Q10 ; AC-3.7.3 retiré).** Story 3.7 (AC-3.7.3, AC-E.7) — revoir la condition d'équivalence avec R `5 × min(fma_can, fma_shrub) ≥ bd_max` quand une FMA est la carte : elle doit porter sur le minimum de la carte, ou être évaluée par pixel.
   evidence: La carte FMA va de 0,05 à 0,5 kg/m². Pour un pixel où FMA < 0,2, on a 5 × FMA < 1 = `bd_max`. Le PAD Python plafonné à 5 donne alors une CBD plus faible que le PAD R non plafonné (maximum observé 7,01). Il y a donc un écart avec R sur ces pixels si PAD > 5, en contradiction avec Q6, qui demande un écart nul. Avec la valeur scalaire 0,254 de la config, la condition reste vraie.
 - source_spec: `_bmad-output/implementation-artifacts/spec-3-3-canopy-metrics.md`
   summary: Story 3.7 — refuser les seuils `canopy_top_bd_thresholds` en double ou de même nom au format `%0.4f` (ex. 0.01 et 0.01004 → `CTH_0p0100`).
@@ -52,15 +52,21 @@
 ## Deferred from: spec-3-5-r-00c654c-alignment (2026-11-23)
 
 - source_spec: `_bmad-output/implementation-artifacts/spec-3-5-r-00c654c-alignment.md`
-  summary: Branche séparée (étape 2) — retirer le plafond du PAD à 5 (`raster_clip` de `lidar_for_fuel/pad_profile/export_raster.py`, bandes `pad_profile_1m` et `pad_sb_0.5m`) et ses tests, puis retirer l'avertissement d'équivalence (AC-3.7.3) et la condition `5 × min(FMA) ≥ bd_max` de l'épique et de la docstring de `fuel_metrics_core`.
+  summary: **Traité le 24/11/2026 (spec-q10-pad-no-cap, branche `fix/pad_profile_no_cap`).** Branche séparée (étape 2) — retirer le plafond du PAD à 5 (`raster_clip` de `lidar_for_fuel/pad_profile/export_raster.py`, bandes `pad_profile_1m` et `pad_sb_0.5m`) et ses tests, puis retirer l'avertissement d'équivalence (AC-3.7.3) et la condition `5 × min(FMA) ≥ bd_max` de l'épique et de la docstring de `fuel_metrics_core`.
   evidence: Réponse INRAE du 23/11/2026 à Q10 : « retire le plafond de python ». Le plafond éventuel sera un post-traitement des rasters PAD avant l'étape 3, à discuter en point technique. Décision de l'utilisatrice : branche séparée, car c'est l'étape 2.
 - source_spec: `_bmad-output/implementation-artifacts/spec-3-5-r-00c654c-alignment.md`
   summary: Quand R mettra les pixels sans donnée à NaN (Q1 bis), régénérer la référence avec `make_fuel_metrics_*.R` sur cette version, retirer le masque D2 du test de parité et ne plus lister D2 comme divergence (docstring, CHANGELOG, épique).
   evidence: L'INRAE a répondu « OUI » le 23/11/2026, mais R Dev 00c654c donne encore le profil nul (CLFL = 0, ProfType = 1) sur les 25 pixels vides de la dalle de référence.
 - source_spec: `_bmad-output/implementation-artifacts/spec-3-5-r-00c654c-alignment.md`
-  summary: Story 3.8 — R Dev 00c654c corrige aussi `fPCpretreatment` (`las <- lidR::classify_ground(...)`, issue #49) : le reclassement du sol n'était pas appliqué avant. Vérifier l'effet sur l'étape 1 et sur la chaîne R de référence de la comparaison.
-  evidence: `git show 00c654c -- R/fPCpretreatment.R`. L'écart nul est attendu sur la chaîne complète (Q6 bis, 23/11/2026).
+  summary: Story 3.8 — faire confirmer par l'INRAE que la chaîne R de référence et la production tournent avec `fPCpretreatment(classify = FALSE)`. R Dev 00c654c corrige `classify = TRUE` (`las <- lidR::classify_ground(...)`, issue #49), qui ne reclassait pas le sol auparavant.
+  evidence: `classify` vaut `FALSE` par défaut (doc R : « seulement si le nuage d'origine n'est pas classé »), comme dans `Code_examples/Processing_Pipeline_example_V1.0.R`. Le Python garde les classes du LiDAR HD, ce qui équivaut à `classify = FALSE` : aucun effet dans ce cas. Avec `TRUE`, R reclasserait le sol (CSF), ce qui changerait les comptages sol et végétation du PAD et empêcherait l'écart nul sur la chaîne complète (Q6 bis). La config de la référence du 10/10/2026 n'a pas de section `fPCpretreatment`, la valeur utilisée n'est donc pas vérifiable.
 - source_spec: `_bmad-output/implementation-artifacts/spec-3-5-r-00c654c-alignment.md`
   summary: Story 3.7 — valider à la lecture de la config les FMA données en valeur (`fma_can`, `fma_shrub`) : finies et dans [0,05 ; 0,5] comme la carte. Une valeur NaN de la config rend aujourd'hui toute la dalle NaN sans message, et une valeur inf ou ≤ 0 donne des métriques en partie NaN sans que D2 s'applique.
   evidence: Revue du 24/11/2026 (Edge Case Hunter). `read_fma` contrôle la plage de la carte mais renvoie la valeur de la config sans contrôle (`np.full(shape, float(fma))`). C'était déjà le cas avant cette story ; une config anormale reste nécessaire pour le déclencher.
+
+## Deferred from: spec-q10-pad-no-cap (2026-11-24)
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-q10-pad-no-cap.md`
+  summary: Étape 2 — journaliser par dalle le nombre de valeurs de PAD supérieures à 5 et non finies, pour donner des chiffres au point technique sur un éventuel plafond en post-traitement (Q10) et repérer les valeurs aberrantes en production.
+  evidence: Revue du 24/11/2026 (Blind Hunter). Sans plafond, plus rien ne signale ces valeurs, alors que la spécification PAD de l'INRAE parle de « valeurs limites à contrôler : 0–5 ». C'est une évolution, pas une régression : R ne les signale pas non plus.
 

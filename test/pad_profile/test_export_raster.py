@@ -10,7 +10,10 @@ from lidar_for_fuel.pad_profile.create_raster import (
     build_pad_aggregation,
     compute_pixel_aggregates,
 )
-from lidar_for_fuel.pad_profile.export_raster import _select_stratum_columns, export_raster
+from lidar_for_fuel.pad_profile.export_raster import (
+    _select_stratum_columns,
+    export_raster,
+)
 
 _GLOBAL_ORIGIN_X = 98029.75
 _GLOBAL_ORIGIN_Y = 6045536.75
@@ -182,10 +185,18 @@ def test_export_raster_places_pixel_value_at_correct_row_col_and_leaves_rest_nod
         assert np.isnan(untouched).all()
 
 
-def test_export_raster_caps_pad_values_at_five(tmp_path, aggregated_single_pixel):
+def test_export_raster_writes_raw_pad_values_and_bounds_the_cover(tmp_path, aggregated_single_pixel):
+    # PAD is written as computed, with no bound, as R `pad_metrics` (INRAE answer to Q10,
+    # 23/11/2026): R goes up to 7.01 (1 m) and 11.83 (0.5 m) on the pilot zone. The cover
+    # keeps its [0, 1] bound.
     aggregated, origin_pixel, nb_pixels = aggregated_single_pixel
     aggregated = aggregated.copy()
-    aggregated["PAD_1_0"] = 42.0  # simulate an out-of-range PAD value
+    low_column = next(c for c in aggregated.columns if c.startswith("PAD_0.5_"))
+    aggregated["PAD_1_0"] = 42.0
+    aggregated["PAD_1_1"] = -0.5
+    aggregated[low_column] = 11.83
+    aggregated["Cover_2"] = 1.5
+    aggregated["Cover_4"] = -0.2
 
     written = export_raster(
         aggregated,
@@ -202,8 +213,13 @@ def test_export_raster_caps_pad_values_at_five(tmp_path, aggregated_single_pixel
     )
 
     with rasterio.open(written["pad_profile_1m"]) as src:
-        band = src.read(1)
-        assert np.nanmax(band) == pytest.approx(5.0)
+        assert np.nanmax(src.read(1)) == pytest.approx(42.0)
+        assert np.nanmin(src.read(2)) == pytest.approx(-0.5)
+    with rasterio.open(written["pad_sb_0.5m"]) as src:
+        assert np.nanmax(src.read(1)) == pytest.approx(11.83)
+    with rasterio.open(written["cover"]) as src:
+        assert np.nanmax(src.read(1)) == pytest.approx(1.0)
+        assert np.nanmin(src.read(2)) == pytest.approx(0.0)
 
 
 def test_export_raster_pl_factor_passes_through_unchanged(tmp_path, aggregated_single_pixel):
@@ -374,7 +390,6 @@ def test_export_raster_real_las_tile_writes_inspectable_geotiffs():
         assert src.crs.to_string() == _SRID
         ground_stratum = src.read(1)  # PAD_1_0: should show real vegetation signal on this tile
         assert np.isfinite(ground_stratum).any(), "Expected at least some populated pixels on this real tile"
-        assert np.nanmax(ground_stratum) <= 5.0  # PAD is capped at 5, per AC
 
     with rasterio.open(written["class_count"]) as src:
         total = src.read(src.count)  # "Total" is always the last band
