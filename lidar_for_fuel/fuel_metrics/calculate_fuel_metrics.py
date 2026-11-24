@@ -3,8 +3,8 @@ Fuel metrics of a vertical PAD profile, ported from R `ffuelmetrics2`: profile p
 canopy metrics, fuel loads, ladder fuel metrics, default ladder metrics and assembly of the
 outputs in the R order and with the R band names (45 with the default configuration).
 
-This is a port of R that keeps its known defects, except the assumed divergence agreed with
-INRAE. `fuel_metrics_core` lists the divergence and the defects kept.
+This is a port of R Dev 00c654c that keeps its known defects, except the assumed divergence
+agreed with INRAE. `fuel_metrics_core` lists the divergence and the defects kept.
 """
 
 from collections.abc import Sequence
@@ -54,22 +54,21 @@ def fuel_metrics_core(
 
     Assumed divergence from R:
 
-    - a profile with no data (all PAD values NaN) gives NaN for all the metrics (D2). R gives
-      the metrics of a null profile (zeros, `CBH2` = CHT, `ProfType` = 1, A5), which would
-      show areas without measurement as areas without fuel.
+    - a pixel with no data, i.e. all PAD values NaN or no FMA (`fma_can` or `fma_shrub`
+      NaN), gives NaN for all the metrics (D2). R gives the metrics of a null profile for an
+      all-NaN PAD (zeros, `CBH2` = CHT, `ProfType` = 1, A5), which would show areas without
+      measurement as areas without fuel. INRAE will apply D2 in R too (Q1 bis).
 
     Otherwise, strict parity with R, including its defects:
 
     - NaN, inf and negative PAD values of a partly valid profile are set to 0, with a debug
-      log only; their count is not returned (A6, counted in story 3.6);
-    - `CBD_cbh`, `CBD_cbh2` and `CBD_cbhlow` are always NaN (A1).
+      log only; their count is not returned (A6, counted in story 3.6).
 
-    The parameters are used as given. The R rasters (`ffuelmetrics2Rast`) pass on neither
-    `smooth_pad` nor `CBHThresholdRatio` and always use `smooth_pad = False` and a ratio of
-    1/3 (A3): to reproduce them, the caller must pass these values, whatever the configured
-    ones (stories 3.6 and 3.7). With the PAD of the `pad_profile` stage, capped at 5 unlike
-    the R one, the results are also guaranteed to be the same as R if
-    `5 × min(fma_can, fma_shrub) >= bd_max` (the CBD is capped at `bd_max` anyway).
+    The parameters are used as given, as R `ffuelmetrics2Rast` does since Dev 00c654c (A3
+    fixed). With the PAD of the `pad_profile` stage, capped at 5 unlike the R one, the results
+    are guaranteed to be the same as R only if `5 × min(fma_can, fma_shrub) >= bd_max` (the
+    CBD is capped at `bd_max` anyway) and `smooth_pad` is false; INRAE asked to remove the cap
+    (Q10, 23/11/2026).
 
     Args:
         pad (np.ndarray): Raw 1-D PAD profile of the pixel (m²/m³), one value per stratum,
@@ -97,9 +96,12 @@ def fuel_metrics_core(
             `CanBDmax`, `CanBDmin`, `CanBDlowmax`, `CanBDlowmin`, `CBDcan`, `CBD_cbh`,
             `CBD_cbh2`, `CBD_cbhlow`, `LFL`, `CFL`, `ProfType`
             (19 + 8 × n_distinct_ladder_thresholds + n_canopy_top_thresholds), all NaN when
-            the profile has no data.
+            the pixel has no data.
     """
-    no_data = bool(np.isnan(pad).all())
+    no_data = bool(np.isnan(pad).all() or np.isnan(fma_can) or np.isnan(fma_shrub))
+    if no_data:
+        # The keys depend on the configuration only: they are computed on a null profile
+        pad, fma_can, fma_shrub = np.zeros(np.shape(pad)), 1.0, 1.0
     profile, _ = prepare_pad_profile(pad, smooth_pad)
     h_center = np.asarray(h_bottom, dtype=float) + dz / 2
     cht = float(canopy_height_threshold)
@@ -154,14 +156,12 @@ def fuel_metrics_core(
         "CanBDlowmax": canopy["CanBDlowmax"],
         "CanBDlowmin": canopy["CanBDlowmin"],
         "CBDcan": canopy["CBDcan"],
-        # Always NaN in R: it looks for `zval == CBH`, a stratum centre equal to a bottom (A1)
-        "CBD_cbh": np.nan,
-        "CBD_cbh2": np.nan,
-        "CBD_cbhlow": np.nan,
+        "CBD_cbh": canopy["CBD_cbh"],
+        "CBD_cbh2": canopy["CBD_cbh2"],
+        "CBD_cbhlow": canopy["CBD_cbhlow"],
         "LFL": ladders[f"LadderLoad_{default}"],
         "CFL": ladders[f"CFL_{default}"],
         "ProfType": ladders[f"ProfType_{default}"],
     }
 
-    # Metrics computed on the null profile first, so that the keys stay those of the contract
     return dict.fromkeys(metrics, np.nan) if no_data else metrics

@@ -11,9 +11,10 @@ from lidar_for_fuel.fuel_metrics.prepare_cbd_profile import (
 )
 
 _REF_DIR = Path(__file__).resolve().parents[2] / "data/ref_inrae"
-# R (lidarforfuel) PAD raster and fuel metrics of the same 500 m tile (story 3.1)
+# R (lidarforfuel) PAD raster of a 500 m tile (story 3.1) and its fuel metrics computed by
+# R Dev 00c654c (data/ref_inrae/fuel_metrics/make_fuel_metrics_00c654c.R)
 _REF_PAD_RASTER_1M = _REF_DIR / "pad_profile/512500_6854997_pad_1m.tif"
-_REF_FUEL_METRICS = _REF_DIR / "fuel_metrics/512500_6854997_fuel_metrics.tif"
+_REF_FUEL_METRICS = _REF_DIR / "fuel_metrics/512500_6854997_fuel_metrics_00c654c.tif"
 
 _CANOPY_BANDS = [
     "CTH_0p0012",
@@ -27,6 +28,9 @@ _CANOPY_BANDS = [
     "CanBDlowmax",
     "CanBDlowmin",
     "CBDcan",
+    "CBD_cbh",
+    "CBD_cbh2",
+    "CBD_cbhlow",
 ]
 
 # Hand-written profiles: FMA = 1 and bd_max = 1, so CBD = PAD (values below 1)
@@ -41,8 +45,7 @@ _HAND_PARAMS = dict(
 )
 
 # Parameters of the R reference tile: INRAE config `ffuelmetrics2` section of
-# data/ref_inrae/2026-09-28_fuel_metrics_zones-pilotes.yml, except the ratio:
-# R ffuelmetrics2Rast does not pass CBHThresholdRatio on and uses 1/3, not 0.333 (A3)
+# data/ref_inrae/2026-09-28_fuel_metrics_zones-pilotes.yml
 _INRAE_PARAMS = dict(
     fma_can=0.2543576,
     fma_shrub=0.2543576,
@@ -50,7 +53,7 @@ _INRAE_PARAMS = dict(
     canopy_height_threshold=1.0,
     canopy_bd_thresh_frac=0.3,
     canopy_top_bd_thresholds=[0.0012, 0.01],
-    cbh_threshold_ratio=1 / 3,
+    cbh_threshold_ratio=0.333,
 )
 
 
@@ -96,6 +99,9 @@ _HAND_CASES = [
             "CanBDlowmax": 0.05,
             "CanBDlowmin": np.nan,
             "CBDcan": np.mean([0.3, 0.5, 0.4, 0.2]),  # 6.5 to 9.5
+            "CBD_cbh": 0.2,
+            "CBD_cbh2": 0.3,
+            "CBD_cbhlow": np.nan,
         },
         id="3a_normal",
     ),
@@ -116,6 +122,9 @@ _HAND_CASES = [
             "CanBDlowmax": 0.2,
             "CanBDlowmin": np.nan,
             "CBDcan": 0.2,  # 1.5 to 9.5
+            "CBD_cbh": np.nan,
+            "CBD_cbh2": np.nan,
+            "CBD_cbhlow": np.nan,
         },
         id="3a_min_equal_max_gives_no_cbh_and_falls_back_on_cht",
     ),
@@ -137,6 +146,9 @@ _HAND_CASES = [
             "CanBDlowmax": 0.6,
             "CanBDlowmin": 0.2,
             "CBDcan": np.mean([0.6, 0.6] + [0.1] * 11),  # 3.5 to 15.5
+            "CBD_cbh": np.nan,
+            "CBD_cbh2": np.nan,
+            "CBD_cbhlow": 0.6,
         },
         id="falls_back_on_cbhlow",
     ),
@@ -157,6 +169,9 @@ _HAND_CASES = [
             "CanBDlowmax": np.nan,
             "CanBDlowmin": np.nan,
             "CBDcan": 0.0,
+            "CBD_cbh": np.nan,
+            "CBD_cbh2": np.nan,
+            "CBD_cbhlow": np.nan,
         },
         id="surface_only_falls_back_on_cht",
     ),
@@ -177,6 +192,9 @@ _HAND_CASES = [
             "CanBDlowmax": 0.02,
             "CanBDlowmin": np.nan,
             "CBDcan": 0.34999999999999998,
+            "CBD_cbh": 0.2,
+            "CBD_cbh2": 0.3,
+            "CBD_cbhlow": np.nan,
         },
         id="half_metre_strata",
     ),
@@ -197,6 +215,9 @@ _HAND_CASES = [
             "CanBDlowmax": np.nan,
             "CanBDlowmin": np.nan,
             "CBDcan": np.nan,
+            "CBD_cbh": np.nan,
+            "CBD_cbh2": np.nan,
+            "CBD_cbhlow": np.nan,
         },
         id="no_stratum_above_0p01",
     ),
@@ -227,6 +248,9 @@ def test_canopy_metrics_null_profile():
             "CanBDlowmax": np.nan,
             "CanBDlowmin": np.nan,
             "CBDcan": np.nan,  # R any(NA): no canopy top, but strata above CBH2
+            "CBD_cbh": np.nan,
+            "CBD_cbh2": np.nan,
+            "CBD_cbhlow": np.nan,
         },
     )
     np.testing.assert_array_equal(cbd, np.zeros(10))
@@ -250,6 +274,9 @@ def test_canopy_metrics_frac_0_gives_cbh_without_cbh2():
     assert metrics["CBH"] == 4.0
     assert metrics["CBH2"] == 1.0
     np.testing.assert_allclose(metrics["CBDcan"], 0.19666666666666668, rtol=1e-12)  # 1.5 to 9.5
+    # R 00c654c: CBD_cbh at the CBH stratum; no CBD_cbh2, as CBH2 does not come from 3A
+    assert metrics["CBD_cbh"] == 0.2
+    assert np.isnan(metrics["CBD_cbh2"])
 
 
 # --- No stratum dense enough for the canopy top (CBD < 0.01) -----------------------------------
@@ -324,7 +351,9 @@ def test_canopy_metrics_distinct_fma_values_computed_by_r():
     # The reference tile has fma_can == fma_shrub, so steps 1 and 4 (FMA switch at CHT, then
     # at CBH2) are checked here against R: values printed with "%.17g" by Rscript, R
     # lidarforfuel `ffuelmetrics2(PADval = pad, FMAcan = 0.3, FMAshrub = 0.15, zval = 0:15,
-    # dz = 1, CanopyBDTreshFrac = 0.3, CBHThresholdRatio = 1/3, bdmax = 1)`, 17/11/2026.
+    # dz = 1, CanopyBDTreshFrac = 0.3, CBHThresholdRatio = 1/3, bdmax = 1)`, 17/11/2026, and
+    # CBD_cbh* with R Dev 00c654c, 23/11/2026. As R, CBD_cbh* are read in the step 1 CBD
+    # (canopy FMA above CHT): 0.3 x 0.3 at the CBH stratum, not 0.3 x 0.15 (step 4 CBD).
     pad = np.array([0.2, 0.1, 0.3, 0.6, 0.6, 0.1, 0.4, 0.4, 0.4, 0.4, 0.4, 0.1, 0.4, 0.4, 0.4, 0.4])
     metrics, cbd = _canopy(pad, fma_can=0.3, fma_shrub=0.15)
 
@@ -342,6 +371,9 @@ def test_canopy_metrics_distinct_fma_values_computed_by_r():
             "CanBDlowmax": 0.17999999999999999,
             "CanBDlowmin": 0.029999999999999999,
             "CBDcan": 0.111,
+            "CBD_cbh": 0.089999999999999997,  # stratum centred on 2.5 m
+            "CBD_cbh2": 0.12,  # 6.5 m
+            "CBD_cbhlow": 0.089999999999999997,  # 2.5 m
         },
     )
     # Step 4: shrub FMA up to CBH2 = 6 m (centres 0.5 to 5.5), canopy FMA above
@@ -385,7 +417,7 @@ def test_canopy_metrics_parity_with_r():
         np.testing.assert_allclose(result[name], ref[name], rtol=1e-5, atol=1e-6, equal_nan=True, err_msg=name)
 
 
-@pytest.mark.parametrize("name", ["CBH", "CBHlow", "CanBDmin", "CanBDlowmin"])
+@pytest.mark.parametrize("name", ["CBH", "CBHlow", "CanBDmin", "CanBDlowmin", "CBD_cbh", "CBD_cbh2", "CBD_cbhlow"])
 def test_reference_tile_exercises_the_band(name):
     # Guard on the parity test: the reference tile has both valid and NaN values for the
     # optional canopy metrics, so the parity test covers the branches that set them.

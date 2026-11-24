@@ -21,19 +21,19 @@ Ajouter à lidar-for-fuel la 3ᵉ et dernière étape de la chaîne LidarForFuel
 ## Requirements & Constraints
 
 - **Parité stricte avec R d'abord, corrections ensuite.** Le Python reproduit R à l'arrondi float32 près. Les tests de parité utilisent `rtol=1e-5, atol=1e-6`, avec égalité des NaN. Les corrections assumées viennent dans une story séparée, et chaque divergence est listée dans la docstring et dans le `CHANGELOG.md`.
-- **Écart nul attendu par l'INRAE** à entrées et paramètres identiques. Il n'y a pas de tolérance en pourcentage.
-- **Pixels sans donnée** (PAD entièrement NaN) : NaN sur toutes les bandes. Cette décision est acceptée par l'INRAE, et la correction est appliquée après la parité.
+- **Écart nul attendu par l'INRAE** à entrées et paramètres identiques, à 10⁻⁴ près (Q6 bis, 23/11/2026), y compris sur la chaîne complète. Il n'y a pas de tolérance en pourcentage.
+- **Pixels sans donnée** (PAD entièrement NaN, ou sans FMA : `fma_can` ou `fma_shrub` NaN) : NaN sur toutes les bandes (D2, étendue le 23/11/2026). L'INRAE l'appliquera aussi dans R ; d'ici là, c'est une divergence exclue du test de parité par un masque.
 - **Le seuil `h > 1` codé en dur** dans la recherche du combustible en échelle est voulu par l'INRAE. Il devient une constante nommée, indépendante de `canopy_height_threshold`.
-- **`cbh_threshold_ratio`** : la décision est encore ouverte. En attendant, on utilise 1/3 exact (`0.3333333333333333`), la valeur que R calcule réellement en mode raster, et on n'utilise **pas** 0.333.
+- **`cbh_threshold_ratio`** = **0.333** (D4 fermée le 23/11/2026) : R `ffuelmetrics2Rast` transmet maintenant ce paramètre et `smooth_pad`.
 - **Robustesse nationale.** Le traitement ne s'interrompt jamais sur une dalle atypique (eau, bord de chantier, dalle vide). Ce qui est corrigé est signalé dans les logs, pas masqué.
 - **Performance.** Environ 3 s par dalle en boucle Python pixel par pixel. Aucune vectorisation ni parallélisation n'est requise.
-- **Bandes `CBD_cbh`, `CBD_cbh2`, `CBD_cbhlow`** : gardées à NaN, comme R (D3, 20/11/2026). On ne les corrige pas ; on les retirera si l'INRAE les supprime dans R.
+- **Bandes `CBD_cbh`, `CBD_cbh2`, `CBD_cbhlow`** : calculées comme R `00c654c` (D3, 23/11/2026) : CBD de l'étape 1 (FMA coupée à CHT) de la strate dont le bas vaut CBH, CBH2 ou CBHlow ; `CBD_cbh2` seulement pour un CBH2 trouvé en 3A.
 - **Nombre de bandes piloté par la config** : 19 + 8·n_seuils_échelle + n_seuils_CTH. Ne jamais coder 45 en dur.
 
 ## Technical Decisions
 
-- **Version R de référence** : branche Dev `8fcccd2` (lidarforfuel 1.0.0.9013, qui inclut la PR #48). Elle sera rebasée si l'INRAE supprime ou modifie les bandes `CBD_cbh*`.
-- **Entrée** : `{stem}_pad_profile_1m.tif`, bandes nommées `PAD_{dz}_{h_bas}` (ex. `PAD_1_10`, `PAD_0.5_1.5`), mêlées à d'autres bandes. Valeurs en float32, nodata NaN, PAD plafonné à [0, 5]. Les bandes PAD se trouvent **par leur nom**, jamais par leur position. Le raster R a 186 bandes, le raster Python 60.
+- **Version R de référence** : branche Dev `00c654c` (lidarforfuel 1.0.0.9014, 23/11/2026). Référence de test : `data/ref_inrae/fuel_metrics/512500_6854997_fuel_metrics_00c654c.tif`, produite par `make_fuel_metrics_00c654c.R` (l'ancienne, R `8fcccd2`, est gardée pour l'historique).
+- **Entrée** : `{stem}_pad_profile_1m.tif`, bandes nommées `PAD_{dz}_{h_bas}` (ex. `PAD_1_10`, `PAD_0.5_1.5`), mêlées à d'autres bandes. Valeurs en float32, nodata NaN, PAD plafonné à [0, 5] (plafond à retirer, Q10 : branche séparée, étape 2). Les bandes PAD se trouvent **par leur nom**, jamais par leur position. Le raster R a 186 bandes, le raster Python 60.
 - **Hauteurs** : `h_bottom` est le bas de strate, lu dans le nom de bande, et `h = h_bottom + dz/2` est le centre de strate (le `zval` de R). En Python, les hauteurs au‑dessus du sol se nomment `h_*`, jamais `z*` (`z` désigne l'altitude brute).
 - **Préparation du profil** :
   - les valeurs non finies ou négatives passent à 0 ;
@@ -52,11 +52,11 @@ Ajouter à lidar-for-fuel la 3ᵉ et dernière étape de la chaîne LidarForFuel
   - un module par responsabilité, des arguments explicites, des docstrings Google ;
   - adapter les fonctions existantes plutôt que d'en créer des parallèles (réutiliser `_write_geotiff` et `_format_num` de `pad_profile/export_raster.py`) ;
   - point d'entrée Hydra comme `main_pad_profile.py`.
-- **Condition d'équivalence avec R** : `5 × min(fma_can, fma_shrub) ≥ bd_max` et `smooth_pad = False`. Le point d'entrée émet un avertissement si elle n'est pas remplie.
+- **Condition d'équivalence avec R** : `5 × min(fma_can, fma_shrub) ≥ bd_max` et `smooth_pad = False`, tant que le PAD est plafonné à 5. Le point d'entrée émet un avertissement si elle n'est pas remplie ; condition et avertissement disparaissent avec le retrait du plafond (Q10).
 
 ## Cross-Story Dependencies
 
-- La 3.1 fournit les données de référence R : `data/ref_inrae/` contient le PAD R, `fuel_metrics.tif` à 45 bandes et la config INRAE, tous issus de la même dalle de 500 m. Les rasters à 10 m ont un débord normal d'une colonne et d'une ligne. Ces données servent au TDD de toutes les stories suivantes.
+- La 3.1 fournit les données de référence R : `data/ref_inrae/` contient le PAD R, `fuel_metrics.tif` à 45 bandes (R `8fcccd2`, plus utilisé par les tests), `fuel_metrics_00c654c.tif` (45 bandes, R `00c654c`, ajouté le 23/11/2026, référence des tests) et la config INRAE, tous issus de la même dalle de 500 m. Les rasters à 10 m ont un débord normal d'une colonne et d'une ligne. Ces données servent au TDD de toutes les stories suivantes.
 - 3.2 → 3.3 → 3.4 forment le calcul 1‑D par profil.
 - La 3.5 suit la 3.4. La 3.6 suit la 3.4 ; elle a besoin de la 3.5 pour le NaN des pixels vides.
 - La 3.7 suit la 3.6. La passe 2 de la 3.8 suit la 3.7 ; sa passe 1 est indépendante.
