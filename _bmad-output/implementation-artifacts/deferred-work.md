@@ -81,3 +81,11 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-3-6-raster-export.md`
   summary: Story 3.7 — valider la FMA donnée par valeur (`fma_can`, `fma_shrub` de la config) : finie et dans [0,05 ; 0,5] kg/m², comme la carte FMA.
   evidence: Revue du 25/11/2026 (Edge Case Hunter). `read_fma` ne contrôle pas une valeur (« no check here ») : une FMA négative ou nulle donnerait des CBD et des charges fausses, écrites sans erreur. C'est pré-existant ; la valeur vient de la config, lue en 3.7.
+
+## Deferred from: code review of spec-3-6-raster-export (2026-11-25)
+
+- `pad_max` n'est jamais passé avec une valeur autre que 5 dans les tests d'export : un oubli de transmission (`export_fuel_metrics` → `compute_fuel_metrics_raster` → `cap_pad`) resterait invisible. Story 3.7 : ajouter le test (ex. `pad_max=2.0` par `export_fuel_metrics`, comptes et valeurs plafonnées) quand `pad_max` entre dans la config.
+- `read_fma` : une carte FMA contenant ±inf passe le contrôle de plage, qui ne porte que sur les valeurs finies (`values[np.isfinite(values)]`, `prepare_cbd_profile.py:197`). La FMA infinie donne des CBD et des charges fausses, sans log. C'est pré-existant (story 3.2) : à traiter en 3.7 avec la validation des FMA (contrôler `~np.isnan` plutôt que `np.isfinite`).
+- FMA donnée par valeur inf, nulle ou négative, acceptée sans erreur : c'est pré-existant et déjà reporté (entrée « FMA > 0 et finies … (story 3.7) » en tête de fichier).
+- Le bilan de fin de dalle et l'avertissement « no pixel with data » de `compute_fuel_metrics_raster` ne nomment pas la dalle. Story 3.7 : le point d'entrée journalise la dalle avant le calcul, comme `main_pad_profile` (« Export 8 rasters for tile : %s »).
+- `epic-3-context.md` (Technical Decisions › Entrée) décrit des bandes PAD « mêlées à d'autres bandes », alors que le `pad_profile_1m` Python ne contient que des `PAD_*` et que l'AC-3.6.9 rejette toute autre bande. C'est un fichier de contexte agent : à corriger à la main ou à régénérer.
