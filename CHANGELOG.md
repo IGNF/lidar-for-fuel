@@ -11,6 +11,7 @@
     - Add function "fuel metrics core": fuel loads (CLFL, FL_k1, FL_k2), default ladder metrics (LFL, CFL, FSG, ProfType) and all metrics with the R band names and order (reference: R lidarforfuel Dev 00c654c)
     - Canopy metrics: CBD_cbh, CBD_cbh2 and CBD_cbhlow are the CBD at the CBH, CBH2 and CBHlow strata, as R Dev 00c654c (no longer NaN)
     - Fuel metrics core: a pixel with no data (PAD all NaN, or no FMA) gets NaN on all metrics, instead of the zero loads and ProfType 1 of R (assumed divergence D2, see docs/epic-3-fuel-metrics.md)
+    - Add function "export fuel metrics": reads a pad_profile_1m raster and the FMA (value or map), caps the PAD on read, computes the fuel metrics pixel by pixel and writes {stem}_fuel_metrics.tif on the same grid (one float32 band per metric); logs per tile the no-data pixels, the partly NaN profiles set to 0 and the PAD values capped (above 5, +inf, negative)
 - Config: align the "fuel_metrics" section with the code parameter names
 - Config: "cbh_threshold_ratio" set to 0.333, the INRAE value, now passed on by R (D4)
 - Add the R reference fuel metrics computed with R lidarforfuel Dev 00c654c and its script

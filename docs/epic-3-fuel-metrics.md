@@ -708,12 +708,15 @@ Normal.
 - **AC-3.6.6** — **Étant donné** un raster de 100 × 100 pixels sur un poste de développement, **quand** on lance le calcul, **alors** il prend moins de 10 s. C'est une indication, pas un test bloquant en CI.
 - **AC-3.6.7** — **Étant donné** une dalle atypique, **quand** on lance le calcul, **alors** il passe **sans exception** (critère de succès 4 du brief) :
   - une dalle dont **tous** les pixels sont NaN (eau, bord de chantier) produit un raster de la même grille, entièrement NaN sur toutes les bandes, avec un `logger.warning` ;
-  - une dalle sans aucune strate au‑dessus de `canopy_height_threshold` (sol nu) donne des métriques finies, sans division par zéro ni `RuntimeWarning` numpy non maîtrisé.
+  - une dalle sans aucune strate au‑dessus de `canopy_height_threshold` (sol nu) passe sans exception ni `RuntimeWarning` numpy. ~~Elle donne des métriques finies.~~ **Reformulé le 24/11/2026 (on suit R)** : les charges (`CLFL`, `FL_k1`, `FL_k2`), les métriques d'échelle (`LadderBot_*` à `FSG_*`, `LFL`, `CFL`, `FSG`) et `ProfType` sont finies ; les métriques de houppier (`CBH`, `CBHlow`, `CanBD*`, `CBD_cbh*`, et pour un profil nul `CTH_*`, `CDH`, `CBDcan`) restent NaN, comme dans R. Ce n'est pas une nouvelle divergence.
 
   Les deux cas sont testés sur de petits rasters synthétiques.
 - **AC-3.6.8** — **Étant donné** une dalle traitée, **quand** le calcul se termine, **alors** un `logger.info` donne, pour que ce qui a été corrigé soit **signalé et non masqué** :
   - le nombre de pixels entièrement NaN, et celui des pixels sans FMA, mis à NaN en sortie (D2) ;
-  - le nombre de valeurs de PAD ramenées dans [0, 5] à la lecture (`cap_pad`, AC-3.2.8) : les inf et les valeurs négatives y sont corrigés avant la préparation du profil ;
+  - le nombre de valeurs de PAD ramenées dans [0, 5] à la lecture (`cap_pad`, AC-3.2.8) ; les inf et les valeurs négatives y sont corrigés avant la préparation du profil. On compte à part :
+    - les valeurs finies > 5 ;
+    - les +inf (anomalie A6 : CBD min(5 × FMA, `bd_max`) au lieu de 0 dans R) ;
+    - les valeurs négatives, −inf compris (24/11/2026, report de la revue de `cap_pad`) ;
   - le nombre de profils partiellement NaN corrigés à 0 (A6, AC‑3.2.3) ;
   - le nombre de pixels traités.
 - **AC-3.6.9** — **Étant donné** un raster d'entrée dont les bandes ne sont pas toutes des bandes `PAD_*` (ou qui n'en a aucune), **quand** on lance le calcul, **alors** une `ValueError` explicite donne le nom du fichier. Ce n'est pas une dalle atypique mais une erreur d'entrée : on ne produit pas de sortie vide en silence.

@@ -11,6 +11,7 @@ import numpy as np
 import pandas as pd
 import rasterio
 from affine import Affine
+from rasterio.crs import CRS
 
 from lidar_for_fuel.pad_profile.calculate_pad_profile import _format_num
 
@@ -95,7 +96,7 @@ def _band_array(values: pd.Series, origin_pixel: tuple, nb_pixels: int, clip: tu
     return array
 
 
-def _write_geotiff(path: Path, bands: dict[str, np.ndarray], transform: Affine, srid: str) -> None:
+def _write_geotiff(path: Path, bands: dict[str, np.ndarray], transform: Affine, srid: str | CRS) -> None:
     """Write one multi-band GeoTIFF.
 
     Args:
@@ -103,7 +104,8 @@ def _write_geotiff(path: Path, bands: dict[str, np.ndarray], transform: Affine, 
         bands (dict[str, np.ndarray]): Band name -> (height, width) float32 array,
             written in dict order (band 1 first).
         transform (Affine): Georeferencing transform (see `_raster_transform`).
-        srid (str): Spatial reference of the output raster (e.g. "EPSG:2154").
+        srid (str | CRS): Spatial reference of the output raster (e.g. "EPSG:2154"), or the
+            CRS of an input raster.
 
     Returns:
         None

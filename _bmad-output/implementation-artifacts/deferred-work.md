@@ -76,4 +76,8 @@
 
 ## Deferred from: code review of spec-3-2-pad-cap-on-read (2026-11-24)
 
-- Story 3.6 — `cap_pad` donne un seul compte pour les valeurs > 5, les +inf (anomalie A6 : CBD min(5 × FMA, `bd_max`) au lieu de 0) et les négatifs ; l'AC-3.6.8 réécrite ne compte plus à part les inf et les négatifs. Raison du report : le log par dalle naît en 3.6 : l'appelant comptera les +inf avant `cap_pad`, sans changer sa signature d'ici là.
+- **Traité le 24/11/2026 (spec-3-6-raster-export) : `compute_fuel_metrics_raster` compte à part, avant `cap_pad`, les valeurs finies > 5, les +inf et les négatifs dans le log de fin de dalle (AC-3.6.8).** ~~Story 3.6~~ — `cap_pad` donne un seul compte pour les valeurs > 5, les +inf (anomalie A6 : CBD min(5 × FMA, `bd_max`) au lieu de 0) et les négatifs ; l'AC-3.6.8 réécrite ne compte plus à part les inf et les négatifs. Raison du report : le log par dalle naît en 3.6 : l'appelant comptera les +inf avant `cap_pad`, sans changer sa signature d'ici là.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-3-6-raster-export.md`
+  summary: Story 3.7 — valider la FMA donnée par valeur (`fma_can`, `fma_shrub` de la config) : finie et dans [0,05 ; 0,5] kg/m², comme la carte FMA.
+  evidence: Revue du 25/11/2026 (Edge Case Hunter). `read_fma` ne contrôle pas une valeur (« no check here ») : une FMA négative ou nulle donnerait des CBD et des charges fausses, écrites sans erreur. C'est pré-existant ; la valeur vient de la config, lue en 3.7.
