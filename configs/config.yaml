@@ -80,6 +80,8 @@ fuel_metrics:
   cbh_threshold_ratio: 0.333
   bd_max: 1
   m_perrakis: 2.5
+  # PAD cap (m²/m³) applied when step 3 reads the PAD raster; R does not cap (AC-3.2.8). Finite > 0
+  pad_max: 5
 
 dtm:
   download:

@@ -747,7 +747,7 @@ Facile.
 - **AC-3.7.4** — **Étant donné** la story livrée, **quand** on consulte le dépôt, **alors** on y trouve :
   - `scripts/example_launch_fuel_metrics.sh` ;
   - le README mis à jour (étape 3, contenu de la sortie, tableau des 45 bandes ou lien vers ce tableau) ;
-  - `CHANGELOG.md` et `_version.py` mis à jour.
+  - `CHANGELOG.md` ~~et `_version.py`~~ mis à jour. *(Amendé le 25/11/2026 : `_version.py` ne change pas dans la story 3.7 ; la version est montée dans un commit séparé à la fin de l'épique, après la 3.8.)*
 - **AC-3.7.5** — **Étant donné** la fenêtre de référence, **quand** le test d'intégration lance `main` (via `hydra.compose` ou un appel direct, comme `test_main_pad_profile.py`), **alors** le fichier est produit avec 45 bandes (config par défaut).
 
 #### Informations complémentaires

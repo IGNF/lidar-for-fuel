@@ -2,7 +2,7 @@
 title: 'Story 3.6 — Application au raster PAD et export GeoTIFF'
 type: 'feature'
 created: '2026-11-24'
-status: 'done'
+status: 'in-progress'
 route: 'dispatch'
 review_loop_iteration: 0
 baseline_commit: '6eb5c094f03a8a0462e885bfa0f7cd07bb4b4c1a'
@@ -83,6 +83,34 @@ Critères de l'épique : AC-3.6.1 à AC-3.6.9 (`docs/epic-3-fuel-metrics.md`, st
 **Acceptance Criteria :**
 - Étant donné un raster PAD de 100 × 100 pixels, quand on lance le calcul, alors il prend moins de 10 s (mesure indicative, sans test bloquant).
 - Étant donné la suite complète, quand on la lance, alors elle est verte, et black, isort (`--profile black`) et flake8 ne signalent rien sur les fichiers touchés.
+
+### Review Findings
+
+Revue du 25/11/2026 (2ᵉ passage, PR #62 : `6eb5c09..0a9d881`) : Blind Hunter (BH), Edge Case Hunter (ECH), Verification Gap (VG), Acceptance Auditor (AA).
+
+- [ ] [Review][Patch] (medium, VG) Aucun test ne détecte une inversion de `fma_can` et `fma_shrub` dans le chemin raster ou fichier : tous les tests d'export passent la même FMA aux deux. Ajouter un test avec `fma_can ≠ fma_shrub` (ex. 0,3 / 0,1), comparé à `fuel_metrics_core` [lidar_for_fuel/fuel_metrics/export_fuel_metrics.py:116]
+- [ ] [Review][Patch] (low, AA+BH) Test sol nu, cas « surface fuel only » : l'ensemble exact des bandes NaN n'est pas vérifié (seulement `⊆ _CROWN`). Il doit valoir CBH, CBHlow, CanBD*, CBD_cbh*. La boucle `for name in ["CLFL", …]` est redondante avec la ligne précédente [test/fuel_metrics/test_export_fuel_metrics.py:257]
+- [ ] [Review][Patch] (low, BH) Une erreur de `read_fma` (carte non alignée, valeurs hors [0,05 ; 0,5] sur la fenêtre de la dalle, CRS) nomme la carte FMA nationale mais pas la dalle PAD. La préfixer par `PAD raster {path}:` comme pour les bandes, et compléter `Raises:` (valeurs hors plage) [lidar_for_fuel/fuel_metrics/export_fuel_metrics.py:221]
+- [ ] [Review][Patch] (low, BH) L'id de test « no PAD band » est trompeur : `[""]` passe par la branche « Band '' is not a PAD band », pas par « no band » (inatteignable par un GeoTIFF). Renommer l'id (ex. « unnamed band ») [test/fuel_metrics/test_export_fuel_metrics.py:331]
+- [ ] [Review][Patch] (low, BH) `deferred-work.md` : l'entrée « valider la FMA donnée par valeur » est rangée sous le titre de la revue de spec-3-2-pad-cap-on-read et double l'entrée existante « FMA > 0 et finies (story 3.7) ». La fusionner avec cette dernière [_bmad-output/implementation-artifacts/deferred-work.md:81]
+- [ ] [Review][Patch] (low, BH) Annotation `band_names: Sequence[str]`, alors que `export_fuel_metrics` passe `src.descriptions`, qui peut contenir `None`. Aligner sur `read_pad_heights` (`Sequence[str | None]`) [lidar_for_fuel/fuel_metrics/export_fuel_metrics.py:36]
+- [x] [Review][Defer] (low, VG) `pad_max` n'est jamais passé avec une valeur autre que 5 : un oubli de transmission resterait invisible [lidar_for_fuel/fuel_metrics/export_fuel_metrics.py:231] — deferred: `pad_max` n'est pas encore exposé dans la config ; le test vient avec la story 3.7
+- [x] [Review][Defer] (low, ECH) Une carte FMA contenant ±inf passe le contrôle de plage de `read_fma` (filtré par `isfinite`) et donne des CBD fausses, sans log [lidar_for_fuel/fuel_metrics/prepare_cbd_profile.py:197] — deferred: pré-existant (`read_fma`, story 3.2) ; à traiter avec la validation des FMA en 3.7
+- [x] [Review][Defer] (low, ECH) FMA donnée par valeur inf, nulle ou négative, acceptée sans erreur [lidar_for_fuel/fuel_metrics/export_fuel_metrics.py:221] — deferred: pré-existant et déjà reporté (« FMA > 0 et finies », story 3.7)
+- [x] [Review][Defer] (low, AA+BH) Le bilan de fin de dalle et l'avertissement « no pixel with data » ne nomment pas la dalle [lidar_for_fuel/fuel_metrics/export_fuel_metrics.py:137] — deferred: le point d'entrée 3.7 journalise la dalle avant le calcul, comme `main_pad_profile` (« Export 8 rasters for tile : %s »)
+- [x] [Review][Defer] (low, AA) `epic-3-context.md` décrit des bandes PAD « mêlées à d'autres bandes », alors que le raster Python ne contient que des `PAD_*` et que l'AC-3.6.9 rejette toute autre bande [_bmad-output/implementation-artifacts/epic-3-context.md:36] — deferred: fichier de contexte agent, à corriger à la main ou à régénérer
+
+**Rejected :**
+- (ECH) `compute_fuel_metrics_raster` appelé avec un tableau masqué perd le masque : low, seul `export_fuel_metrics` l'appelle et il remplit le masque par NaN ; ce serait un garde pour un état non démontré.
+- (ECH) Le test de parité ne pourrait pas détecter un plafonnement (et le n° 12 du triage précédent se réfute à tort) : low. Avec 5 × 0,254 ≥ `bd_max`, le plafond ne change pas les métriques, et le PAD de la dalle reste ≤ 2,04 ; la correction modifierait la spec.
+- (AA) Le log ne donne pas le total des valeurs plafonnées : false. L'AC-3.6.8 réécrite demande les trois comptes distincts, dont le total est la somme ; `cap_pad` journalise déjà le total.
+- (AA) Dalle vide et sol nu testés seulement sur tableaux : low. Le chemin fichier n'a aucune branche propre à ces cas et il est couvert par le test de la dalle de référence.
+- (AA) Pixel hors de la carte FMA non testé par le chemin fichier : false. C'est une transmission à `read_fma`, déjà testée (`test_read_fma_map_nodata_and_outside_the_map_are_nan`).
+- (AA) Performance mesurée sur la fonction tableaux seulement : low. L'AC-3.6.6 est indicative, et la lecture de 60 bandes de 50 × 50 pixels est négligeable.
+- (BH) Dalle à une seule strate → `FL_k2` NaN : low, inatteignable en production (`nlayers: 60` dans `configs/config.yaml`), et documenté dans `fuel_metrics_core`.
+- (BH) « A6 » désigne deux choses, et la divergence +inf manque dans le CHANGELOG : false. Le CHANGELOG (« cap PAD ») la documente déjà comme divergence assumée ; la renommer modifierait l'épique.
+- (BH) « processed » compte tous les pixels : false. C'est la définition de la spec (Implementation Notes).
+- (BH) `review_loop_iteration` et le Spec Change Log ne reflètent pas la revue précédente : la correction modifierait la spec sous revue.
 
 ## Implementation Notes
 
