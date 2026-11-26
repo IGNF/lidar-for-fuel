@@ -144,32 +144,20 @@ def test_main_fuel_metrics_output_dir_null_raises(tmp_path):
         main(_config(f"io.input_dir={tmp_path}"))
 
 
-# --- Parameters checked at start, before any tile ---------------------------------------------
-
-
-@pytest.mark.parametrize(
-    "override, key",
-    [
-        ("fuel_metrics.bd_max=0", "bd_max"),
-        ("fuel_metrics.pad_max=null", "pad_max"),
-        ("fuel_metrics.canopy_top_bd_thresholds=[0.01,0.01004]", "canopy_top_bd_thresholds"),
-        ("fuel_metrics.ladder_fuel_bd_thresholds=[]", "ladder_fuel_bd_thresholds"),
-        ("fuel_metrics.fma_can=0.6", "fma_can"),
-        ("fuel_metrics.fma_shrub=nan", "fma_shrub"),
-        ("fuel_metrics.fma_can=null", "fma_can"),
-        ("fuel_metrics.fma_shrub=missing.tif", "fma_shrub"),
-    ],
-)
-def test_main_fuel_metrics_invalid_parameter_raises_before_any_tile(tmp_path, caplog, override, key):
+@pytest.mark.parametrize("key", ["fma_can", "fma_shrub"])
+def test_main_fuel_metrics_fma_map_missing_raises_before_any_tile(tmp_path, caplog, key):
     input_dir, output_dir = tmp_path / "in", tmp_path / "out"
     input_dir.mkdir()
     _write_small_pad(input_dir / "a_pad_profile_1m.tif")
+    missing = tmp_path / "missing_fma.tif"
 
-    with caplog.at_level(logging.INFO), pytest.raises(ValueError, match=key):
-        main(_config(f"io.input_dir={input_dir}", f"io.output_dir={output_dir}", override))
+    with caplog.at_level(logging.INFO), pytest.raises(
+        FileNotFoundError, match=rf"^The FMA map of config.fuel_metrics.{key} \({missing}\) doesn't exist.$"
+    ):
+        main(_config(f"io.input_dir={input_dir}", f"io.output_dir={output_dir}", f"fuel_metrics.{key}={missing}"))
 
     assert not any(r.getMessage().startswith("Processing tile") for r in caplog.records)
-    assert not output_dir.exists() or not any(output_dir.iterdir())
+    assert not output_dir.exists()
 
 
 # --- Config contract (review of story 3.4) ----------------------------------------------------

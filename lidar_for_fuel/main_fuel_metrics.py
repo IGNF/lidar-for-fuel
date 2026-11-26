@@ -8,14 +8,9 @@ import logging
 import os
 
 import hydra
-from affine import Affine
-from omegaconf import DictConfig, OmegaConf
+from omegaconf import DictConfig
 
 from lidar_for_fuel.fuel_metrics.export_fuel_metrics import export_fuel_metrics
-from lidar_for_fuel.fuel_metrics.prepare_cbd_profile import read_fma
-from lidar_for_fuel.fuel_metrics.validate_fuel_metrics_params import (
-    validate_fuel_metrics_params,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -28,15 +23,15 @@ def main(config: DictConfig):
     """Compute the fuel metrics of PAD rasters and save each as a `{stem}_fuel_metrics.tif` GeoTIFF.
 
     It can run either on a single file (`io.input_filename`), or on each `*_pad_profile_1m.tif`
-    file of a folder. The `fuel_metrics` parameters are checked once, before the first tile.
+    file of a folder.
 
     Args:
         config (DictConfig): hydra configuration (configs/config.yaml by default).
 
     Raises:
-        ValueError: If `io.input_dir` or `io.output_dir` is empty, or if a `fuel_metrics`
-            parameter is invalid (the message names its key).
-        FileNotFoundError: If `io.input_dir` does not exist.
+        ValueError: If `io.input_dir` or `io.output_dir` is empty.
+        FileNotFoundError: If `io.input_dir` or a FMA map (`fuel_metrics.fma_can` or
+            `fuel_metrics.fma_shrub` given as a path) does not exist.
     """
     logging.basicConfig(level=logging.INFO)
 
@@ -45,29 +40,35 @@ def main(config: DictConfig):
         raise ValueError("config.io.input_dir is empty, please provide an input directory in the configuration")
     if not os.path.isdir(input_dir):
         raise FileNotFoundError(f"The input directory ({input_dir}) doesn't exist.")
+    for key in ("fma_can", "fma_shrub"):
+        # A FMA given as a path is the FMA map, read tile by tile: check it exists before the first tile
+        fma = config.fuel_metrics[key]
+        if isinstance(fma, str) and not os.path.isfile(fma):
+            raise FileNotFoundError(f"The FMA map of config.fuel_metrics.{key} ({fma}) doesn't exist.")
 
     output_dir = config.io.output_dir
     if output_dir is None:
         raise ValueError("config.io.output_dir is empty, please provide an output directory in the configuration")
 
-    params = OmegaConf.to_container(config.fuel_metrics, resolve=True)
-    validate_fuel_metrics_params(**params)
-    for key in ("fma_can", "fma_shrub"):
-        # A value and a map path are checked here, before the first tile; the map values tile by tile
-        if isinstance(params[key], str):
-            if not os.path.isfile(params[key]):
-                raise ValueError(f"{key}: the FMA map {params[key]} is not an existing file.")
-        else:
-            try:
-                read_fma(params[key], Affine.identity(), (1, 1))
-            except (TypeError, ValueError) as error:
-                raise ValueError(f"{key}: {error}") from error
-
     os.makedirs(output_dir, exist_ok=True)
 
     def main_on_one_tile(filename):
         logger.info("Processing tile : %s", os.path.splitext(filename)[0])
-        export_fuel_metrics(os.path.join(input_dir, filename), output_dir, **params)
+        export_fuel_metrics(
+            pad_path=os.path.join(input_dir, filename),
+            output_dir=output_dir,
+            fma_can=config.fuel_metrics.fma_can,
+            fma_shrub=config.fuel_metrics.fma_shrub,
+            smooth_pad=config.fuel_metrics.smooth_pad,
+            ladder_fuel_bd_thresholds=config.fuel_metrics.ladder_fuel_bd_thresholds,
+            canopy_height_threshold=config.fuel_metrics.canopy_height_threshold,
+            canopy_bd_thresh_frac=config.fuel_metrics.canopy_bd_thresh_frac,
+            canopy_top_bd_thresholds=config.fuel_metrics.canopy_top_bd_thresholds,
+            cbh_threshold_ratio=config.fuel_metrics.cbh_threshold_ratio,
+            bd_max=config.fuel_metrics.bd_max,
+            m_perrakis=config.fuel_metrics.m_perrakis,
+            pad_max=config.fuel_metrics.pad_max,
+        )
 
     if config.io.input_filename:
         main_on_one_tile(config.io.input_filename)
