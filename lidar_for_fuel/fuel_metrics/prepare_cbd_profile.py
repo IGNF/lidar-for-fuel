@@ -144,11 +144,13 @@ def read_fma(
     (single-band raster, 10 m, values in [0.05, 0.5] kg/m²). As in R `ffuelmetrics2`,
     `fma_can` and `fma_shrub` each accept one or the other; the same map can be given to both.
 
-    - **Value**: the grid is filled with it (current behaviour, no check here).
+    - **Value**: the grid is filled with it. It must be in [0.05, 0.5], as the map values
+      (a NaN or inf value is refused).
     - **Map path**: the window of the map covering the PAD grid is read, each PAD pixel
       taking the FMA pixel whose centre is the nearest. The two grids must have the same
       resolution and be aligned within `_FMA_GRID_TOLERANCE` of a pixel (the 6 cm offset of
-      the CosiaFrance origin is tolerated). NoData pixels and pixels outside the map are NaN.
+      the CosiaFrance origin is tolerated). NoData pixels and pixels outside the map are NaN;
+      every other value (±inf included) must be in [0.05, 0.5].
 
     Args:
         fma (float | str | os.PathLike): FMA value (kg/m²) or path to the FMA map.
@@ -160,11 +162,15 @@ def read_fma(
         np.ndarray: FMA (kg/m²) of every PAD pixel, float64, of shape `shape`.
 
     Raises:
-        ValueError: If the map has another CRS or resolution than the PAD grid, if it is not
-            aligned on it, or if one of its values in the window is outside [0.05, 0.5].
+        ValueError: If the value is outside [0.05, 0.5] (NaN and inf included), if the map has
+            another CRS or resolution than the PAD grid, if it is not aligned on it, or if one
+            of its values in the window is outside [0.05, 0.5].
     """
     if not isinstance(fma, (str, os.PathLike)):
-        return np.full(shape, float(fma))
+        value = float(fma)
+        if not FMA_MAP_MIN <= value <= FMA_MAP_MAX:  # also false for NaN
+            raise ValueError(f"FMA value {value} outside [{FMA_MAP_MIN}, {FMA_MAP_MAX}] kg/m².")
+        return np.full(shape, value)
 
     height, width = shape
     with rasterio.open(fma) as src:
@@ -194,7 +200,8 @@ def read_fma(
             data = src.read(1, window=window, masked=True).astype(float).filled(np.nan)
             values[top - row0 : bottom - row0, left - col0 : right - col0] = data
 
-    valid = values[np.isfinite(values)]
+    # NaN is no FMA; ±inf is a value, outside the range
+    valid = values[~np.isnan(values)]
     out_of_range = (valid < FMA_MAP_MIN) | (valid > FMA_MAP_MAX)
     if out_of_range.any():
         raise ValueError(

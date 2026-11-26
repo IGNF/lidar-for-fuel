@@ -262,6 +262,18 @@ def test_read_fma_scalar_fills_the_pad_grid():
     np.testing.assert_array_equal(fma, np.full((2, 3), 0.2543576))
 
 
+@pytest.mark.parametrize("value", [0.05, 0.5])
+def test_read_fma_scalar_on_the_bounds_is_accepted(value):
+    np.testing.assert_array_equal(read_fma(value, _PAD_TRANSFORM, (1, 2)), [[value, value]])
+
+
+@pytest.mark.parametrize("bad_value", [np.nan, np.inf, -np.inf, 0.0, -0.1, 0.04, 0.6])
+def test_read_fma_scalar_not_finite_or_out_of_range_raises(bad_value):
+    # Same range as the FMA map: a NaN value would set the whole tile to NaN without a message
+    with pytest.raises(ValueError, match=r"FMA value .* outside \[0.05, 0.5\]"):
+        read_fma(bad_value, _PAD_TRANSFORM, (2, 3))
+
+
 def test_read_fma_map_on_the_pad_grid(tmp_path):
     values = [[0.1, 0.2, 0.3], [0.4, 0.5, 0.05]]
     path = _write_fma_map(tmp_path / "fma.tif", values, _PAD_TRANSFORM)
@@ -293,7 +305,7 @@ def test_read_fma_map_nodata_and_outside_the_map_are_nan(tmp_path):
     np.testing.assert_array_equal(fma, [[np.float32(0.2), np.nan], [np.nan, np.nan]])
 
 
-@pytest.mark.parametrize("bad_value", [0.04, 0.6])
+@pytest.mark.parametrize("bad_value", [0.04, 0.6, np.inf, -np.inf], ids=["0.04", "0.6", "+inf", "-inf"])
 def test_read_fma_map_value_out_of_range_raises(tmp_path, bad_value):
     path = _write_fma_map(tmp_path / "fma.tif", [[0.2, bad_value]], _PAD_TRANSFORM)
 

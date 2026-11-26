@@ -298,6 +298,39 @@ def test_compute_fuel_metrics_raster_caps_the_pad_and_counts_each_kind(caplog):
     ]
 
 
+def test_export_fuel_metrics_passes_pad_max_on_to_the_cap(tmp_path, caplog):
+    # pad_max given to export_fuel_metrics reaches cap_pad (review of story 3.6)
+    pad = _tile()
+    pad[6, 0, 0] = 3.0  # above 2
+    pad[6, 0, 1] = 7.0  # above 2 and 5
+    pad[6, 0, 2] = np.inf
+    pad[6, 1, 0] = 1.5  # below 2: unchanged
+    pad_path = _write_pad(tmp_path / "tile_pad_profile_1m.tif", pad)
+
+    with caplog.at_level(logging.INFO, logger=_LOGGER):
+        out = export_fuel_metrics(pad_path, tmp_path / "out", _FMA, _FMA, **_PARAMS, pad_max=2.0)
+
+    with rasterio.open(out) as dst:
+        clfl = dst.read(list(dst.descriptions).index("CLFL") + 1)
+    capped = _PROFILE.astype(np.float32)
+    capped[6] = 2.0
+    for col in range(3):
+        assert clfl[0, col] == np.float32(_core(capped)["CLFL"])
+    # the cap at 2 is visible: 2 × FMA < bd_max, so a PAD of 3 gives another load
+    uncapped = _PROFILE.astype(np.float32)
+    uncapped[6] = 3.0
+    assert clfl[0, 0] != np.float32(_core(uncapped)["CLFL"])
+    unchanged = _PROFILE.astype(np.float32)
+    unchanged[6] = 1.5
+    assert clfl[1, 0] == np.float32(_core(unchanged)["CLFL"])
+    assert _summary(caplog)[0] == (
+        logging.INFO,
+        "Fuel metrics: 6 pixel(s) processed; set to NaN on all bands (D2): 0 with an all-NaN PAD, "
+        "0 without FMA; 0 partly NaN PAD profile(s) set to 0 (A6); PAD values brought back into [0, 2] "
+        "on read: 2 above 2, 1 +inf, 0 negative",
+    )
+
+
 # --- File: FMA map, invalid bands (AC-3.6.4, AC-3.6.9) ----------------------------------------
 
 
