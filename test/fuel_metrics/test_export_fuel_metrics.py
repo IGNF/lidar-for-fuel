@@ -159,6 +159,45 @@ def test_compute_fuel_metrics_raster_uses_the_fma_of_each_pixel():
     assert metrics["CLFL"][0, 0] == np.float32(_core(_PROFILE)["CLFL"])
 
 
+def test_compute_fuel_metrics_raster_does_not_swap_fma_can_and_fma_shrub():
+    # fma_can and fma_shrub may be equal (default config). Two different values are used here
+    # only so that a swap of the two arguments would show in the metrics (review of story 3.6)
+    metrics = _compute(_tile(), fma_can=0.3, fma_shrub=0.1)
+
+    # the tile PAD is float32
+    profile = _PROFILE.astype(np.float32)
+    expected = fuel_metrics_core(profile, _H_BOTTOM, 1.0, 0.3, 0.1, **_PARAMS)
+    swapped = fuel_metrics_core(profile, _H_BOTTOM, 1.0, 0.1, 0.3, **_PARAMS)
+    for name, band in metrics.items():
+        np.testing.assert_array_equal(band, np.float32(expected[name]), err_msg=name)
+    # Check of the test data, not of the code: with these values a swap changes the canopy fuel
+    # (fma_can) and the first stratum (fma_shrub)
+    for name in ["CLFL", "FL_k1"]:
+        assert expected[name] != swapped[name], name
+
+
+def test_export_fuel_metrics_does_not_swap_fma_can_and_fma_shrub(tmp_path):
+    # Two different values only to see a swap; fma_can and fma_shrub may be equal
+    pad_path = _write_pad(tmp_path / "tile_pad_profile_1m.tif", _tile())
+
+    out = export_fuel_metrics(pad_path, tmp_path / "out", 0.3, 0.1, **_PARAMS)
+
+    with rasterio.open(out) as dst:
+        result = dict(zip(dst.descriptions, dst.read()))
+    # the written PAD is float32
+    expected = fuel_metrics_core(_PROFILE.astype(np.float32), _H_BOTTOM, 1.0, 0.3, 0.1, **_PARAMS)
+    for name in ["CLFL", "FL_k1"]:
+        np.testing.assert_array_equal(result[name], np.float32(expected[name]), err_msg=name)
+
+
+def test_export_fuel_metrics_fma_error_names_the_tile_and_the_parameter(tmp_path):
+    # The FMA map is the same for every tile: the error must say which tile and which FMA
+    pad_path = _write_pad(tmp_path / "tile_pad_profile_1m.tif", _tile())
+
+    with pytest.raises(ValueError, match=r"^PAD raster .*tile_pad_profile_1m\.tif: fma_shrub: FMA value 0\.6 "):
+        export_fuel_metrics(pad_path, tmp_path / "out", _FMA, 0.6, **_PARAMS)
+
+
 # --- Arrays: edge cases of the I/O matrix (AC-3.6.4, AC-3.6.7, AC-3.6.8) -----------------------
 
 
@@ -250,11 +289,15 @@ def test_compute_fuel_metrics_raster_fma_grid_of_another_shape_raises(shape):
 
 
 @pytest.mark.parametrize(
-    "profile",
-    [np.zeros(8), [0.4, 0, 0, 0, 0, 0, 0, 0]],
+    "profile, crown_nan",
+    [
+        (np.zeros(8), _CROWN),
+        # with surface fuel only, CTH_*, CDH and CBDcan are found; the crown base is not
+        ([0.4, 0, 0, 0, 0, 0, 0, 0], _CROWN - {"CTH_0p0012", "CTH_0p0100", "CDH", "CBDcan"}),
+    ],
     ids=["null profile", "surface fuel only"],
 )
-def test_compute_fuel_metrics_raster_bare_ground_follows_r(profile):
+def test_compute_fuel_metrics_raster_bare_ground_follows_r(profile, crown_nan):
     # AC-3.6.7 (decision of 24/11/2026): no exception nor RuntimeWarning; loads, ladder and
     # ProfType finite; the crown metrics stay NaN, as R
     with warnings.catch_warnings():
@@ -262,12 +305,8 @@ def test_compute_fuel_metrics_raster_bare_ground_follows_r(profile):
         metrics = _compute(_tile(profile=profile))
 
     nan_names = {name for name, band in metrics.items() if np.isnan(band).all()}
-    assert nan_names <= _CROWN
-    assert all(np.isfinite(band).all() for name, band in metrics.items() if name not in _CROWN)
-    for name in ["CLFL", "FL_k1", "FL_k2", "LFL", "CFL", "FSG", "ProfType"]:
-        assert np.isfinite(metrics[name]).all(), name
-    if not np.any(profile):
-        assert nan_names == _CROWN
+    assert nan_names == crown_nan
+    assert all(np.isfinite(band).all() for name, band in metrics.items() if name not in crown_nan)
 
 
 def test_compute_fuel_metrics_raster_caps_the_pad_and_counts_each_kind(caplog):
@@ -361,7 +400,7 @@ def test_export_fuel_metrics_fma_map_nodata_pixel_is_nan(tmp_path, caplog):
 @pytest.mark.parametrize(
     "names",
     [["PAD_1_0", "Cover_2"], [""]],
-    ids=["band not PAD", "no PAD band"],
+    ids=["band not PAD", "unnamed band"],
 )
 def test_export_fuel_metrics_invalid_bands_raise_with_the_file_name(tmp_path, names):
     pad = np.zeros((len(names), 2, 3), dtype=np.float32)

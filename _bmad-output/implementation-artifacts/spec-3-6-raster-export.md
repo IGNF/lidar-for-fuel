@@ -2,7 +2,7 @@
 title: 'Story 3.6 — Application au raster PAD et export GeoTIFF'
 type: 'feature'
 created: '2026-11-24'
-status: 'in-progress'
+status: 'done'
 route: 'dispatch'
 review_loop_iteration: 0
 baseline_commit: '6eb5c094f03a8a0462e885bfa0f7cd07bb4b4c1a'
@@ -88,12 +88,12 @@ Critères de l'épique : AC-3.6.1 à AC-3.6.9 (`docs/epic-3-fuel-metrics.md`, st
 
 Revue du 25/11/2026 (2ᵉ passage, PR #62 : `6eb5c09..0a9d881`) : Blind Hunter (BH), Edge Case Hunter (ECH), Verification Gap (VG), Acceptance Auditor (AA).
 
-- [ ] [Review][Patch] (medium, VG) Aucun test ne détecte une inversion de `fma_can` et `fma_shrub` dans le chemin raster ou fichier : tous les tests d'export passent la même FMA aux deux. Ajouter un test avec `fma_can ≠ fma_shrub` (ex. 0,3 / 0,1), comparé à `fuel_metrics_core` [lidar_for_fuel/fuel_metrics/export_fuel_metrics.py:116]
-- [ ] [Review][Patch] (low, AA+BH) Test sol nu, cas « surface fuel only » : l'ensemble exact des bandes NaN n'est pas vérifié (seulement `⊆ _CROWN`). Il doit valoir CBH, CBHlow, CanBD*, CBD_cbh*. La boucle `for name in ["CLFL", …]` est redondante avec la ligne précédente [test/fuel_metrics/test_export_fuel_metrics.py:257]
-- [ ] [Review][Patch] (low, BH) Une erreur de `read_fma` (carte non alignée, valeurs hors [0,05 ; 0,5] sur la fenêtre de la dalle, CRS) nomme la carte FMA nationale mais pas la dalle PAD. La préfixer par `PAD raster {path}:` comme pour les bandes, et compléter `Raises:` (valeurs hors plage) [lidar_for_fuel/fuel_metrics/export_fuel_metrics.py:221]
-- [ ] [Review][Patch] (low, BH) L'id de test « no PAD band » est trompeur : `[""]` passe par la branche « Band '' is not a PAD band », pas par « no band » (inatteignable par un GeoTIFF). Renommer l'id (ex. « unnamed band ») [test/fuel_metrics/test_export_fuel_metrics.py:331]
-- [ ] [Review][Patch] (low, BH) `deferred-work.md` : l'entrée « valider la FMA donnée par valeur » est rangée sous le titre de la revue de spec-3-2-pad-cap-on-read et double l'entrée existante « FMA > 0 et finies (story 3.7) ». La fusionner avec cette dernière [_bmad-output/implementation-artifacts/deferred-work.md:81]
-- [ ] [Review][Patch] (low, BH) Annotation `band_names: Sequence[str]`, alors que `export_fuel_metrics` passe `src.descriptions`, qui peut contenir `None`. Aligner sur `read_pad_heights` (`Sequence[str | None]`) [lidar_for_fuel/fuel_metrics/export_fuel_metrics.py:36]
+- [x] [Review][Patch] (medium, VG) Aucun test ne détecte une inversion de `fma_can` et `fma_shrub` dans le chemin raster ou fichier : tous les tests d'export passent la même FMA aux deux. Ajouter un test avec `fma_can ≠ fma_shrub` (ex. 0,3 / 0,1), comparé à `fuel_metrics_core` [lidar_for_fuel/fuel_metrics/export_fuel_metrics.py:116]
+- [x] [Review][Patch] (low, AA+BH) Test sol nu, cas « surface fuel only » : l'ensemble exact des bandes NaN n'est pas vérifié (seulement `⊆ _CROWN`). Il doit valoir CBH, CBHlow, CanBD*, CBD_cbh*. La boucle `for name in ["CLFL", …]` est redondante avec la ligne précédente [test/fuel_metrics/test_export_fuel_metrics.py:257]
+- [x] [Review][Patch] (low, BH) Une erreur de `read_fma` (carte non alignée, valeurs hors [0,05 ; 0,5] sur la fenêtre de la dalle, CRS) nomme la carte FMA nationale mais pas la dalle PAD. La préfixer par `PAD raster {path}:` comme pour les bandes, et compléter `Raises:` (valeurs hors plage) [lidar_for_fuel/fuel_metrics/export_fuel_metrics.py:221]
+- [x] [Review][Patch] (low, BH) L'id de test « no PAD band » est trompeur : `[""]` passe par la branche « Band '' is not a PAD band », pas par « no band » (inatteignable par un GeoTIFF). Renommer l'id (ex. « unnamed band ») [test/fuel_metrics/test_export_fuel_metrics.py:331]
+- [x] [Review][Patch] (low, BH) `deferred-work.md` : l'entrée « valider la FMA donnée par valeur » est rangée sous le titre de la revue de spec-3-2-pad-cap-on-read et double l'entrée existante « FMA > 0 et finies (story 3.7) ». La fusionner avec cette dernière [_bmad-output/implementation-artifacts/deferred-work.md:81]
+- [x] [Review][Patch] (low, BH) Annotation `band_names: Sequence[str]`, alors que `export_fuel_metrics` passe `src.descriptions`, qui peut contenir `None`. Aligner sur `read_pad_heights` (`Sequence[str | None]`) [lidar_for_fuel/fuel_metrics/export_fuel_metrics.py:36]
 - [x] [Review][Defer] (low, VG) `pad_max` n'est jamais passé avec une valeur autre que 5 : un oubli de transmission resterait invisible [lidar_for_fuel/fuel_metrics/export_fuel_metrics.py:231] — deferred: `pad_max` n'est pas encore exposé dans la config ; le test vient avec la story 3.7
 - [x] [Review][Defer] (low, ECH) Une carte FMA contenant ±inf passe le contrôle de plage de `read_fma` (filtré par `isfinite`) et donne des CBD fausses, sans log [lidar_for_fuel/fuel_metrics/prepare_cbd_profile.py:197] — deferred: pré-existant (`read_fma`, story 3.2) ; à traiter avec la validation des FMA en 3.7
 - [x] [Review][Defer] (low, ECH) FMA donnée par valeur inf, nulle ou négative, acceptée sans erreur [lidar_for_fuel/fuel_metrics/export_fuel_metrics.py:221] — deferred: pré-existant et déjà reporté (« FMA > 0 et finies », story 3.7)

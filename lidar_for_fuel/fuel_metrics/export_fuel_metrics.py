@@ -33,7 +33,7 @@ _PAD_RASTER_SUFFIX = "_pad_profile_1m"
 
 def compute_fuel_metrics_raster(
     pad: np.ndarray,
-    band_names: Sequence[str],
+    band_names: Sequence[str | None],
     fma_can: np.ndarray,
     fma_shrub: np.ndarray,
     smooth_pad: bool,
@@ -201,8 +201,10 @@ def export_fuel_metrics(
         Path: Path of the fuel metrics GeoTIFF written.
 
     Raises:
-        ValueError: If a band of the PAD raster is not a `PAD_{dz}_{h_bottom}` band (the
-            message gives the file name), or if the FMA map does not fit the PAD grid.
+        ValueError: If a band of the PAD raster is not a `PAD_{dz}_{h_bottom}` band, if a FMA
+            value is outside [0.05, 0.5], or if the FMA map does not fit the PAD grid (CRS,
+            resolution, alignment) or has values outside [0.05, 0.5] on it. The message gives
+            the PAD raster name, and the FMA parameter (`fma_can` or `fma_shrub`) for a FMA error.
     """
     pad_path = Path(pad_path)
     with rasterio.open(pad_path) as src:
@@ -215,11 +217,19 @@ def export_fuel_metrics(
         pad = src.read(masked=True).astype(float).filled(np.nan)
         transform, crs, shape = src.transform, src.crs, src.shape
 
+    # A FMA map is the same for every tile: the error names the tile and the parameter
+    fma = {}
+    for key, value in (("fma_can", fma_can), ("fma_shrub", fma_shrub)):
+        try:
+            fma[key] = read_fma(value, transform, shape, crs)
+        except ValueError as error:
+            raise ValueError(f"PAD raster {pad_path}: {key}: {error}") from error
+
     metrics = compute_fuel_metrics_raster(
         pad,
         band_names,
-        read_fma(fma_can, transform, shape, crs),
-        read_fma(fma_shrub, transform, shape, crs),
+        fma["fma_can"],
+        fma["fma_shrub"],
         smooth_pad=smooth_pad,
         ladder_fuel_bd_thresholds=ladder_fuel_bd_thresholds,
         canopy_height_threshold=canopy_height_threshold,

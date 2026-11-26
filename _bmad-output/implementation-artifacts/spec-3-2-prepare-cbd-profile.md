@@ -14,7 +14,7 @@ context:
 
 ## Intent
 
-**Problem :** L'étape 3 (portage de `ffuelmetrics2`) a besoin d'une couche d'entrée. Elle doit lire les bandes `PAD_{dz}_{h_bas}` d'un raster PAD (où elles sont mêlées à d'autres bandes) et transformer un profil PAD vertical en profil CBD, comme le fait l'étape 1 de l'algorithme R. Elle doit aussi choisir le seuil d'échelle par défaut selon la règle de la PR #48. Les stories 3.3 et 3.4 s'appuient sur cette couche.
+**Problem :** L'étape 3 (portage de `ffuelmetrics2`) a besoin d'une couche d'entrée. Elle doit lire les bandes `PAD_{dz}_{h_bas}` du raster `{stem}_pad_profile_1m.tif`, qui ne contient que des bandes `PAD_*`, et transformer un profil PAD vertical en profil CBD, comme le fait l'étape 1 de l'algorithme R. Elle doit aussi choisir le seuil d'échelle par défaut selon la règle de la PR #48. Les stories 3.3 et 3.4 s'appuient sur cette couche.
 
 **Approach :** Créer le module `lidar_for_fuel/fuel_metrics/prepare_cbd_profile.py` avec quatre fonctions pures, développées en TDD dans `test/fuel_metrics/test_prepare_cbd_profile.py` :
 1. lecture des strates PAD à partir des noms de bandes ;
