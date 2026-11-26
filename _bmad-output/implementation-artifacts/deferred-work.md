@@ -5,7 +5,7 @@
   evidence: Vérifié avec Rscript, `which.min(abs(s - median(s)))` renvoie 0.05 pour les deux ordres de liste, car il n'y a pas d'égalité exacte en double précision. Le code et les tests suivent R. Comme l'épique est une spec, sa correction revient à l'utilisatrice.
 - source_spec: `_bmad-output/implementation-artifacts/spec-3-2-prepare-cbd-profile.md`
   summary: **Traité le 25/11/2026 (spec-3-7-main-fuel-metrics : `validate_fuel_metrics_params` au démarrage de `main_fuel_metrics` pour les seuils et `bd_max` ; FMA donnée en valeur contrôlée par `read_fma`, dans [0,05 ; 0,5]).** Valider les paramètres scientifiques de la section `fuel_metrics` de la config au démarrage : FMA > 0 et finies, `bd_max` > 0, seuils non vides, finis et positifs (story 3.7).
-  evidence: Le périmètre de la story 3.2 mentionne une « validation des paramètres ». Pourtant, `select_default_ladder_threshold([nan, …])` renvoie le premier seuil sans erreur, et `compute_cbd` accepte des FMA négatives. Ces valeurs viennent de la config, que la story 3.7 lit. *(24/11/2026 : l'avertissement d'équivalence AC-3.7.3 est retiré ; cette validation reste à faire à la lecture de la config.)*
+  evidence: Le périmètre de la story 3.2 mentionne une « validation des paramètres ». Pourtant, `select_default_ladder_threshold([nan, …])` renvoie le premier seuil sans erreur, et `compute_cbd` accepte des FMA négatives. Ces valeurs viennent de la config, que la story 3.7 lit. *(24/11/2026 : l'avertissement d'équivalence AC-3.7.3 est retiré ; cette validation reste à faire à la lecture de la config.)* *(25/11/2026, revue de la 3.6, Edge Case Hunter : `read_fma` ne contrôlait pas une FMA donnée par valeur (« no check here ») ; une FMA négative ou nulle donnait des CBD et des charges fausses, écrites sans erreur. Entrée fusionnée ici, elle était rangée en double sous la revue de spec-3-2-pad-cap-on-read.)*
 - source_spec: `_bmad-output/implementation-artifacts/spec-3-2-prepare-cbd-profile.md`
   summary: Décider en story 3.4 quoi faire si le premier `h_bottom` n'est pas 0, puisque `FL_k1` et `FL_k2` supposent que la première strate commence au sol.
   evidence: `parse_pad_strata` vérifie que le profil est régulier (même `dz`, ni doublon ni trou), mais pas son point de départ. R calcule `FL_k1 = CBD[1]·dz` sans le vérifier. Imposer 0 dès la story 3.2 risquerait de diverger de R avec un `z0` non nul.
@@ -78,10 +78,6 @@
 
 - **Traité le 24/11/2026 (spec-3-6-raster-export) : `compute_fuel_metrics_raster` compte à part, avant `cap_pad`, les valeurs finies > 5, les +inf et les négatifs dans le log de fin de dalle (AC-3.6.8).** ~~Story 3.6~~ — `cap_pad` donne un seul compte pour les valeurs > 5, les +inf (anomalie A6 : CBD min(5 × FMA, `bd_max`) au lieu de 0) et les négatifs ; l'AC-3.6.8 réécrite ne compte plus à part les inf et les négatifs. Raison du report : le log par dalle naît en 3.6 : l'appelant comptera les +inf avant `cap_pad`, sans changer sa signature d'ici là.
 
-- source_spec: `_bmad-output/implementation-artifacts/spec-3-6-raster-export.md`
-  summary: **Traité le 25/11/2026 (spec-3-7-main-fuel-metrics : `read_fma`).** Story 3.7 — valider la FMA donnée par valeur (`fma_can`, `fma_shrub` de la config) : finie et dans [0,05 ; 0,5] kg/m², comme la carte FMA.
-  evidence: Revue du 25/11/2026 (Edge Case Hunter). `read_fma` ne contrôle pas une valeur (« no check here ») : une FMA négative ou nulle donnerait des CBD et des charges fausses, écrites sans erreur. C'est pré-existant ; la valeur vient de la config, lue en 3.7.
-
 ## Deferred from: code review of spec-3-6-raster-export (2026-11-25)
 
 - **Traité le 25/11/2026 (spec-3-7-main-fuel-metrics : `test_export_fuel_metrics_passes_pad_max_on_to_the_cap`).** `pad_max` n'est jamais passé avec une valeur autre que 5 dans les tests d'export : un oubli de transmission (`export_fuel_metrics` → `compute_fuel_metrics_raster` → `cap_pad`) resterait invisible. Story 3.7 : ajouter le test (ex. `pad_max=2.0` par `export_fuel_metrics`, comptes et valeurs plafonnées) quand `pad_max` entre dans la config.
@@ -93,5 +89,5 @@
 ## Deferred from: code review of spec-3-7-main-fuel-metrics (2026-11-26)
 
 - source_spec: `_bmad-output/implementation-artifacts/spec-3-7-main-fuel-metrics.md`
-  summary: Une carte FMA dont les valeurs ne sont hors de [0,05 ; 0,5] que sur la fenêtre d'une dalle tardive arrête le lancement au milieu, avec une erreur qui ne nomme ni la clé (`fma_can`, `fma_shrub`) ni la dalle PAD.
+  summary: **Traité le 26/11/2026 (branche `feat/ffuelmetrics2_raster_export_review`, action n° 3 de la revue 3.6) : `export_fuel_metrics` préfixe les erreurs de `read_fma` par `PAD raster {path}: {fma_can|fma_shrub}:`.** Une carte FMA dont les valeurs ne sont hors de [0,05 ; 0,5] que sur la fenêtre d'une dalle tardive arrête le lancement au milieu, avec une erreur qui ne nomme ni la clé (`fma_can`, `fma_shrub`) ni la dalle PAD.
   evidence: Revue du 26/11/2026 (Edge Case Hunter). `read_fma` ne contrôle que la fenêtre de la dalle. L'arrêt est voulu (pas de reprise sur erreur, comme l'étape 2), mais le message ne nomme que la carte nationale. Le nom de la dalle est l'action n° 3 de la revue de la 3.6 (préfixe `PAD raster {path}:` sur les erreurs de `read_fma`) : à traiter avec elle, en y ajoutant la clé si possible.
