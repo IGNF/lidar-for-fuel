@@ -20,9 +20,9 @@ from lidar_for_fuel.fuel_metrics.prepare_cbd_profile import (
     PAD_MAX,
     PAD_MIN,
     cap_pad,
-    read_fma,
     read_pad_heights,
 )
+from lidar_for_fuel.fuel_metrics.read_fma import read_fma
 from lidar_for_fuel.pad_profile.export_raster import _write_geotiff
 
 logger = logging.getLogger(__name__)
