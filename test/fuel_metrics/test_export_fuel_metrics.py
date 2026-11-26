@@ -159,8 +159,9 @@ def test_compute_fuel_metrics_raster_uses_the_fma_of_each_pixel():
     assert metrics["CLFL"][0, 0] == np.float32(_core(_PROFILE)["CLFL"])
 
 
-def test_compute_fuel_metrics_raster_keeps_fma_can_and_fma_shrub_apart():
-    # Distinct FMA: swapping fma_can and fma_shrub would change the metrics (review of story 3.6)
+def test_compute_fuel_metrics_raster_does_not_swap_fma_can_and_fma_shrub():
+    # fma_can and fma_shrub may be equal (default config). Two different values are used here
+    # only so that a swap of the two arguments would show in the metrics (review of story 3.6)
     metrics = _compute(_tile(), fma_can=0.3, fma_shrub=0.1)
 
     # the tile PAD is float32
@@ -169,11 +170,14 @@ def test_compute_fuel_metrics_raster_keeps_fma_can_and_fma_shrub_apart():
     swapped = fuel_metrics_core(profile, _H_BOTTOM, 1.0, 0.1, 0.3, **_PARAMS)
     for name, band in metrics.items():
         np.testing.assert_array_equal(band, np.float32(expected[name]), err_msg=name)
-    for name in ["CLFL", "FL_k1"]:  # canopy fuel (fma_can) and first stratum (fma_shrub)
+    # Check of the test data, not of the code: with these values a swap changes the canopy fuel
+    # (fma_can) and the first stratum (fma_shrub)
+    for name in ["CLFL", "FL_k1"]:
         assert expected[name] != swapped[name], name
 
 
-def test_export_fuel_metrics_keeps_fma_can_and_fma_shrub_apart(tmp_path):
+def test_export_fuel_metrics_does_not_swap_fma_can_and_fma_shrub(tmp_path):
+    # Two different values only to see a swap; fma_can and fma_shrub may be equal
     pad_path = _write_pad(tmp_path / "tile_pad_profile_1m.tif", _tile())
 
     out = export_fuel_metrics(pad_path, tmp_path / "out", 0.3, 0.1, **_PARAMS)
