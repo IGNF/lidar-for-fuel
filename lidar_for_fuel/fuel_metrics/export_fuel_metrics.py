@@ -4,7 +4,7 @@ Fuel metrics of a whole tile, from its `{stem}_pad_profile_1m.tif` PAD raster to
 - `compute_fuel_metrics_raster`: on arrays, caps the PAD (`cap_pad`), applies
   `fuel_metrics_core` pixel by pixel and logs what was corrected;
 - `export_fuel_metrics`: on files, reads the PAD raster and the FMA (value or map), calls the
-  former and writes the GeoTIFF on the grid of the PAD raster (`_write_geotiff`).
+  former and writes the GeoTIFF on the grid of the PAD raster (`write_geotiff`).
 """
 
 import logging
@@ -15,6 +15,7 @@ from pathlib import Path
 import numpy as np
 import rasterio
 
+from lidar_for_fuel.commons.write_geotiff import write_geotiff
 from lidar_for_fuel.fuel_metrics.calculate_fuel_metrics import fuel_metrics_core
 from lidar_for_fuel.fuel_metrics.prepare_cbd_profile import (
     PAD_MAX,
@@ -23,7 +24,6 @@ from lidar_for_fuel.fuel_metrics.prepare_cbd_profile import (
     read_pad_heights,
 )
 from lidar_for_fuel.fuel_metrics.read_fma import read_fma
-from lidar_for_fuel.pad_profile.export_raster import _write_geotiff
 
 logger = logging.getLogger(__name__)
 
@@ -244,7 +244,7 @@ def export_fuel_metrics(
     stem = pad_path.stem.removesuffix(_PAD_RASTER_SUFFIX)
     out_path = Path(output_dir) / f"{stem}_fuel_metrics.tif"
     # The CRS is passed as read: the R reference one is a LOCAL_CS without EPSG code
-    _write_geotiff(out_path, metrics, transform, crs)
+    write_geotiff(out_path, metrics, transform, crs)
     logger.info("Wrote fuel metrics (%d bands) to %s", len(metrics), out_path)
 
     return out_path

@@ -8,9 +8,9 @@ import rasterio
 from affine import Affine
 from hydra import compose, initialize
 
+from lidar_for_fuel.commons.write_geotiff import write_geotiff
 from lidar_for_fuel.fuel_metrics.export_fuel_metrics import export_fuel_metrics
 from lidar_for_fuel.main_fuel_metrics import main
-from lidar_for_fuel.pad_profile.export_raster import _write_geotiff
 
 # R (lidarforfuel) PAD raster of a 500 m tile (story 3.1): 186 bands, only its PAD_1_* bands
 # make a valid step 3 input
@@ -33,7 +33,7 @@ def _write_reference_pad(path):
         names = [src.descriptions[i - 1] for i in bands]
         pad = src.read(bands)
         transform, crs = src.transform, src.crs
-    _write_geotiff(path, dict(zip(names, pad)), transform, crs)
+    write_geotiff(path, dict(zip(names, pad)), transform, crs)
     return path
 
 
@@ -41,7 +41,7 @@ def _write_small_pad(path):
     """Write a 2 x 3 PAD raster of 8 strata of 1 m."""
     profile = np.array([0.05, 0.05, 0.03, 0.03, 0.0, 0.2, 0.3, 0.1], dtype=np.float32)
     pad = np.repeat(profile[:, None, None], 6, axis=1).reshape(-1, 2, 3)
-    _write_geotiff(path, {f"PAD_1_{h}": band for h, band in enumerate(pad)}, _TRANSFORM, _CRS)
+    write_geotiff(path, {f"PAD_1_{h}": band for h, band in enumerate(pad)}, _TRANSFORM, _CRS)
     return path
 
 
@@ -54,7 +54,7 @@ def test_main_fuel_metrics_processes_the_pad_rasters_of_a_folder(tmp_path, caplo
     for stem in ["512500_6854997", "513000_6854997"]:
         _write_reference_pad(input_dir / f"{stem}_pad_profile_1m.tif")
     # Another raster written by step 2 in the same folder: not a step 3 input
-    _write_geotiff(input_dir / "512500_6854997_cover.tif", {"Cover_2": np.zeros((2, 3))}, _TRANSFORM, _CRS)
+    write_geotiff(input_dir / "512500_6854997_cover.tif", {"Cover_2": np.zeros((2, 3))}, _TRANSFORM, _CRS)
 
     with caplog.at_level(logging.INFO):
         main(_config(f"io.input_dir={input_dir}", f"io.output_dir={output_dir}"))
@@ -92,7 +92,7 @@ def test_main_fuel_metrics_processes_only_the_input_filename(tmp_path):
 def test_main_fuel_metrics_folder_without_pad_raster_logs_a_warning(tmp_path, caplog):
     input_dir, output_dir = tmp_path / "in", tmp_path / "out"
     input_dir.mkdir()
-    _write_geotiff(input_dir / "a_cover.tif", {"Cover_2": np.zeros((2, 3))}, _TRANSFORM, _CRS)
+    write_geotiff(input_dir / "a_cover.tif", {"Cover_2": np.zeros((2, 3))}, _TRANSFORM, _CRS)
 
     with caplog.at_level(logging.INFO):
         main(_config(f"io.input_dir={input_dir}", f"io.output_dir={output_dir}"))

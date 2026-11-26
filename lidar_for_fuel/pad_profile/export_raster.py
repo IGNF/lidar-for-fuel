@@ -9,10 +9,9 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-import rasterio
 from affine import Affine
-from rasterio.crs import CRS
 
+from lidar_for_fuel.commons.write_geotiff import write_geotiff
 from lidar_for_fuel.pad_profile.calculate_pad_profile import _format_num
 
 logger = logging.getLogger(__name__)
@@ -96,41 +95,6 @@ def _band_array(values: pd.Series, origin_pixel: tuple, nb_pixels: int, clip: tu
     return array
 
 
-def _write_geotiff(path: Path, bands: dict[str, np.ndarray], transform: Affine, srid: str | CRS) -> None:
-    """Write one multi-band GeoTIFF.
-
-    Args:
-        path (Path): Output file path. Parent directories are created if missing.
-        bands (dict[str, np.ndarray]): Band name -> (height, width) float32 array,
-            written in dict order (band 1 first).
-        transform (Affine): Georeferencing transform (see `_raster_transform`).
-        srid (str | CRS): Spatial reference of the output raster (e.g. "EPSG:2154"), or the
-            CRS of an input raster.
-
-    Returns:
-        None
-    """
-    path.parent.mkdir(parents=True, exist_ok=True)
-
-    height, width = next(iter(bands.values())).shape
-
-    with rasterio.open(
-        path,
-        "w",
-        driver="GTiff",
-        height=height,
-        width=width,
-        count=len(bands),
-        dtype="float32",
-        crs=srid,
-        transform=transform,
-        nodata=np.nan,
-    ) as dst:
-        for band_index, (name, array) in enumerate(bands.items(), start=1):
-            dst.write(array, band_index)
-            dst.set_band_description(band_index, name)
-
-
 def export_raster(
     aggregated: pd.DataFrame,
     origin_pixel: tuple,
@@ -207,7 +171,7 @@ def export_raster(
         clip = raster_clip[raster_name]
         bands = {name: _band_array(aggregated[name], origin_pixel, nb_pixels, clip=clip) for name in columns}
         path = output_dir / f"{tile_stem}_{raster_name}.tif"
-        _write_geotiff(path, bands, transform, srid)
+        write_geotiff(path, bands, transform, srid)
         written[raster_name] = path
         logger.info("Wrote %s (%d bands) to %s", raster_name, len(bands), path)
 

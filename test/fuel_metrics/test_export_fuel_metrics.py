@@ -7,12 +7,12 @@ import pytest
 import rasterio
 from affine import Affine
 
+from lidar_for_fuel.commons.write_geotiff import write_geotiff
 from lidar_for_fuel.fuel_metrics.calculate_fuel_metrics import fuel_metrics_core
 from lidar_for_fuel.fuel_metrics.export_fuel_metrics import (
     compute_fuel_metrics_raster,
     export_fuel_metrics,
 )
-from lidar_for_fuel.pad_profile.export_raster import _write_geotiff
 
 _REF_DIR = Path(__file__).resolve().parents[2] / "data/ref_inrae"
 # R (lidarforfuel) PAD raster of a 500 m tile (story 3.1) and its fuel metrics computed by
@@ -80,7 +80,7 @@ def _core(profile, fma=_FMA):
 
 
 def _write_pad(path, pad, names=_NAMES, transform=_TRANSFORM, crs=_CRS):
-    _write_geotiff(path, dict(zip(names, pad)), transform, crs)
+    write_geotiff(path, dict(zip(names, pad)), transform, crs)
     return path
 
 
@@ -405,7 +405,7 @@ def test_export_fuel_metrics_fma_map_nodata_pixel_is_nan(tmp_path, caplog):
 def test_export_fuel_metrics_invalid_bands_raise_with_the_file_name(tmp_path, names):
     pad = np.zeros((len(names), 2, 3), dtype=np.float32)
     path = tmp_path / "bad_pad_profile_1m.tif"
-    _write_geotiff(path, {f"b{i}": band for i, band in enumerate(pad)}, _TRANSFORM, _CRS)
+    write_geotiff(path, {f"b{i}": band for i, band in enumerate(pad)}, _TRANSFORM, _CRS)
     with rasterio.open(path, "r+") as dst:
         for index, name in enumerate(names, start=1):
             dst.set_band_description(index, name)
