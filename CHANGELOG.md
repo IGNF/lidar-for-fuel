@@ -1,7 +1,13 @@
 # not yet released
 - Add fuel metrics computation (step 3):
     - Add function "read FMA" as a single value or from an FMA map; a value or a map value must be in [0.05, 0.5] kg/m²
+    - Add function "read PAD heights" from the PAD band names
     - Add function "prepare PAD profile" (invalid values set to 0, optional 3-strata smoothing)
+    - Add function "cap PAD": the PAD bands read from pad_profile_1m are brought back into [0, pad_max] (values above pad_max and +inf set to pad_max, negative values set to 0); R does not cap
+    - Add function "compute CBD" (PAD x FMA, capped at bd_max)
+    - Add function "select default ladder threshold" (threshold closest to the median)
+    - Add function "compute canopy metrics" (CTH, CDH, CBH, CBH2, CBHlow, CanBD*, CBDcan, CBD_cbh, CBD_cbh2, CBD_cbhlow)
+
 
 # v0.3.0
 - Fix outliers : Classify statistical outliers using height above ground without removing points, and assign in classe "18"
