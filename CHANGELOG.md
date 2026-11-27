@@ -10,6 +10,7 @@
     - Add function "compute ladder metrics" (LadderBot, LadderTop, LadderLoad, SFLeq0, SFLeq_intot, ProfType, CFL, FSG for each ladder threshold)
     - Add function "fuel metrics core": fuel loads (CLFL, FL_k1, FL_k2), default ladder metrics (LFL, CFL, FSG, ProfType) and all metrics with the band names and order; a pixel with no data (PAD all NaN, or no FMA) gets NaN on all metrics, instead of the zero loads and ProfType 1 of R.
     - Add function "export fuel metrics": reads a pad_profile_1m raster and the FMA (value or map), caps the PAD on read, computes the fuel metrics pixel by pixel and writes {stem}_fuel_metrics.tif on the same grid (one float32 band per metric); logs per tile the no-data pixels, the partly NaN profiles set to 0 and the PAD values capped; a FMA error names the PAD raster and the FMA parameter
+    - Add main script "main_fuel_metrics" (Hydra, as main_pad_profile): computes the fuel metrics of a pad_profile_1m raster ("io.input_filename") or of every *_pad_profile_1m.tif of "io.input_dir", with the "fuel_metrics" section of the config, and writes one {stem}_fuel_metrics.tif per tile in "io.output_dir"; 
 
 # v0.3.0
 - Fix outliers : Classify statistical outliers using height above ground without removing points, and assign in classe "18"
