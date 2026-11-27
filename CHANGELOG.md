@@ -1,6 +1,7 @@
 # not yet released
 - Add fuel metrics computation (step 3):
     - Add function "read FMA" as a single value or from an FMA map; a value or a map value must be in [0.05, 0.5] kg/m²
+    - Add function "prepare PAD profile" (invalid values set to 0, optional 3-strata smoothing)
 
 # v0.3.0
 - Fix outliers : Classify statistical outliers using height above ground without removing points, and assign in classe "18"
