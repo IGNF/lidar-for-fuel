@@ -7,6 +7,8 @@
     - Add function "compute CBD" (PAD x FMA, capped at bd_max)
     - Add function "select default ladder threshold" (threshold closest to the median)
     - Add function "compute canopy metrics" (CTH, CDH, CBH, CBH2, CBHlow, CanBD*, CBDcan, CBD_cbh, CBD_cbh2, CBD_cbhlow)
+    - Add function "compute ladder metrics" (LadderBot, LadderTop, LadderLoad, SFLeq0, SFLeq_intot, ProfType, CFL, FSG for each ladder threshold)
+    - Add function "fuel metrics core": fuel loads (CLFL, FL_k1, FL_k2), default ladder metrics (LFL, CFL, FSG, ProfType) and all metrics with the band names and order; a pixel with no data (PAD all NaN, or no FMA) gets NaN on all metrics, instead of the zero loads and ProfType 1 of R.
 
 
 # v0.3.0
